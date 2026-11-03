@@ -24,6 +24,16 @@ async function page(title:string):Promise<WikiDrops>{
  if(memory.size>300)memory.delete(memory.keys().next().value!);memory.set(title,{at:Date.now(),data:result});return result;})();
  pending.set(title,work);try{return await work;}finally{pending.delete(title);}
 }
+let logNames:Set<string>|null=null;
+/** The drops worth noting on these tables, lower-case, for a guide's drop table to mark: collection log items at 1/50 or
+ * rarer (the pet, the uniques, rare log slots). Log slots that come often (Mole claw, Zul-andra teleport) stay plain; a log
+ * item with no known rate counts as rare. */
+function notableDrops(sources:DropSource[]):string[]{
+ logNames??=new Set(Object.values(names as Record<string,string>).map(n=>n.toLowerCase()));
+ const log=sources.flatMap(s=>s.tabs.flatMap(t=>t.r)).filter(r=>logNames!.has(r[0].toLowerCase()));
+ const common=new Set(log.filter(r=>r[3]!=null&&r[3]>1/50+1e-9).map(r=>r[0].toLowerCase()));
+ return [...new Set(log.map(r=>r[0].toLowerCase()))].filter(n=>!common.has(n));
+}
 export async function GET(req:Request){try{
  const url=new URL(req.url);
  // Source search for the guide editor: boss and activity pages by name, then pages holding a matching drop or pet.
@@ -33,7 +43,7 @@ export async function GET(req:Request){try{
   const seen=new Set(pages.map(p=>p.page)),drops:{page:string;match:string;img:string}[]=[];
   for(const [page,sources] of Object.entries(ix.pages)){if(seen.has(page)||drops.length>=12)continue;for(const row of sources.flatMap(s=>s.tabs.flatMap(t=>t.r))){if(rank(row[0])<2){drops.push({page,match:row[0],img:row[4]});break;}}}
   return Response.json({results:[...pages,...drops].slice(0,20)},{headers:{'Cache-Control':'public, max-age=3600'}});}
- if(url.searchParams.has('page')){const name=url.searchParams.get('page')??'';const ids=(url.searchParams.get('items')??'').split(',').filter(Boolean).slice(0,400);const ix=index as unknown as Index;const sources=applyTableRates(refreshActivityRates(ix.pages[name]??[],names,acquisition as Record<string,CollectionReference>),await reviewedRates());const items=collectionItemRates(sources,ids,names,acquisition as Record<string,CollectionReference>);return Response.json({sources,items},{headers:{'Cache-Control':'private, max-age=60'}});}
+ if(url.searchParams.has('page')){const name=url.searchParams.get('page')??'';const ids=(url.searchParams.get('items')??'').split(',').filter(Boolean).slice(0,400);const ix=index as unknown as Index;const sources=applyTableRates(refreshActivityRates(ix.pages[name]??[],names,acquisition as Record<string,CollectionReference>),await reviewedRates());const items=collectionItemRates(sources,ids,names,acquisition as Record<string,CollectionReference>);return Response.json({sources,items,notable:notableDrops(sources)},{headers:{'Cache-Control':'private, max-age=60'}});}
  if(url.searchParams.has('ids')){const ids=(url.searchParams.get('ids')??'').split(',').slice(0,200);const rates=collectionItemRates([],ids,names,acquisition as Record<string,CollectionReference>);return Response.json(Object.fromEntries(Object.entries(rates).map(([id,rate])=>[id,rate.r])),{headers:{'Cache-Control':'private, max-age=86400'}});}
  const id=url.searchParams.get('id')??'',name=(names as Record<string,string>)[id];if(!name)return Response.json({error:'Unknown collection item.'},{status:400});
  const item=(acquisition as Record<string,CollectionReference>)[id] ?? await page(name),source=url.searchParams.get('source');

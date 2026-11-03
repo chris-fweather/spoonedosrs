@@ -68,6 +68,11 @@ try{
  const held=await call('/api/staff/cases',m,{action:'create',username:rsn2,operation:'unlink',reason});
  const row=(await sql('SELECT state,reviewer_id FROM staff_cases WHERE id=?',[held.id]))[0];assert.equal(row.state,'approved');assert.equal(row.reviewer_id,mod);
  assert.equal((await sql('SELECT * FROM claimed_names WHERE rsn=?',[rsn2])).length,0);assert.match((await sql('SELECT discord_id FROM profile_link_owners WHERE rsn=?',[rsn2]))[0].discord_id,/^moderation-hold:/);
+ // A request opened by a higher rank is decided by that rank or above: a moderator never approves or rejects an admin's request.
+ const adminRelease=await call('/api/staff/cases',a,{action:'create',username:rsn2,operation:'release',reason});
+ for(const decision of ['approved','rejected'])await call('/api/staff/cases',m,{...approve,id:adminRelease.id,decision},403);
+ assert.equal((await call('/api/staff/cases?id='+adminRelease.id,m)).canReview,false);
+ assert.equal((await sql('SELECT state FROM staff_cases WHERE id=?',[adminRelease.id]))[0].state,'pending');
  console.log('PASS: CSRF/auth, helper and moderator limits, changed protection thresholds, unknown destination ID, no self-approval, atomic transfer, private-note isolation, old-owner revocation, admin progress confirmation/revision/audit, unlink hold, hold release and immediate holds under the Hold names permission.');
 }finally{
  for(const table of ['transfer_private_archives'])await sql(`DELETE FROM ${table} WHERE case_id IN (SELECT id FROM staff_cases WHERE rsn=?)`,[rsn]);

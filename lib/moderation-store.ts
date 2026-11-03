@@ -1,4 +1,4 @@
-import type {StaffRole} from './staff-policy';
+import {proposerRankGuard,type StaffRole} from './staff-policy';
 import {accountName,db,sameOrigin} from './storage';
 import {staffPeople} from './staff-people';
 import {HttpError} from './auth';
@@ -8,6 +8,7 @@ import {canSubmitCase,canReviewCase,protectionReasons,validDiscordId} from './mo
 import records from './petcord-driest.json';
 import {takeBudget} from './request-controls';
 import type {Journal} from './model';
+import {notificationStatement} from './notifications';
 
 type Actor=Awaited<ReturnType<typeof requireStaff>>;
 const creatorRole=async(id:string)=>(await db().prepare('SELECT role FROM staff_members WHERE discord_id=?').bind(id).first<{role:StaffRole}>())?.role??null;
@@ -108,7 +109,7 @@ type Checked=Awaited<ReturnType<typeof moderationSnapshot>>;
 async function decide(item:Case,s:Checked,actor:Actor,decision:'approved'|'rejected',note:string,now:string){
  const database=db(),body={decision};
  const token=crypto.randomUUID(),g=guard(s,actor),gate='EXISTS(SELECT 1 FROM staff_cases WHERE id=? AND execution_token=?)';
- const writes=[database.prepare(`UPDATE staff_cases SET state=?,reviewer_id=?,reviewed_at=?,execution_token=?,protected=? WHERE id=? AND state='pending' AND ${g.sql}`).bind(body.decision,actor.id,now,token,+(!!item.protected||s.protected),item.id,...g.values)];
+ const writes=[database.prepare(`UPDATE staff_cases SET state=?,reviewer_id=?,reviewed_at=?,execution_token=?,protected=? WHERE id=? AND state='pending' AND ${g.sql} AND ${proposerRankGuard('staff_cases.creator_id','?')}`).bind(body.decision,actor.id,now,token,+(!!item.protected||s.protected),item.id,...g.values,actor.role)];
  const stmt=(sql:string,...values:(string|number|null)[])=>database.prepare(sql).bind(...values,item.id,token);
  if(body.decision==='approved'){
   if(item.action==='relink'){
@@ -124,8 +125,16 @@ async function decide(item:Case,s:Checked,actor:Actor,decision:'approved'|'rejec
    writes.push(stmt(`INSERT INTO claimed_names(rsn,display_name,discord_id,claimed_at) SELECT ?,?,?,? WHERE ${gate} ON CONFLICT(rsn) DO UPDATE SET discord_id=excluded.discord_id,claimed_at=excluded.claimed_at`,item.rsn,item.rsn,item.target_id,Date.now()));
    // Donation attribution stays with the original Discord identity, archived in a restricted audit entry.
    writes.push(stmt(`INSERT INTO account_actions(rsn,case_id,actor_id,action,detail,created_at) SELECT rsn,?,?, 'donor attribution reset',json_object('from',?,'amount',amount_minor,'currency',currency),? FROM profile_supporter_totals WHERE rsn=? AND ${gate}`,item.id,actor.id,item.source_id,now,item.rsn));
+   // Donations to the name stop supporting it; a donor who gave while signed in can move theirs to another of their names.
+   writes.push(stmt(`UPDATE donations SET target_rsn=NULL,updated_at=? WHERE target_rsn=? AND ${gate}`,Date.now(),item.rsn));
    writes.push(stmt(`DELETE FROM profile_supporter_totals WHERE rsn=? AND ${gate}`,item.rsn));
    writes.push(stmt(`DELETE FROM profile_presentation WHERE rsn=? AND ${gate}`,item.rsn));
+   // Plugin verification follows the decision: game accounts the new owner's plugin saw under this name are bound to
+   // them; any other binding under this name is cleared, so the old owner's proof no longer locks it.
+   const at=Date.now();
+   writes.push(stmt(`INSERT INTO plugin_account_owners(account_key,discord_id,rsn,rsn_at_binding,bound_at,updated_at) SELECT account_key,?,?,?,?,? FROM plugin_accounts WHERE rsn=? AND discord_id=? AND ${gate}
+    ON CONFLICT(account_key) DO UPDATE SET discord_id=excluded.discord_id,rsn=excluded.rsn,rsn_at_binding=excluded.rsn_at_binding,bound_at=excluded.bound_at,updated_at=excluded.updated_at`,item.target_id,item.rsn,item.rsn,at,at,item.rsn,item.target_id));
+   writes.push(stmt(`DELETE FROM plugin_account_owners WHERE rsn=? AND discord_id<>? AND ${gate}`,item.rsn,item.target_id));
   }else if(item.action==='release'){
    // The hold ends: the name is free for its owner to link again, and the hold's private setting is lifted.
    writes.push(stmt(`DELETE FROM profile_link_owners WHERE rsn=? AND discord_id LIKE 'moderation-hold:%' AND NOT EXISTS(SELECT 1 FROM claimed_names WHERE rsn=?) AND ${gate}`,item.rsn,item.rsn));
@@ -140,7 +149,42 @@ async function decide(item:Case,s:Checked,actor:Actor,decision:'approved'|'rejec
    writes.push(stmt(`INSERT INTO profile_visibility(rsn,visibility) SELECT ?,'private' WHERE ${gate} ON CONFLICT(rsn) DO UPDATE SET visibility='private'`,item.rsn));
   }
  }
+ // Requests raised from the RuneLite plugin tell both people the outcome.
+ if(item.creator_id===PLUGIN_CASE_CREATOR){
+  const kind=body.decision==='approved'?'link_review_approved':'link_review_rejected';
+  for(const person of [item.target_id,item.source_id])if(person&&!person.startsWith('moderation-hold:'))
+   writes.push(stmt(`INSERT INTO notifications(id,discord_id,kind,rsn,case_id,created_at) SELECT ?,?,?,?,?,? WHERE ${gate}`,crypto.randomUUID(),person,kind,item.rsn,item.id,Date.now()));
+ }
  writes.push(stmt(`INSERT INTO account_actions(rsn,case_id,actor_id,actor_name,action,detail,created_at) SELECT ?,?,?,?,?,?,? WHERE ${gate}`,item.rsn,item.id,actor.id,actor.globalName||actor.username,String(body.decision),JSON.stringify({reason:note,from:item.source_id,to:item.target_id,protection:s.reasons}),now));
  const results=await database.batch(writes);if(!results[0].meta.changes)throw new HttpError(409,'Account or staff access changed. Refresh and review again.');
  await database.prepare('DELETE FROM transfer_private_archives WHERE expires_at<?').bind(Date.now()).run();return {id:item.id};
+}
+
+/** Who opened a case the RuneLite plugin raised. Not a staff member, so any authorised reviewer may decide it. */
+export const PLUGIN_CASE_CREATOR='runelite-plugin';
+
+/**
+ * A player who logs in to a character in game asks staff to review the link another Discord account holds.
+ * The current owner keeps the name meanwhile. One pending request per name and requester. Both people are
+ * notified; neither is shown the other's Discord identity. Protected accounts get the usual stricter review.
+ */
+export async function openPluginConflictCase(name:string,requesterId:string,boundOwner:string|null=null):Promise<'opened'|'pending'>{
+ const rsn=accountName(name).toLowerCase(),database=db();
+ const open=await database.prepare("SELECT 1 FROM staff_cases WHERE rsn=? AND action='relink' AND target_id=? AND state='pending'").bind(rsn,requesterId).first();
+ if(open)return 'pending';
+ // A character bound to another Discord account through the plugin can be disputed under a name nobody links (a name change).
+ const s=await moderationSnapshot(rsn,requesterId,!!boundOwner);
+ const other=(id:string|null)=>id&&id!==requesterId?id:null;
+ const owner=other(s.claim)??other(s.reservation)??boundOwner;
+ const id=crypto.randomUUID(),now=new Date().toISOString();
+ const note='A player who logs in to this character in game (seen by the RuneLite plugin) asked to review the link. The current owner keeps it until this is decided. Approve only if the requester shows they own the game account.';
+ const results=await database.batch([
+  database.prepare(`INSERT INTO staff_cases(id,rsn,action,target_id,source_id,expected_claim,expected_reservation,protected,reason,creator_id,creator_name,created_at)
+   SELECT ?,?,'relink',?,?,?,?,?,?,?,'RuneLite plugin',? WHERE NOT EXISTS(SELECT 1 FROM staff_cases WHERE rsn=? AND action='relink' AND target_id=? AND state='pending')`)
+   .bind(id,rsn,requesterId,owner,s.claim,s.reservation,+s.protected,note,PLUGIN_CASE_CREATOR,now,rsn,requesterId),
+  database.prepare(`INSERT INTO account_actions(rsn,case_id,actor_id,actor_name,action,detail,created_at) SELECT rsn,id,creator_id,creator_name,'case opened',reason,created_at FROM staff_cases WHERE id=?`).bind(id),
+  ...(owner?[notificationStatement(owner,'link_review_requested',rsn,id)]:[]),
+  notificationStatement(requesterId,'link_review_opened',rsn,id),
+ ]);
+ return results[0].meta.changes?'opened':'pending';
 }

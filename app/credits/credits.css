@@ -1,0 +1,43 @@
+/* People on the Credits page: guide writers, staff by rank and former staff with their ranks in order. */
+.credits-people{display:grid;gap:4px}
+.credits-people.is-loading{min-height:420px}
+.legal-page .credits-people .credits-list{list-style:none;padding-left:0;margin:0}
+.legal-page .credits-people .credits-list li{margin:.35rem 0}
+.legal-page a.credits-person{display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap}
+.legal-page a.credits-person:not([class*=rank-text-]){color:var(--text,#dedbcc)}
+.legal-page a.credits-person:hover b{text-decoration:underline;text-underline-offset:3px}
+.credits-person b{font-weight:650}
+.credits-person .rank-icon{width:20px;height:20px;flex:0 0 20px}
+.credits-count{margin-left:10px;font-size:.85rem;color:var(--muted,#a59e8b);white-space:nowrap}
+/* A writer's guide count; hover, focus or tap shows their guides in a small card. */
+.credits-writer-guides{position:relative;display:inline-block}
+.credits-writer-guides>button.credits-count{padding:2px 0;border:0;background:none;font:inherit;font-size:.85rem;color:var(--muted,#a59e8b);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.credits-writer-guides>button.credits-count:hover,.credits-writer-guides.is-open>button.credits-count{color:var(--gold,#e8b34a)}
+.credits-guides-card{position:absolute;z-index:20;top:100%;left:0;display:none;min-width:260px;max-width:min(460px,calc(100vw - 32px));margin-top:6px;padding:6px;background:#1d1a14;border:1px solid #514632;border-radius:6px;box-shadow:0 8px 22px #000b}
+/* A bridge over the gap, so the pointer can move from the count into the card. */
+.credits-guides-card::before{content:'';position:absolute;left:0;right:0;top:-8px;height:8px}
+.credits-writer-guides:hover .credits-guides-card,.credits-writer-guides:focus-within .credits-guides-card,.credits-writer-guides.is-open .credits-guides-card{display:grid}
+.credits-guides-head{padding:4px 10px 6px;margin-bottom:2px;border-bottom:1px solid #3a3226;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--dim,#7a7465);white-space:nowrap}
+.legal-page .credits-guides-card a{display:flex;align-items:baseline;gap:8px;min-width:0;padding:6px 10px;border-radius:4px;line-height:1.3;color:#efe6d2;text-decoration:none}
+.legal-page .credits-guides-card a>*{white-space:nowrap}.legal-page .credits-guides-card a>b{flex:none}.legal-page .credits-guides-card a>img{flex:none;align-self:center;width:20px;height:20px;object-fit:contain}.legal-page .credits-guides-card a>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.legal-page .credits-guides-card a b{font-size:.9rem;font-weight:650}
+.legal-page .credits-guides-card a span{font-size:.8rem;color:var(--muted,#a59e8b)}
+.legal-page .credits-guides-card a:hover,.legal-page .credits-guides-card a:focus-visible{background:#2e271c;outline:none}.legal-page .credits-guides-card a:hover b,.legal-page .credits-guides-card a:focus-visible b{color:var(--gold,#e8b34a)}
+@media(pointer:coarse){.credits-writer-guides>button.credits-count{min-height:40px}.legal-page .credits-guides-card a{padding:11px 10px}}
+.credits-note{margin:.3rem 0;font-size:.9rem;color:var(--muted,#a59e8b)}
+.credits-staff{display:grid;gap:8px;margin:0}
+.credits-staff>div{display:grid;grid-template-columns:120px minmax(0,1fr);align-items:baseline;gap:0 12px}
+.credits-staff dt{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--dim,#7a7465)}
+.credits-staff dd{display:flex;flex-wrap:wrap;gap:2px 18px;margin:0}
+.credits-retired li{display:flex;flex-wrap:wrap;align-items:center;gap:2px 0}
+.credits-ranks{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px 0;margin-left:12px;font-size:.9rem;font-weight:600}
+.credits-rank{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.credits-rank i{font-style:normal;padding:0 8px;color:var(--dim,#7a7465)}
+.credits-rank .rank-icon{width:20px;height:20px;flex:0 0 20px}
+@media(max-width:640px){
+ .credits-staff>div{grid-template-columns:minmax(0,1fr)}
+ .credits-staff dt{margin-top:4px}
+ .credits-retired li{display:grid;gap:2px}
+ .credits-ranks{margin-left:0}
+ .credits-retired .credits-count{margin-left:0}
+}

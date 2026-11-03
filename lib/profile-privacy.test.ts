@@ -3,7 +3,8 @@ import test from 'node:test';
 import {journalForViewer,validVisibility} from './profile-privacy.ts';
 import {initial,type Journal} from './model.ts';
 import seed from './seed.json' with {type:'json'};
-import {petPresentation,petPlacement} from './pet-presentation.ts';
+import {petPresentation,petPlacement,PET_HOVER} from './pet-presentation.ts';
+import {wearables} from './flair.ts';
 
 test('private visitors only receive skills, name and privacy state, with no hidden progress fields',()=>{
  const source=structuredClone(seed) as Journal;
@@ -30,6 +31,15 @@ test('portrait companions have bounded proportions and Rift guardian floats near
   const p=petPresentation(name);assert.ok(p.extent>=.2&&p.extent<=.4);assert.equal(p.hover,0);
  }
  assert.ok(petPresentation('Rift guardian').hover<.05);
+});
+
+test('Pet kraken sits on the ground, Pet chaos elemental hovers, and every hover entry names a shipped pet model',()=>{
+ assert.equal(petPresentation('Pet Kraken').hover,0);
+ assert.ok(petPresentation('Pet chaos elemental').hover>=.1);
+ const shipped=new Set(Object.values(wearables.pets).map(p=>p.name));
+ for(const [name,hover] of Object.entries(PET_HOVER)){assert.ok(shipped.has(name),name);assert.ok(hover>0&&hover<=.2,name);}
+ const p=petPlacement(180,-8,{x:50,y:60,z:50,minY:182},'Pet chaos elemental');
+ assert.equal(Math.round(((182+p.localY)*p.scale+p.groundY)*1000)/1000,Math.round((-8+180*.15)*1000)/1000);
 });
 
 test('scaled companions meet the player floor without multiplying the local ground offset',()=>{

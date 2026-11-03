@@ -5,6 +5,7 @@ import {RefreshCw, ExternalLink, Check, Download, Upload, Shield, BookOpen} from
 import type {SyncedJournal} from '@/lib/sync-journal';
 import './profile-release.css';
 import {num} from '@/lib/ui';
+import {PLUGIN_ON_HUB,PLUGIN_PAGE} from '@/lib/plugin-page';
 
 function date(s: string | null) {
   if (!s) return 'Never';
@@ -42,6 +43,7 @@ export function Connections({journal: j, busy, ready, onSync, onImport, onError}
     <section className="panel connection-guide"><h2 className="connection-heading">Syncing from RuneLite</h2>
       <div className="ph">
         <div className="row gap">
+          {PLUGIN_PAGE && <a className="btn ghost sm" href="/plugin"><img className="conn-plugin-icon" src="/icons/runelite/runelite-logo.png" alt=""/>{PLUGIN_ON_HUB ? 'Spooned plugin' : 'Spooned plugin · soon'}</a>}
           <a className="btn ghost sm" href="https://runeprofile.com/info/guide" target="_blank" rel="noreferrer">RuneProfile guide <ExternalLink size={13}/></a>
           <a className="btn ghost sm" href={'https://runeprofile.com/' + encodeURIComponent(j.username)} target="_blank" rel="noreferrer">Your RuneProfile <ExternalLink size={13}/></a>
         </div>

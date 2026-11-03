@@ -7,7 +7,9 @@ import {RequestError} from './request-body';
 const policies = {
   temple: {label:'TempleOSRS', gap:12_500, ttl:300_000},
   runeprofile: {label:'RuneProfile', gap:2_100, ttl:60_000},
-  wom: {label:'Wise Old Man', gap:3_100, ttl:300_000},
+  wom: {label:'Wise Old Man', gap:4_000, ttl:300_000}, // With the achievements lane (one per 12 s) this stays at WOM's 20 requests a minute without an API key.
+  // Dated skill achievements change rarely: a slower lane and a long cache keep WOM's shared limit for snapshots.
+  womAchievements: {label:'Wise Old Man', gap:12_000, ttl:21_600_000},
   hiscores: {label:'OSRS Hiscores', gap:1_100, ttl:60_000},
 };
 export function providerPolicy(url:URL) {
@@ -18,6 +20,7 @@ export function providerPolicy(url:URL) {
   else if(url.hostname==='api.runeprofile.com' && /^\/v1\/accounts\/[^/]+\/full$/.test(url.pathname))provider='runeprofile';
   else if(url.hostname==='runeprofile.com' && /^\/api\/profiles\/models\/[^/]+$/.test(url.pathname)){provider='runeprofile';model=true;}
   else if(url.hostname==='api.wiseoldman.net' && /^\/v2\/players\/[^/]+$/.test(url.pathname))provider='wom';
+  else if(url.hostname==='api.wiseoldman.net' && /^\/v2\/players\/[^/]+\/achievements$/.test(url.pathname))provider='womAchievements';
   else if(url.hostname==='secure.runescape.com' && url.pathname==='/m=hiscore_oldschool/index_lite.json')provider='hiscores';
   else throw new RequestError(400,'Unsupported import source.');
   url.hash='';url.searchParams.sort();

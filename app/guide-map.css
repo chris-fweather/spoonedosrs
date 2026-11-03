@@ -1,0 +1,183 @@
+/* Guide maps (GuideMap.tsx, GuideMapView.tsx). */
+.guide-map{margin:0;display:flex;flex-direction:column;gap:12px}
+.guide-map>header{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.guide-map>header h3{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-frame{position:relative;isolation:isolate;border:1px solid #514632;border-radius:8px;overflow:hidden;background:#0e0d0b}
+.gm-canvas{height:min(440px,62vw);min-height:260px;background:#0e0d0b;font:inherit}
+.gm-canvas.is-editing{height:min(400px,60vw)}
+.gm-loading{display:flex;align-items:center;justify-content:center;color:#8f8672;font-size:13px}
+.gm-canvas .leaflet-container,.gm-canvas.leaflet-container{background:#0e0d0b;font:inherit;outline:none}
+.gm-canvas.is-editing.leaflet-container{cursor:crosshair}
+.gm-canvas .leaflet-tile{image-rendering:pixelated}
+.gm-canvas .leaflet-control-zoom a{background:#1d1a14;color:#e9c97a;border-color:#514632}
+.gm-canvas .leaflet-control-zoom a:hover{background:#2a251c}
+.gm-canvas .leaflet-control-attribution{background:#0e0d0bcc;color:#8f8672;font-size:10px}
+.gm-canvas .leaflet-control-attribution a{color:#c9b27a}
+.gm-canvas .leaflet-tooltip{background:#191a16;border:1px solid #5c584a;color:#e7e4dc;font-size:12px;box-shadow:0 4px 14px #0009}
+.gm-canvas .leaflet-tooltip-top::before{border-top-color:#5c584a}
+.gm-marker{background:none;border:0}
+.gm-pin{position:relative;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:linear-gradient(135deg,#ffd36b,#c98a1c);border:2px solid #2a1d08;box-shadow:0 3px 8px #000a}
+.gm-pin b{transform:rotate(45deg);color:#231503;font-size:13px;font-weight:800;line-height:1}
+.gm-pin img{position:absolute;right:-9px;top:-9px;width:16px;height:16px;object-fit:contain;transform:rotate(45deg);filter:drop-shadow(0 1px 1px #000)}
+.gm-pin.kind-danger{background:linear-gradient(135deg,#ff8a7a,#b92e22)}
+.gm-pin.kind-start{background:linear-gradient(135deg,#9be38e,#3c9a3a)}
+.gm-pin.is-active{outline:3px solid #fff8;outline-offset:1px}
+.gm-floors{display:flex;gap:4px;flex:none}
+.gm-floors button{height:30px;padding:0 10px;border:1px solid #514632;border-radius:6px;background:#1d1a14;color:#cfc4a8;font-size:12px;white-space:nowrap}
+.gm-floors button[aria-pressed=true]{border-color:#e99b27;color:#ffd98f;background:#ffc34818}
+.gm-stop-mark{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#ffd36b,#c98a1c);color:#231503;font-size:12px}
+.gm-stop-mark b{font-weight:800}
+.gm-stop-mark img{position:absolute;right:-6px;bottom:-4px;width:14px;height:14px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
+.gm-stop-mark.kind-danger{background:linear-gradient(135deg,#ff8a7a,#b92e22)}
+.gm-stop-mark.kind-start{background:linear-gradient(135deg,#9be38e,#3c9a3a)}
+.gm-editor{display:flex;flex-direction:column;gap:12px}
+.gm-editor .fine{display:flex;align-items:center;gap:6px;margin:0}
+.gm-editor-hint{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.gm-editor-hint .check{min-height:40px;font-size:13px;white-space:nowrap}
+.gm-arrow{background:none;border:0;pointer-events:none}
+.gm-arrow svg{display:block;width:14px;height:14px}
+.gm-edit-stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.gm-edit-stops>li{display:grid;grid-template-columns:28px 140px 1fr auto;align-items:center;gap:8px;padding:4px 6px;border:1px solid transparent;border-radius:6px}
+.gm-edit-stops>li.is-active{border-color:#837043;background:#ffc34810}
+.gm-edit-stops>li>select,.gm-edit-stops>li>input{min-width:0}
+.gm-edit-actions{display:flex;gap:2px}
+.gm-edit-actions button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;border-radius:5px;background:none;color:#cfc4a8}
+.gm-edit-actions button:hover:not(:disabled){background:#ffffff10}
+.gm-edit-actions button:disabled{opacity:.35}
+@media (max-width:600px){
+ .gm-canvas,.gm-canvas.is-editing{height:72vw}
+ .gm-floors button{padding:0 8px}
+ .gm-edit-stops>li{grid-template-columns:28px 1fr auto;grid-template-rows:auto auto}
+ .gm-edit-stops>li>select{grid-column:2/3}
+ .gm-edit-stops>li>input{grid-column:1/-1;grid-row:2}
+}
+.gm-editor>.guide-insert-fields{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) minmax(0,1fr);gap:12px}
+@media (max-width:600px){.gm-editor>.guide-insert-fields{grid-template-columns:1fr 1fr}.gm-editor>.guide-insert-fields>label:first-child{grid-column:1/-1}}
+
+
+/* Route lines: a stop's badge takes the colour of the leg that ends there (after the kind colours, so it wins). */
+.gm-pin.has-leg,.gm-stop-mark.has-leg{background:linear-gradient(135deg,color-mix(in srgb,var(--leg),#fff 22%),var(--leg))}
+
+/* The map's controls: zoom (top left), one quiet Route control (top right) and, away from the surface, a floor button
+   (bottom left), all the same small dark style. */
+.gm-map-tools{position:absolute;top:10px;right:10px;z-index:1000;display:flex}
+.gm-route-toggle,.gm-map-back .map-back{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid #514632;border-radius:6px;background:#1d1a14e0;color:#cfc4a8;font:inherit;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px #0007;cursor:pointer}
+.gm-route-toggle:hover,.gm-map-back .map-back:hover{background:#2a251ce8;border-color:#6b5c3f;color:#ffd98f}
+.gm-route-toggle svg,.gm-map-back .map-back svg{width:15px;height:15px;flex:none}
+.gm-route-toggle[aria-pressed=true]{color:#ffd98f}
+.gm-route-toggle[aria-pressed=false]{color:#8f8672}
+.gm-canvas .leaflet-control-zoom{border:1px solid #514632;border-radius:6px;overflow:hidden;box-shadow:0 2px 6px #0007}
+.gm-canvas .leaflet-control-zoom a{width:30px;height:30px;line-height:30px;border-color:#514632}
+@media (max-width:600px){.gm-map-tools{top:8px;right:8px}.gm-route-toggle,.gm-map-back .map-back{height:40px;padding:0 12px}.gm-canvas .leaflet-control-zoom a{width:40px;height:40px;line-height:40px}}
+
+/* A focused stop: the stops off its leg step back, without their numbers. */
+.gm-pin.is-faded{opacity:.45;transform:rotate(-45deg) scale(.7);box-shadow:none}
+.gm-pin.is-faded b,.gm-pin.is-faded img{visibility:hidden}
+
+/* Back to the surface (or down to the ground floor) while a reader is elsewhere, under the zoom buttons. */
+.gm-map-back{position:absolute;left:10px;bottom:10px;z-index:1000}
+@media (max-width:600px){.gm-map-back{left:8px;bottom:8px}}
+
+/* The talk icon is a thin speech bubble: shown about a quarter bigger than the other stop icons, centred on the same spot. */
+.gm-pin.kind-npc img{right:-11px;top:-11px;width:20px;height:20px}
+.gm-stop-mark.kind-npc img{right:-8px;bottom:-6px;width:18px;height:18px}
+
+/* The stops under the map: a numbered timeline. Each stop's badge sits on one vertical line, coloured like the route leg
+   to the next stop (dotted where the next stop is a teleport or another floor); the label takes the row, with a muted
+   second line for its items and notes. The chosen stop opens its details in place, beside the line. */
+.gm-stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.gm-stop{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;border-radius:6px}
+.gm-stop:not(:last-child)::before{content:'';position:absolute;left:19px;top:36px;bottom:-4px;width:0;border-left:2px dotted #4a4232;pointer-events:none}
+.gm-stop.has-next-leg:not(:last-child)::before{border-left-style:solid;border-color:color-mix(in srgb,var(--next) 55%,#0e0d0b)}
+.gm-stop-row{display:flex;align-items:flex-start;gap:12px;min-width:0;min-height:42px;padding:8px;border:0;border-radius:6px;background:none;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.gm-stop-row:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.gm-stop.is-lit,.gm-stop:hover{background:#ffffff08}
+.gm-stop.is-active{background:#ffc3480f}
+.gm-stop-text{display:flex;flex-direction:column;gap:2px;min-width:0;padding-top:2px}
+.gm-stop-label{min-width:0;font-size:14px;line-height:20px;color:#e7e4dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-stop.is-active .gm-stop-label{color:#ffd98f}
+.gm-stop-meta{display:flex;align-items:center;gap:8px;min-width:0;height:20px;color:#8f8672;font-size:12px}
+.gm-stop-items{display:inline-flex;align-items:center;gap:2px;flex:none}
+.gm-stop-items img{width:24px;height:24px;margin:-3px 0;object-fit:contain;image-rendering:pixelated}
+.gm-stop-items small{margin-left:2px;font-size:11px}
+.gm-stop-note{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-stop-mark{transition:box-shadow .15s}
+.gm-stop.is-lit .gm-stop-mark,.gm-stop.is-active .gm-stop-mark{box-shadow:0 0 0 2px #0e0d0b,0 0 0 4px #fff6}
+.gm-directions{display:grid;place-items:center;width:36px;height:40px;margin-top:0;border-radius:6px;color:#8f8672;opacity:.55;transition:opacity .15s}
+.gm-stop:hover .gm-directions,.gm-stop:focus-within .gm-directions,.gm-stop.is-lit .gm-directions,.gm-stop.is-active .gm-directions{opacity:1}
+.gm-directions:hover,.gm-directions:focus-visible{color:var(--gold)}
+@media (hover:none){.gm-directions{opacity:.8}}
+.gm-stop-details{grid-column:1/-1;display:flex;flex-direction:column;gap:8px;min-width:0;padding:0 12px 10px 44px;font-size:13px}
+/* A pin lit from its row (or hovered) stands out on the map. */
+.gm-pin{transition:transform .15s}
+.gm-pin.is-lit{transform:rotate(-45deg) scale(1.18);outline:3px solid #fffa;outline-offset:1px}
+.gm-pin.is-faded.is-lit{opacity:1}
+.gm-pin.is-faded.is-lit b,.gm-pin.is-faded.is-lit img{visibility:visible}
+.gm-card-items{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.gm-card-items li{display:flex;align-items:center;gap:8px;min-width:0}
+.gm-card-item{display:flex;align-items:center;gap:8px;min-width:0;min-height:28px;cursor:help}
+.gm-card-items img{width:24px;height:24px;flex:none;object-fit:contain;image-rendering:pixelated}
+.gm-card-items span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e7e4dc}
+.gm-card-items b{flex:none;color:var(--gold);font-weight:600;font-variant-numeric:tabular-nums}
+/* Chat options to pick, in order, in the game's chat font and the highlighted option's blue. */
+.gm-card-dialogue{list-style:none;margin:0;padding:0;display:grid;gap:3px;font:15px/1.3 var(--rs);color:#7cc0ff}
+.gm-card-dialogue li{display:flex;align-items:baseline;gap:6px;min-width:0}
+.gm-card-dialogue li>q{min-width:0;quotes:none;text-wrap:balance}
+.gm-card-dialogue li>span{flex:none;color:#8f8672}
+.gm-card-note{margin:0;color:#c6bca5;font-size:12.5px;line-height:1.5;text-wrap:balance}
+.gm-canvas .leaflet-tooltip.gm-pin-tip{display:grid;gap:2px;padding:5px 9px;white-space:nowrap;pointer-events:none}
+.gm-pin-tip strong{font-size:12.5px;font-weight:600;color:#e9c97a}
+
+/* Editor: a stop's details open under its row. */
+.gm-edit-actions button.has-details{color:var(--gold)}
+.gm-edit-actions button[aria-expanded=true]{background:#ffffff10;color:#ffd98f}
+.gm-edit-details{grid-column:1/-1;display:grid;gap:12px;margin:4px 0 6px;padding:12px;border:1px solid #3d362a;border-radius:6px;background:#17150f}
+.gm-edit-field{display:grid;gap:6px;font-size:12px;color:var(--muted);min-width:0}
+.gm-edit-field>span small{margin-left:4px;color:#7d7461}
+.gm-edit-field input,.gm-edit-field textarea{min-width:0;width:100%}
+.gm-edit-field textarea{resize:vertical;field-sizing:content;min-height:3.4em}
+.gm-edit-items,.gm-edit-lines{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.gm-edit-items li{display:grid;grid-template-columns:28px minmax(0,1fr) 84px 30px;align-items:center;gap:8px;font-size:13px;color:var(--text)}
+.gm-edit-items img{width:26px;height:26px;object-fit:contain;image-rendering:pixelated}
+.gm-edit-items span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-edit-lines li{display:grid;grid-template-columns:22px minmax(0,1fr) 30px;align-items:center;gap:6px}
+.gm-edit-lines b{font-weight:600;color:#8f8672;font-size:13px;text-align:right}
+.gm-edit-items button,.gm-edit-lines button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;border-radius:5px;background:none;color:#cfc4a8}
+.gm-edit-items button:hover,.gm-edit-lines button:hover{background:#ffffff10}
+.gm-edit-results{max-height:180px}
+.gm-edit-add{justify-self:start;display:inline-flex;align-items:center;gap:6px}
+@media (max-width:600px){.gm-card-dialogue{font-size:14px}.gm-edit-details{grid-row:auto}.gm-edit-items li{grid-template-columns:28px minmax(0,1fr) 72px 30px}}
+.gm-canvas .leaflet-tooltip-bottom::before{border-bottom-color:#5c584a}
+
+/* An item stop that lists items shows its first item (a chest's map piece) as its icon: inventory art, drawn a little larger. */
+.gm-pin.has-item img{right:-13px;top:-13px;width:24px;height:22px;image-rendering:pixelated}
+.gm-stop-mark.has-item img{right:-9px;bottom:-7px;width:20px;height:18px;image-rendering:pixelated}
+/* The fight style under a fight stop's label over its pin. */
+.gm-pin-tip .gm-card-hint{color:#a59a80;font-size:11.5px}
+/* A teleport stop's ways there: each teleport with its game icon; the one the guide names in gold. */
+.gm-card-teleports{display:grid;gap:4px}
+.gm-card-teleports>small{margin:0;color:#8f8672;font-size:11px}
+.gm-card-teleports ul{list-style:none;margin:0;padding:0;display:grid;gap:1px}
+.gm-card-teleports li{display:flex;align-items:center;gap:8px;min-width:0;min-height:26px;padding:0 6px;margin:0 -6px;border-radius:4px;color:#d6cdb6;font-size:12.5px}
+.gm-card-teleports li img{width:22px;height:22px;flex:none;object-fit:contain;image-rendering:pixelated}
+.gm-card-teleports li span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-card-teleports li.is-named{background:#ffc34814;color:#ffd98f;font-weight:600}
+/* Editor: a teleport stop's way there, with the icon it gives the stop. */
+.gm-edit-via{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;gap:8px}
+.gm-edit-via img{width:24px;height:24px;object-fit:contain;image-rendering:pixelated}
+
+/* Every map with stops is a wide section of its own: on a desktop the stops are the steps on the left and the map sits on the
+   right; on narrower pages the stops follow under the map. A stop that says what to do there shows it under its name. */
+.gm-body{display:flex;flex-direction:column;gap:12px;min-width:0}
+.guide-map{container-type:inline-size}
+.gm-stop-say{grid-column:1/-1;margin:-6px 0 0;padding:0 12px 8px 44px;color:#b3a990;font-size:13.5px;line-height:1.5;text-wrap:pretty}
+.gm-stop-say .guide-ref{white-space:nowrap}
+.gm-stop>.gm-stop-meta{grid-column:1/-1;margin:-4px 0 0;padding:0 12px 8px 44px}
+.gm-stop.is-active .gm-stop-say{color:#d6cdb6}
+.guide-map.is-steps .gm-stop-label{font-weight:600}
+@container (min-width:720px){
+ .guide-map .gm-body:has(>.gm-stops){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:18px;align-items:start}
+ .guide-map .gm-body>.gm-stops{order:-1}
+ .guide-map .gm-body>.gm-stops .gm-stop-label{white-space:normal}
+ .guide-map .gm-body>.gm-frame .gm-canvas{height:440px}
+}

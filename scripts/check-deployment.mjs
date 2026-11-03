@@ -55,7 +55,7 @@ export async function checkDeployment(origin,{
  }
  log(`✔ Live version ${actual.version} (${actual.buildId}) matches this revision.`);
 
- for(const route of ['/','/leaderboard','/privacy','/terms']){
+ for(const route of ['/','/leaderboard','/privacy','/terms','/credits']){
   const result=await get(route);
   await result.body?.cancel();if(result.status!==200)throw Error(`${route}: HTTP ${result.status}`);
   if(route==='/'&&!local)for(const [name,pattern] of [['Strict-Transport-Security',/max-age=\d+/],['X-Content-Type-Options',/nosniff/],['X-Frame-Options',/SAMEORIGIN|DENY/],['Content-Security-Policy',/frame-ancestors/]])

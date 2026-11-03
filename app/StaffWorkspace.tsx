@@ -13,21 +13,26 @@ export type ReviewState = "pending" | "approved" | "rejected";
 export type ChangeNote = {kind:'note'|'reason';actorId:string;actorName:string|null;text:string;at:string};
 export type Change = {id:number;notes?:ChangeNote[];kind:'rate'|'record';image?:string|null;target:string;payload:string;source:string;reason:string;actor_id:string;actor_name:string;state:string;created_at:string;reviewed_at:string|null;reviewer_id?:string|null;reviewer_name?:string|null;actor_role?:StaffRole|null;reviewer_role?:StaffRole|null};
 /** A recent ownership request, for the overview feed. */
-export type OwnershipCase = {id:string;rsn:string;action:"relink"|"unlink"|"release";state:string;created_at:string;reviewed_at:string|null;creator_id:string;creator_name:string;reviewer_id:string|null;target_id:string|null;protected:number};
+export type OwnershipCase = {id:string;rsn:string;action:"relink"|"unlink"|"release";state:string;created_at:string;reviewed_at:string|null;creator_id:string;creator_name:string;reviewer_id:string|null;target_id:string|null;source_id?:string|null;protected:number;creator_role?:StaffRole|null;reviewer_role?:StaffRole|null};
+/** A published guide, for the overview feed. */
+export type PublishedGuide = {id:string;title:string;image:string|null;published_at:string;publisher_id:string|null;publisher_role?:StaffRole|null};
 /** Everyone the portal names, as the site shows them; filled from the dashboard. */
 export const StaffPeople = createContext<StaffPerson[]>([]);
-/** A person's site name (scimitar, Sir, rank colour, the Generous), falling back to the stored name. */
-export function Person({id, fallback, role}: {id: string | null | undefined; fallback: string; role?: StaffRole | null}) {
+/** A person's site name (scimitar, rank colour), falling back to the stored name. `rankThen` colours it by the rank they held when the row happened. */
+export function Person({id, fallback, role, rankThen}: {id: string | null | undefined; fallback: string; role?: StaffRole | null; rankThen?: StaffRole | null}) {
   const people = useContext(StaffPeople);
-  return <PersonName person={id ? people.find((p) => p.id === id) : undefined} fallback={fallback} role={role} />;
+  return <PersonName person={id ? people.find((p) => p.id === id) : undefined} fallback={fallback} role={role} rankThen={rankThen} />;
 }
-/** A Discord account by its Discord name (not its RuneScape name), with the Discord mark. */
-export function DiscordName({id}: {id: string | null}) {
+/** A Discord account by its Discord name (not its RuneScape name), with the Discord mark; `possessive` reads "Dry Guy's". */
+export function DiscordName({id, possessive = false}: {id: string | null; possessive?: boolean}) {
   const person = useContext(StaffPeople).find((p) => p.id === id);
-  return <span className="discord-name"><DiscordMark /><b>{person?.name ?? "a new owner"}</b></span>;
+  const name = person?.name ?? "a new owner";
+  return <span className="discord-name"><DiscordMark /><b>{possessive ? name + "\u2019s" : name}</b></span>;
 }
-/** A RuneScape name, marked with the friends-list icon so it never reads as a Discord account. */
-export function RsName({name}: {name: string}) {return <span className="rs-name" title="RuneScape name"><img src="/icons/community/friends-list.png" alt="" /><b>{name}</b></span>;}
+/** The in-game character head the account menu shows beside each linked RuneScape name. */
+export const RS_NAME_ICON = "/portraits/male-brown-default.svg";
+/** A RuneScape name, marked with the character head so it never reads as a Discord account. */
+export function RsName({name}: {name: string}) {return <span className="rs-name" title="RuneScape name"><img src={RS_NAME_ICON} alt="" /><b>{name}</b></span>;}
 export const REVIEW_STATES: {state: ReviewState; label: string}[] = [
   {state: "pending", label: "Awaiting review"},
   {state: "approved", label: "Approved"},
@@ -52,7 +57,7 @@ type Payload = {label?:string;planning?:boolean;rate?:number;pace?:number|null;u
 export const payloadOf = (c: Change): Payload => {try {return JSON.parse(c.payload);} catch {return {};}};
 export const changeTitle = (c: Change) => payloadOf(c).label ?? c.target;
 
-export function StaffOverview({changes, cases, memberCount, viewer, onNavigate, onFilter}: {changes: Change[]; cases: OwnershipCase[]; memberCount: number | null; viewer: Viewer; onNavigate: (tab: StaffTabId, section?: CorrectionSection) => void; onFilter: (state: ReviewState) => void}) {
+export function StaffOverview({changes, cases, guides = [], memberCount, viewer, onNavigate, onFilter}: {changes: Change[]; cases: OwnershipCase[]; guides?: PublishedGuide[]; memberCount: number | null; viewer: Viewer; onNavigate: (tab: StaffTabId, section?: CorrectionSection) => void; onFilter: (state: ReviewState) => void}) {
   const counts = Object.fromEntries(REVIEW_STATES.map(({state}) => [state, changes.filter((c) => c.state === state).length])) as Record<ReviewState, number>;
   const reviews = viewer.permissions.corrections;
   return <div className="staff-overview">
@@ -66,7 +71,7 @@ export function StaffOverview({changes, cases, memberCount, viewer, onNavigate, 
       </div>
     </div>
     {reviews && <ReviewActivity changes={changes} onHistory={() => onNavigate("corrections", "history")} onQueue={() => onNavigate("corrections", "queue")} />}
-    <LatestActivity changes={reviews ? changes : []} cases={cases} onCorrections={() => onNavigate("corrections", "history")} onOwnership={() => onNavigate("ownership")} />
+    <LatestActivity changes={reviews ? changes : []} cases={cases} guides={guides} onCorrections={() => onNavigate("corrections", "history")} onOwnership={() => onNavigate("ownership")} />
     <div className="staff-quick-cards">
       {viewer.permissions.guides && <button type="button" onClick={() => onNavigate("guides")}><img src="/icons/navigation/collection-log-icon.png" alt="" /><span><b>Guide workshop</b><small>Write guides, insert requirements and build equipment setups.</small></span><em>Open workshop →</em></button>}
       {viewer.permissions.planning && <button type="button" onClick={() => onNavigate("corrections", "paces")}><img src="/icons/navigation/combat-achievements-icon.png" alt="" /><span><b>Kill rates &amp; XP</b><small>Set the default pace and average XP plans start from.</small></span><em>Open corrections →</em></button>}
@@ -91,49 +96,67 @@ function ReviewActivity({changes, onHistory, onQueue}: {changes: Change[]; onHis
         <span className="staff-activity-bar" style={{height: `${(d.total / max) * 100}%`}}>{d.parts.filter((p) => p.count).map((p) => <i key={p.state} className={"state-" + p.state} style={{flexGrow: p.count}} />)}</span>
         <small aria-hidden="true">{i % 2 === 1 || i === 13 ? d.label : ""}</small>
       </div>)}
-    </div> : <div className="staff-activity-empty"><img src="/icons/navigation/quest-list-icon.png" alt="" /><div><b>No submissions in the last 14 days</b><p>New proposals and review decisions will appear here.</p></div></div>}
+    </div> : <div className="staff-activity-empty"><img src="/ui/quest-list-icon.png" alt="" /><div><b>No submissions in the last 14 days</b><p>New proposals and review decisions will appear here.</p></div></div>}
     <footer><button type="button" className="btn sm ghost" onClick={onQueue}>Review queue</button><button type="button" className="link" onClick={onHistory}>Full history →</button></footer>
   </section>;
 }
 
-const KIND_ICON = {rate: "/icons/navigation/collection-log-icon.png", planning: "/icons/navigation/combat-achievements-icon.png", record: "/icons/skills/firemaking.png"};
+const KIND_ICON = {rate: "/ui/collection-log-icon.png", planning: "/icons/navigation/combat-achievements-icon.png", record: "/icons/skills/firemaking.png"};
 const CASE_ICON = {relink: <Link2 size={16} />, unlink: <Lock size={16} />, release: <LockOpen size={16} />};
-/** What a correction proposes, in words: "1/400 for Kraken tentacle". */
+/** Per hour, in words: "32 kills per hour", "95,000 XP per hour". */
+const perHour = (n: number, unit?: string) => `${n.toLocaleString()} ${unit === "XP" ? "XP" : unit ?? "kills"} per hour`;
+/** What a correction changes, as a short title: "Kraken tentacle drop rate: 1/400", "Vorkath kill rate: 32 kills per hour". */
 function proposal(c: Change) {
-  const p = payloadOf(c), parts = changeTitle(c).split(" · "), item = parts.at(-1);
-  if (p.planning) return <>{p.pace != null && <>a pace of <b className="activity-value">{p.pace.toLocaleString()} {p.unit}/h</b></>}{p.pace != null && p.rate ? " and " : null}{p.rate ? <>a pet rate of <b className="activity-value">1/{p.rate.toLocaleString()}</b></> : null} at <b>{parts.slice(1).join(" · ") || parts[0]}</b><span className="activity-where"> · {parts[0]}</span></>;
-  if (c.kind === "record") return <>a dry-streak record: <b>{p.username}</b> went <b className="activity-value">{p.count?.toLocaleString()} {p.unit}</b> without <b>{item}</b></>;
-  return <>a rate of <b className="activity-value">1/{p.denominator?.toLocaleString()}</b> for <b>{item}</b>{parts.length > 1 ? <span className="activity-where"> · {parts.slice(0, -1).join(" · ")}</span> : null}</>;
+  const p = payloadOf(c), parts = [...new Set(changeTitle(c).split(" · "))], item = parts.at(-1)!;
+  const where = parts.slice(0, -1).filter((w) => w !== item);
+  const place = where.length ? <span className="activity-where"> · {where.join(" · ")}</span> : null;
+  if (p.planning) {
+    const at = parts.slice(1).join(" · ") || parts[0];
+    return <><b>{at}</b> {p.pace != null ? <>kill rate: <b className="activity-value">{perHour(p.pace, p.unit)}</b></> : null}{p.pace != null && p.rate ? ", " : null}{p.rate ? <>pet rate{p.pace == null ? ":" : ""} <b className="activity-value">1/{p.rate.toLocaleString()}</b></> : null}</>;
+  }
+  if (c.kind === "record") return <>Dry-streak record: <b>{p.username}</b>, <b className="activity-value">{p.count?.toLocaleString()} {p.unit}</b> without <b>{item}</b></>;
+  return <><b>{item}</b> drop rate: <b className="activity-value">1/{p.denominator?.toLocaleString()}</b>{place}</>;
 }
-/** What an ownership request does, in words: "moving Lucky Lad to Dry Guy". */
-function caseWords(c: OwnershipCase, pending: boolean) {
+const isHold = (id: string | null | undefined) => !!id?.startsWith("moderation-hold:");
+/** An ownership request as a short title: "Move Lucky Lad to Dry Guy's Discord account", "Hold Dry Streaker". */
+function caseTitle(c: OwnershipCase) {
   const rsn = <RsName name={c.rsn} />;
-  if (c.action === "unlink") return pending ? <>asked to hold {rsn}</> : <>holding {rsn}</>;
-  if (c.action === "release") return pending ? <>asked to release the hold on {rsn}</> : <>releasing the hold on {rsn}</>;
-  const to = <>the Discord account <DiscordName id={c.target_id} /></>;
-  return pending ? <>asked to move {rsn} to {to}</> : <>moving {rsn} to {to}</>;
+  if (c.action === "unlink") return <>Hold on {rsn}</>;
+  if (c.action === "release") return <>Release the hold on {rsn}</>;
+  return <>{isHold(c.source_id) ? "Link" : "Move"} {rsn} to <DiscordName id={c.target_id} possessive /> Discord account</>;
 }
-/** Everything staff proposed or decided lately, newest first, each as one sentence: who did what, the state and when. */
-function LatestActivity({changes, cases, onCorrections, onOwnership}: {changes: Change[]; cases: OwnershipCase[]; onCorrections: () => void; onOwnership: () => void}) {
-  type Row = {key: string; when: string; state: string; icon: React.ReactNode; text: React.ReactNode; open: () => void};
-  const decided = (state: string) => state === "approved" ? "approved" : "rejected";
+/** Who asked and who decided: "Requested by Tansy Iron · Approved by Mira Vale", or "Held by Bramble Pk" when a hold took effect at once. */
+function byLine(first: string, who: React.ReactNode, c: {reviewed_at?: string | null; state: string}, reviewer: React.ReactNode) {
+  const asked = <span className="ws-by-part">{first} by {who}</span>;
+  if (!c.reviewed_at) return asked;
+  return <>{asked}<span className="ws-by-sep" aria-hidden="true">·</span><span className="ws-by-part">{c.state === "approved" ? "Approved" : "Rejected"} by {reviewer}</span></>;
+}
+function caseBy(c: OwnershipCase) {
+  const creator = <Person id={c.creator_id} fallback={c.creator_name} rankThen={c.creator_role} />;
+  if (c.action === "unlink" && c.reviewed_at && c.state === "approved" && c.reviewer_id === c.creator_id) return <>Held by {creator}</>;
+  return byLine("Requested", creator, c, <Person id={c.reviewer_id} fallback="a reviewer" rankThen={c.reviewer_role} />);
+}
+/** Everything staff proposed, decided or published lately, newest first: what changed on the first line, who on the second. */
+function LatestActivity({changes, cases, guides, onCorrections, onOwnership}: {changes: Change[]; cases: OwnershipCase[]; guides: PublishedGuide[]; onCorrections: () => void; onOwnership: () => void}) {
+  type Row = {key: string; when: string; state: string; label?: string; icon: React.ReactNode; title: React.ReactNode; by: React.ReactNode; open?: () => void; href?: string};
   const rows: Row[] = [
     ...changes.map((c): Row => ({key: "c" + c.id, when: c.reviewed_at ?? c.created_at, state: c.state, open: onCorrections, icon: <img src={c.image ?? KIND_ICON[correctionKind(c)]} alt="" />,
-      text: c.reviewed_at ? <><Person id={c.reviewer_id} fallback={c.reviewer_name ?? "A reviewer"} role={c.reviewer_role} /> {decided(c.state)} <Person id={c.actor_id} fallback={c.actor_name} role={c.actor_role} />&apos;s proposal: {proposal(c)}</>
-        : <><Person id={c.actor_id} fallback={c.actor_name} role={c.actor_role} /> proposed {proposal(c)}</>})),
-    ...cases.map((c): Row => ({key: "o" + c.id, when: c.reviewed_at ?? c.created_at, state: c.state, open: onOwnership, icon: <span className={"case-icon is-" + c.action}>{CASE_ICON[c.action]}</span>,
-      text: c.reviewed_at ? <><Person id={c.reviewer_id} fallback="A reviewer" /> {decided(c.state)} {caseWords(c, false)}</> : <><Person id={c.creator_id} fallback={c.creator_name} /> {caseWords(c, true)}</>})),
+      title: proposal(c), by: byLine("Proposed", <Person id={c.actor_id} fallback={c.actor_name} rankThen={c.actor_role} />, c, <Person id={c.reviewer_id} fallback={c.reviewer_name ?? "a reviewer"} rankThen={c.reviewer_role} />)})),
+    ...cases.map((c): Row => ({key: "o" + c.id, when: c.reviewed_at ?? c.created_at, state: c.state, open: onOwnership, icon: <span className={"case-icon is-" + c.action}>{CASE_ICON[c.action]}</span>, title: caseTitle(c), by: caseBy(c)})),
+    ...guides.map((g): Row => ({key: "g" + g.id, when: g.published_at, state: "approved", label: "Published", href: "/guides?guide=" + encodeURIComponent(g.id), icon: <img src={g.image ?? "/icons/navigation/collection-log-icon.png"} alt="" />,
+      title: <>Guide: <b>{g.title}</b></>, by: <>Published by <Person id={g.publisher_id} fallback="a staff member" rankThen={g.publisher_role} /></>})),
   ].sort((a, b) => b.when.localeCompare(a.when)).slice(0, 8);
-  // The same rows as Access history: icon tile, one sentence, state and time.
+  // The same rows as Access history: icon, what changed, who, then the state and time. A published guide opens the guide.
+  const body = (r: Row) => <>
+    <span className="ws-row-icon" aria-hidden="true">{r.icon}</span>
+    <span className="ws-row-main"><span className="ws-feed-title">{r.title}</span><span className="ws-feed-by">{r.by}</span></span>
+    <span className="ws-row-side"><StateLabel state={r.state} label={r.label} /><time dateTime={r.when} title={fullDate(r.when)}>{timeAgo(r.when)}</time></span>
+  </>;
   return <section className="staff-card staff-feed" aria-label="Latest activity">
-    <PanelHead icon="/icons/navigation/quest-list-icon.png" title="Latest activity" text="Corrections and ownership requests, newest first." />
+    <PanelHead icon="/ui/quest-list-icon.png" title="Latest activity" text="Corrections, ownership requests and published guides, newest first." />
     {rows.length ? <ol className="ws-list ws-feed">{rows.map((r) => <li key={r.key} className={"ws-row state-" + r.state}>
-      <button type="button" className="ws-row-head" onClick={r.open}>
-        <span className="ws-row-icon" aria-hidden="true">{r.icon}</span>
-        <span className="ws-row-main ws-feed-text">{r.text}</span>
-        <span className="ws-row-side"><StateLabel state={r.state} /><time dateTime={r.when} title={fullDate(r.when)}>{timeAgo(r.when)}</time></span>
-      </button>
-    </li>)}</ol> : <Empty icon="/icons/navigation/quest-list-icon.png" title="Nothing yet" text="Proposals, decisions and ownership requests will appear here." />}
+      {r.href ? <a className="ws-row-head" href={r.href}>{body(r)}</a> : <button type="button" className="ws-row-head" onClick={r.open}>{body(r)}</button>}
+    </li>)}</ol> : <Empty icon="/ui/quest-list-icon.png" title="Nothing yet" text="Proposals, decisions, ownership requests and published guides will appear here." />}
   </section>;
 }
 

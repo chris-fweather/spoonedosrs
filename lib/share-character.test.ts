@@ -16,7 +16,7 @@ test('both share characters include the real jaw and retain their saved body, ha
 test('saved Pyromancer gear covers the matching base parts and preserves embedded cape texture',async()=>{
  const paths:string[]=[];const equipped={...emptyEquipped(),head:'20708',body:'20704',legs:'20706',feet:'20710',cape:'21295'};
  const dressed=await renderShareCharacter({appearance:{body:'female',hair:'blonde'},equipped,loadAsset:async path=>{paths.push(path);return localAsset(path);}});
- assert.deepEqual(dressed.missing,[]);assert.ok(paths.includes('/models/look/appearance/female-hat-head.gltf'));assert.ok(paths.includes('/models/look/'+appearanceModels.femaleItems['20704']));assert.ok(!paths.includes('/models/look/'+appearanceModels.femaleKits.find(k=>k.part===2)!.file));assert.match(dressed.svg,/data:image\/png;base64,/);assert.match(dressed.svg,/<pattern/);assert.ok(dressed.svg.length<500_000,'Small enough for an embedded share-card image');
+ assert.deepEqual(dressed.missing,[]);assert.ok(!paths.some(path=>path.includes('/appearance/')),'the hood replaces the head kit');assert.ok(paths.includes('/models/look/'+appearanceModels.femaleItems['20704']));assert.ok(!paths.includes('/models/look/'+appearanceModels.femaleKits.find(k=>k.part===2)!.file));assert.match(dressed.svg,/data:image\/png;base64,/);assert.match(dressed.svg,/<pattern/);assert.ok(dressed.svg.length<500_000,'Small enough for an embedded share-card image');
  const plain=await renderShareCharacter({appearance:{body:'female',hair:'blonde'},loadAsset:localAsset});assert.notEqual(dressed.svg,plain.svg);
 });
 

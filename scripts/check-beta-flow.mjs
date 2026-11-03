@@ -29,6 +29,8 @@ async function mock(request){
  if((url.searchParams.get('player')??decodeURIComponent(url.pathname.split('/')[3]??'')).startsWith('Zq'))return new Response(null,{status:404});
  if(url.hostname==='secure.runescape.com')return url.searchParams.get('player')==='Moved Player'?new Response(null,{status:302,headers:{Location:'https://example.invalid/'}}):Response.json(hiscores);
  if(url.hostname==='api.runeprofile.com')return Response.json(profile);
+ // Wise Old Man does not track Beta Tester's snapshots, but has dated skill achievements for the Player timeline.
+ if(url.hostname==='api.wiseoldman.net'&&url.pathname==='/v2/players/Beta%20Tester/achievements')return Response.json([{name:'99 Attack',createdAt:'2024-03-01T10:00:00.000Z',accuracy:3600000},{name:'Base 70 Stats',createdAt:'1970-01-01T00:00:00.000Z',accuracy:null},{name:'1k Zulrah kills',createdAt:'2024-01-01T00:00:00.000Z'}]);
  return new Response(null,{status:404}); // Temple and Wise Old Man: player not tracked.
 }
 const cookie=(response,name)=>response.headers.getSetCookie().map(c=>c.split(';')[0]).find(c=>c.startsWith(name+'='));
@@ -72,6 +74,7 @@ try{
  const journal=await (await call('/api/journal?username=Beta%20Tester')).json();
  assert.equal(journal.hiscores.skills.find(s=>s.name==='Overall').xp,50000000);assert.equal(journal.log.obtained,1);
  assert.equal(journal.profile.quests[0].state,'finished');assert.ok(journal.statsSyncedAt);
+ assert.deepEqual(journal.skillMilestones,{'Attack:99':'2024-03-01'},'WOM achievements become dated milestones; undated ones are skipped');
 
  // An upstream redirect is reported as unavailable, never followed or leaked as a runtime error.
  assert.equal((await send('/api/accounts',{username:'Moved Player'})).status,200);
@@ -98,7 +101,7 @@ try{
  assert.equal((await (await call('/api/journal?username=Beta%20Tester')).json()).revision,journal.revision,'health check saved nothing');
 
  // Searching a new name pulls every public source once, before anyone claims it, and shows it straight away.
- await new Promise(resolve=>setTimeout(resolve,2200)); // Hiscores and RuneProfile pacing gaps after the deploy check.
+ await new Promise(resolve=>setTimeout(resolve,4200)); // Hiscores, RuneProfile and Wise Old Man (4 s) pacing gaps after the deploy check.
  const before=upstream.length;
  const search=await json(await call('/api/player-status?username=New%20Search'));
  assert.equal(search.status,200,JSON.stringify(search.body));

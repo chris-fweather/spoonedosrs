@@ -5,7 +5,7 @@ import {RankIcon} from './StaffBadge';
 import {DiscordMark} from './DiscordMark';
 import {AchievementEmblem} from './AchievementEmblem';
 import {ProfileIdentity,type IdentityProps} from './ProfileIdentity';
-import {ChevronDown,Lock,Settings,X} from 'lucide-react';
+import {ChevronDown,Lock,X} from 'lucide-react';
 import {STAFF_LABEL,STAFF_TONE,type StaffRole} from '@/lib/staff-policy';
 import {titleEffect} from '@/lib/presentation';
 import type {Mark} from '@/lib/flair';
@@ -28,7 +28,7 @@ export function ProfileStaffControls({username,viewerKey,identity}:{username:str
   return()=>abort.abort();
  },[username,viewerKey]);
  if(!panel)return null;
- return <><button className="portrait-settings" type="button" title="Staff controls" aria-label={`Staff controls for ${username}`} aria-haspopup="dialog" onClick={()=>setOpen(true)}><Settings size={19}/></button>{open&&<StaffDialog initial={panel} identity={identity} onClose={changed=>{setOpen(false);if(changed)window.location.reload();}}/>}</>;
+ return <><button className="portrait-settings" type="button" title="Staff controls" aria-label={`Staff controls for ${username}`} aria-haspopup="dialog" onClick={()=>setOpen(true)}><img className="settings-icon" src="/icons/community/settings-icon.png" alt="" width={19} height={19}/></button>{open&&<StaffDialog initial={panel} identity={identity} onClose={changed=>{setOpen(false);if(changed)window.location.reload();}}/>}</>;
 }
 
 /** Quick staff panel: rank, profile settings and the Discord link for this name. Every change is audited server-side. */

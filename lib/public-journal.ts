@@ -16,6 +16,7 @@ export function discoveryData(j:Journal,previous?:Journal|null,checkedAt?:string
   hiscores:structuredClone(j.hiscores),statsSyncedAt:j.statsSyncedAt,logSyncedAt:j.log?j.logSyncedAt:null,log:j.log?structuredClone(j.log):null,
   ...(j.profile?{profile:structuredClone(j.profile)}:{}),
   ...(j.collectionDates&&Object.keys(j.collectionDates).length?{collectionDates:{...j.collectionDates}}:{}),
+  ...(j.skillMilestones&&Object.keys(j.skillMilestones).length?{skillMilestones:{...j.skillMilestones}}:{}),
   pets:j.pets.filter(p=>p.obtained).map(p=>({id:p.id,obtained:true}) as unknown as Pet),
   sourcesCheckedAt:checkedAt??sourcesCheckedAt(previous)};
  return compact;
@@ -35,5 +36,5 @@ export function hydratePublicJournal(j:Journal):Journal {
   })}));
  return {username:j.username,accountMode:j.accountMode,revision:j.revision,hiscores:structuredClone(j.hiscores),statsSyncedAt:j.statsSyncedAt,
   logSyncedAt:j.log?j.logSyncedAt??null:null,log:j.log??null,pets,calculationVersion:initial.calculationVersion,
-  ...(j.profile?{profile:j.profile}:{}),...(j.collectionDates?{collectionDates:j.collectionDates}:{})};
+  ...(j.profile?{profile:j.profile}:{}),...(j.collectionDates?{collectionDates:j.collectionDates}:{}),...(j.skillMilestones?{skillMilestones:j.skillMilestones}:{})};
 }

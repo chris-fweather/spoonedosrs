@@ -6,18 +6,20 @@ import {PlayerSearch, SiteBrand} from './SiteHeader';
 import {HeaderNavigation} from './HeaderNavigation';
 import {emptyFlair, PlayerCard, SkillsPanel, ActivityRanks, Overview, type ProfileFlair} from './Profile';
 import {ChipRow, FilterBar, IconBox, SearchBox, SortMenu} from './Controls';
-import {DiscordLogin, type DiscordUser} from './DiscordLogin';
+import {DiscordLogin} from './DiscordLogin';
+import {siteSession, useSiteSession} from './site-session';
 import {Meter} from './Meter';
 import {ProfileEmpty} from './ProfileEmpty';
 import {ProfileChat} from './Community';
 import {JournalLoading} from './JournalLoading';
+import {OWNER_TABS, PROFILE_TABS} from './profile-tabs';
 import './profile-banner-layout.css';
 import './insights.css';
 import {PlayerStatus} from './PlayerStatus';
 import type {PlayerLookup} from '@/lib/player-lookup';
 import {progressAvailability} from '@/lib/progress-availability';
 import {acquisitionUnit,acquisitionMethod,acquisitionLabel} from '@/lib/pet-record';
-import {petRateLines} from '@/lib/pet-rates';
+import {hoursToMilestone, petRateLines} from '@/lib/pet-rates';
 import {PetDialog} from './PetDialog';
 import {PetPanel} from './PetPanel';
 import {Quests, Diaries, Combat} from './AccountProgress';
@@ -33,17 +35,6 @@ import {profileSaveBody} from '@/lib/flair';
 import {compact, num} from '@/lib/ui';
 
 const CATS = ['All', 'Bosses', 'Skilling', 'Minigames', 'Raids', 'Clues'];
-type Tab = {n: string; img?: string; Icon?: typeof Target};
-const TABS: Tab[] = [
-  {n: 'Overview', img: '/icons/navigation/stats-icon.png'},
-  {n: 'Pets', img: '/brand/rocky-mascot.webp'},
-  {n: 'Collection log', img: '/icons/navigation/collection-log-icon.png'},
-  {n: 'Quests', img: '/icons/navigation/quest-point-icon.png'},
-  {n: 'Diaries', img: '/icons/navigation/achievement-diaries-icon.png'},
-  {n: 'Combat', img: '/icons/navigation/combat-achievements.png'},
-  {n: 'Insights', img: '/icons/navigation/stats-icon.png'},
-  {n: 'Connections', img: '/icons/community/settings-icon.png'},
-];
 
 export default function Tracker({username}: {username: string}) {
   const [j, setJ] = useState<Journal>(() => ({...structuredClone(initial), username}));
@@ -76,7 +67,7 @@ export default function Tracker({username}: {username: string}) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [auth, setAuth] = useState<{user: DiscordUser | null; names: string[]}>({user: null, names: []});
+  const auth = useSiteSession();
   const [flair, setFlair] = useState<ProfileFlair>(emptyFlair);
   const [pop, setPop] = useState<{key: string; node: PopNode} | null>(null);
   const journalRef = useRef(j);
@@ -132,23 +123,14 @@ export default function Tracker({username}: {username: string}) {
       return true;
     } catch (e) { setError((e as Error).message); return false; }
   }
-  async function unlinkAccount(username: string) {
-    setBusy(true);
-    try {
-      const r = await fetch('/api/accounts', {method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username})});
-      const d = await r.json() as {error?: string};
-      if (!r.ok) throw Error(d.error || 'Could not unlink that name.');
-      await refreshSession(); await load(usernameRef.current);
-    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
-  }
-  async function refreshSession() {
-    try { const r = await fetch('/api/auth/session'); if (r.ok) setAuth(await r.json() as {user: DiscordUser | null; names: string[]}); } catch {}
+  async function refreshSession(force = true) {
+    await siteSession.load(force);
     void loadProfile(usernameRef.current);
   }
   async function logout() {
     const r = await fetch('/api/auth/logout', {method: 'POST'});
     if (!r.ok) { const d = await r.json() as {error?: string}; setError(d.error || 'Could not log out.'); return; }
-    setAuth({user: null, names: []});
+    siteSession.clear();
     setView('Overview'); setPet(null); setPop(null);
     await load(usernameRef.current);
   }
@@ -161,7 +143,7 @@ export default function Tracker({username}: {username: string}) {
       queueMicrotask(() => setError('Discord login did not finish. Try again.'));
     }
     usernameRef.current = username;
-    void load(username); void refreshSession();
+    void load(username); void refreshSession(false);
     const key = (e: KeyboardEvent) => {
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
       if (e.key === '/' && !typing) {
@@ -191,7 +173,7 @@ export default function Tracker({username}: {username: string}) {
   const displayJournal=!j.restricted&&j.details?.skills!==false&&!j.hiscores.skills.length&&lookup?.username.toLowerCase()===j.username.toLowerCase()&&lookup.skills.length?{...j,hiscores:{...j.hiscores,skills:lookup.skills}}:j;
   const owner=!!auth.user&&flair.canEdit;
   const sectionKey:Record<string,keyof NonNullable<Journal['details']>>={Pets:'pets','Collection log':'log',Quests:'quests',Diaries:'diaries',Combat:'combat'};
-  const visibleTabs=TABS.filter(t=>owner||(!['Insights','Connections'].includes(t.n)&&j.details?.[sectionKey[t.n]]!==false));
+  const visibleTabs=PROFILE_TABS.filter(t=>owner||(!OWNER_TABS.includes(t.n)&&j.details?.[sectionKey[t.n]]!==false));
   const activeView=visibleTabs.some(t=>t.n===view)?view:'Overview';
   // Measure only intrinsic content: overview, fixed portrait/skills/ranks and the
   // collapsed banner. The joining guide is a separate top-layer dialog.
@@ -205,8 +187,8 @@ export default function Tracker({username}: {username: string}) {
       const children = Array.from(left.children);
       const gap = Number.parseFloat(getComputedStyle(left).rowGap) || 0;
       const leftHeight = children.reduce((height, child) => {
-        // Boss ranks absorbs spare space, so measure its intrinsic rows instead
-        // of feeding the stretched card height back into the frame height.
+        // Boss ranks fills down to the window's bottom edge, so measure its intrinsic
+        // rows instead of feeding the stretched card height back into the frame height.
         if (child.classList.contains('activity-ranks')) {
           const heading = child.querySelector<HTMLElement>('.activity-rank-heading');
           const grid = child.querySelector<HTMLElement>('.activity-rank-grid');
@@ -224,7 +206,8 @@ export default function Tracker({username}: {username: string}) {
       }, 0) + gap * Math.max(0, children.length - 1);
       const bannerHeight = chat.getBoundingClientRect().height;
       const centreHeight = naturalHeight + (tabs?.getBoundingClientRect().height ?? 0) + 34 + bannerHeight + 12;
-      setContentHeight(Math.ceil(Math.max(leftHeight, centreHeight)));
+      // The left column shares only the window's row; the banner row beside it stays free.
+      setContentHeight(Math.ceil(Math.max(leftHeight + bannerHeight + 12, centreHeight)));
     };
     const observer = new ResizeObserver(measure);
     if (overview) observer.observe(overview);
@@ -233,7 +216,7 @@ export default function Tracker({username}: {username: string}) {
     measure();
     return () => observer.disconnect();
   }, [ready, owner, j.restricted, displayJournal.hiscores.activities.length, displayJournal.hiscores.skills.length]);
-  const go = (n: string) => { if(!owner&&['Insights','Connections'].includes(n))return; setView(n); setQ(''); setCat('All'); setStatus('all'); setHunt(false); };
+  const go = (n: string) => { if(!owner&&OWNER_TABS.includes(n))return; setView(n); setQ(''); setCat('All'); setStatus('all'); setHunt(false); };
   const syncProfile = () => void action('/api/sync', {source: 'all'});
 
   const huntCount = j.pets.filter(p => p.priority).length;
@@ -260,7 +243,7 @@ export default function Tracker({username}: {username: string}) {
       <PlayerSearch/>
       <HeaderNavigation>
         <FeatureLinks/>
-        <DiscordLogin user={auth.user} names={auth.names} viewing={j.username} disabled={busy} onSelect={n => window.location.assign('/player/' + encodeURIComponent(n))} onClaim={addAccount} onUnlink={unlinkAccount} onLogout={() => void logout()}/>
+        <DiscordLogin user={auth.user} pending={!auth.known} names={auth.names} viewing={j.username} disabled={busy} onSelect={n => window.location.assign('/player/' + encodeURIComponent(n))} onClaim={addAccount} onLogout={() => void logout()}/>
       </HeaderNavigation>
 
     </div></header>
@@ -271,7 +254,7 @@ export default function Tracker({username}: {username: string}) {
     </div>}
 
     {ready&&lookup&&lookup.state==='not_found'&&<PlayerStatus lookup={lookup} username={j.username} saved={!!j.restricted||available.pets||available.log||available.quests||available.diaries||available.combat} onRetry={()=>setLookupAttempt(n=>n+1)}/>}
-    {!ready ? <JournalLoading username={j.username} failed={!!error}/> : <div className="frame has-pop profile-banner-layout" style={{'--profile-content-h': `${contentHeight}px`} as CSSProperties}>
+    {!ready ? <JournalLoading username={j.username} failed={!!error} owner={!!auth.user&&auth.names.some(n=>n.toLowerCase()===j.username.toLowerCase())}/> : <div className="frame has-pop profile-banner-layout" style={{'--profile-content-h': `${contentHeight}px`} as CSSProperties}>
       <aside ref={leftSize} className="col-left">
         <PlayerCard journal={displayJournal} flair={flair} onFlair={updateFlair} viewerKey={auth.user?.id ?? 'guest'}/>
         {(!displayJournal.restricted&&(owner||displayJournal.details?.skills!==false))&&<SkillsPanel journal={displayJournal} pop={popApi}/>}
@@ -280,8 +263,8 @@ export default function Tracker({username}: {username: string}) {
 
       <section className="window osrs-panel">
         {j.restricted ? <div className="private-profile"><LockKeyhole size={30}/><h2>{ready?'Private collection':'Loading profile...'}</h2><p>{ready?`${j.username} has made their collection and progress private.`:'Your journal is being loaded.'}</p></div> : <>
-        <nav className="wtabs" role="tablist">{visibleTabs.map(({n, img, Icon}) => <button key={n} type="button" role="tab" aria-selected={activeView === n} onClick={() => go(n)} title={n}>
-          {img ? <img src={img} alt=""/> : Icon && <Icon size={17}/>}<span>{n}</span>
+        <nav className="wtabs" role="tablist">{visibleTabs.map(({n, img}) => <button key={n} type="button" role="tab" aria-selected={activeView === n} onClick={() => go(n)} title={n}>
+          <img src={img} alt=""/><span>{n}</span>
         </button>)}</nav>
 
         <div className={`wbody ${activeView === 'Overview' ? 'overview-body' : ''} ${['Collection log', 'Quests', 'Combat', 'Pets', 'Diaries', 'Insights'].includes(activeView) ? 'fill' : ''}`}>
@@ -308,8 +291,8 @@ export default function Tracker({username}: {username: string}) {
                   : outlook.lines.find(line => line.label === 'Drop rate' || line.label.startsWith('Drop rate at'))?.value
                   ?? (m?.rate ? m.unit==='XP'?`~${compact(m.rate)} XP estimate`:`1/${num(m.rate, 0)}` : 'Rate unavailable');
                 const phoenix = p.name === 'Phoenix' ? phoenixShownCount(p.crateRolls, j.hiscores.activities.find(a => a.name === 'Wintertodt')?.score) : null;
-                const countText = phoenix ? `${num(phoenix.value, 0)} ${phoenix.unit}` : m?.kc != null ? `${num(m.kc, 0)} ${m.unit}` : null;
-                const left = p.obtained ? 'Collected' : shownHours !== null ? `~${num(shownHours, 0)} h left` : null;
+                const count = (n: number) => n >= 10_000 ? compact(n) : n >= 1000 ? `${num(n / 1000, 1)}K` : num(n, 0), countText = phoenix ? `${count(phoenix.value)} ${phoenix.unit}` : m?.kc != null ? `${count(m.kc)} ${m.unit}` : null;
+                const next = hoursToMilestone(shownHours, shownChance), left = p.obtained ? 'Collected' : next ? `~${num(Math.max(1, next.hours), 0)} h to ${next.percent}%` : shownHours !== null ? 'Past 95%' : null;
                 // Laid out like a collection-log activity tile: icon, name, progress, then one small line of kills and time left.
                 return <button className={`pet cl-activity pet-tile ${p.obtained ? 'owned' : ''} ${pop?.key === 'pet:' + p.id ? 'sel' : ''}`} onClick={() => openPet(p)} key={p.id} title={`${p.name} · ${sub} · ${rateText}${p.obtained&&p.obtainedCount!=null?` · Obtained: ${acquisitionLabel(p)}`:''}`}>
                   <IconBox src={`/pets/${p.id}.png`} alt=""/>
@@ -343,7 +326,6 @@ export default function Tracker({username}: {username: string}) {
     </div>
 
     }
-    {ready&&<footer className="foot">Drop rates and images from the <a href="https://oldschool.runescape.wiki" target="_blank" rel="noreferrer">OSRS Wiki</a> (CC BY-NC-SA). Stats, collection log, quests and character from the <a href="https://secure.runescape.com/m=hiscore_oldschool/" target="_blank" rel="noreferrer">OSRS Hiscores</a>, <a href="https://runeprofile.com" target="_blank" rel="noreferrer">RuneProfile</a>, <a href="https://templeosrs.com" target="_blank" rel="noreferrer">TempleOSRS</a> and <a href="https://wiseoldman.net" target="_blank" rel="noreferrer">Wise Old Man</a>. SpoonedOSRS is a fan project, not affiliated with Jagex.</footer>}
 
     <PetDialog journal={j} pet={j.restricted ? null : pet} setPet={p=>setPet(p?normalizeRates({...j,pets:[p]}).pets[0]:null)} canEdit={ready&&flair.canEdit} editProgress={editPetProgress} busy={busy} error={error} onSave={async () => { if (pet && await action('/api/journal', {pet, revision: j.revision})) setPet(null); }}/>
   </div>;

@@ -1,0 +1,26 @@
+/* Item price cards (ItemPriceCard.tsx): shown in the floating tooltip over guide items. */
+/* The card grows to fit a long name ("Fremennik sea boots 4"); the footer and notes never widen it. */
+.floating-tooltip.ipc-tip{width:max-content;min-width:248px;max-width:min(340px,calc(100vw - 16px));padding:10px 12px;font-size:12px}
+.ipc{display:flex;flex-direction:column;gap:8px}
+.ipc-head{display:flex;align-items:center;gap:8px;min-width:0}
+.ipc-head>img{width:28px;height:28px;object-fit:contain;flex:none}
+.ipc-head>b{font-size:13px;color:#f2e6c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ipc-members{margin-left:auto;flex:none;color:#d8b25a;font-size:10px;letter-spacing:.04em;text-transform:uppercase}
+.ipc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ipc-cell{display:grid;grid-template-columns:18px 1fr;grid-template-rows:auto auto;column-gap:6px;align-items:center;padding:6px 8px;border-radius:5px;background:#ffffff08}
+.ipc-cell img{grid-row:1/3;width:18px;height:18px;object-fit:contain}
+.ipc-cell small{color:#a39d8c;font-size:10px;line-height:1.2;white-space:nowrap}
+.ipc-cell b{color:#f6e54e;font-size:13px;line-height:1.3;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ipc-effect{color:#d6cdb6;font-size:12px;line-height:1.45;text-wrap:pretty;contain:inline-size}
+.ipc-source{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:#ffffff08;contain:inline-size}
+.ipc-source>img{width:20px;height:20px;object-fit:contain;flex:none}
+.ipc-source>span{display:flex;flex-direction:column;min-width:0}
+.ipc-source b{color:#f2e6c4;font-size:12px}.ipc-source small{color:#a39d8c;font-size:11px}
+.ipc-note,.ipc-foot{color:#a39d8c;font-size:11px;contain:inline-size}
+.ipc-foot{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ipc-trigger:focus-visible{outline:2px solid #e9c97a;outline-offset:2px;border-radius:3px}
+.ipc-trigger.guide-slot{cursor:help}.ipc-trigger.guide-slot:hover{border-color:#837043}
+.ipc-grid.is-single{grid-template-columns:1fr}
+/* A stack (×90): the stack's worth as the big value, the price of one under it, and the quantity beside the name. */
+.ipc-head>small.ipc-qty{flex:none;color:#c9bfa6;font-size:12px;font-variant-numeric:tabular-nums}
+.ipc-cell em.ipc-each{grid-column:2;font-style:normal;color:#c9bfa6;font-size:10px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}

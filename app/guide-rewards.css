@@ -1,0 +1,132 @@
+/* Rewards sections (GuideRewards.tsx), one style per kind of reward, after the game's own interfaces:
+   - quest, casket and diary: the parchment scroll (a 3D model in the game, drawn here in CSS): a warm sheet between two
+     rolled ends, the picture on a round plate, text in the game's dark inks (#321e25 titles, #37242b lines).
+   - chest: the game's stone reward window, built from its own sprites (public/icons/ui-reward, 1x, pixel-crisp): the
+     "steelborder" frame as a 9-slice border image, the "tradebacking" stone tiled behind, the title in the game's orange
+     (#ff981f) over the frame's divider. */
+.guide-rewards{--gr-ink:#37242b;--gr-title:#321e25;--gr-muted:#6b5434;--gr-paper:#ead9ad;--gr-edge:#b8925a;display:grid;justify-items:stretch;max-width:660px;margin-inline:auto;color:var(--gr-ink)}
+
+/* The scroll's rolled ends: a rod a little wider than the sheet, shaded round, with a curl at each end. */
+.gr-roll{position:relative;height:22px;margin:0 8px;border-radius:11px;z-index:1;
+ background:linear-gradient(180deg,#7a5a2c 0%,#d8c08a 22%,#f3e6c2 42%,#d4b981 64%,#9b773f 86%,#5e4320 100%);
+ box-shadow:0 2px 3px #0006,inset 0 0 0 1px #5e432066}
+.gr-roll::before,.gr-roll::after{content:'';position:absolute;top:-3px;width:28px;height:28px;border-radius:50%;
+ background:radial-gradient(circle at 50% 50%,#5e4320 0 2px,#c9ab70 3px 5px,#7a5a2c 6px 7px,#e9d6a6 8px 10px,#8a6a3a 11px 12px,#d6bd88 13px);
+ box-shadow:0 1px 3px #0007}
+.gr-roll::before{left:-8px}.gr-roll::after{right:-8px}
+.gr-roll.is-top{margin-bottom:-6px}.gr-roll.is-bottom{margin-top:-6px}
+.gr-sheet{position:relative;display:grid;gap:14px;margin:0 22px;padding:24px 28px 22px;
+ background:
+  radial-gradient(120% 90% at 50% 45%,#f4e8c6 0%,var(--gr-paper) 55%,#d9bf86 88%,var(--gr-edge) 100%),
+  var(--gr-paper);
+ box-shadow:inset 10px 0 14px -10px #7a5a2c99,inset -10px 0 14px -10px #7a5a2c99,0 3px 10px #0005}
+/* Faint fibres so the sheet reads as paper, not a flat panel. */
+.gr-sheet::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.35;
+ background:repeating-linear-gradient(0deg,#8a6a3a0d 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,#8a6a3a08 0 1px,transparent 1px 7px)}
+.gr-sheet>*{position:relative}
+
+/* Heading: a large title over one line, centred, as the game's scroll has "Congratulations!" over "You have completed …!". */
+.gr-head{display:grid;gap:4px;justify-items:center;min-width:0;text-align:center}
+.guide-rewards .gr-kicker{font:700 24px/1.15 var(--rs);color:var(--gr-title);text-shadow:0 1px 0 #fff6;text-wrap:balance}
+.gr-head h3{margin:0;font:700 17px/1.3 var(--rs);color:var(--gr-ink);text-wrap:balance}
+.guide-rewards .gr-sub{font:700 14px/1.2 var(--rs);color:var(--gr-muted)}
+.gr-head.is-stacked{gap:6px}
+
+/* The scroll's picture: twice its size, pixel-crisp, on a round parchment plate with a soft inset, like an emblem. */
+.gr-emblem{flex:none;display:grid;place-items:center;width:96px;height:96px;border-radius:50%;
+ background:radial-gradient(circle at 50% 42%,#fbf3dc 0%,#efe0b6 55%,#dcc48f 80%,#c8a96c 100%);
+ box-shadow:inset 0 2px 6px #7a5a2c66,inset 0 -2px 3px #fff8,0 1px 0 #fff9,0 0 0 1px #a8834d66}
+.gr-emblem img{width:63px;height:56px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(1px 2px 0 #5e432055)}
+.gr-head .gr-emblem{width:96px;height:96px;margin-bottom:2px}
+
+/* Body: the picture centred under the heading, then the awards as one neat block centred under it: its label and rows
+   all start at the same left edge, so nothing is centred on its own. */
+.gr-body{display:flex;flex-direction:column;align-items:center;gap:16px;min-width:0}
+.gr-awards{display:grid;gap:8px;justify-items:start;width:fit-content;max-width:100%;min-width:0;margin-inline:auto}
+.guide-rewards .gr-label{font:700 15px/1.2 var(--rs);color:var(--gr-title)}
+.gr-awards>.gr-label:not(:first-child){margin-top:6px}
+.gr-list{list-style:none;margin:0;padding:0;display:grid;gap:6px;width:fit-content;max-width:100%}
+.gr-list>li{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;column-gap:10px;min-height:28px;min-width:0;font-size:14px;line-height:1.45;text-align:left}
+.gr-list>li>.gr-item{grid-column:1/-1;display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;column-gap:10px}
+.gr-icon{display:grid;place-items:center;width:28px;height:28px}
+.gr-icon img{width:26px;height:26px;object-fit:contain;image-rendering:pixelated}
+.gr-text{min-width:0;text-wrap:pretty}
+.gr-list b{font-weight:700;font-variant-numeric:tabular-nums}
+.gr-item{min-width:0;border-radius:4px;cursor:help}
+.gr-item:focus-visible{outline:2px solid #7a4a12;outline-offset:2px}
+/* Every row has its icon in the column, so a mention's own inline icon (a line's item, an XP row's skill) is hidden
+   rather than shown twice. */
+.gr-list .guide-ref img{display:none}
+/* Item and skill mentions on parchment: dark ink instead of the page's gold, and no gap before a following comma. */
+.guide-rewards:not(.is-chest) .guide-ref{color:#5a340c;border-bottom-color:#5a340c66}
+.guide-rewards:not(.is-chest) .guide-ref:hover{color:#2b1d0e;border-bottom-color:#2b1d0e}
+.guide-rewards .guide-ref-punct{margin-left:0}
+/* An item row's name is underlined like a mention, so every name with a hover card reads the same. */
+.gr-list .gr-name{border-bottom:1px dotted #5a340c66;color:#5a340c}
+.is-chest .gr-list .gr-name{color:#e9c97a;border-bottom-color:#e9c97a66}
+.gr-list .gr-item:hover .gr-name{color:#2b1d0e;border-bottom-color:#2b1d0e}
+.is-chest .gr-list .gr-item:hover .gr-name{color:#fff}
+
+/* Loot: items straight on the scroll or stone in rows (three by default, as the clue and Barrows windows lay them), each
+   in a 40x36 cell with its stack size in the top-left corner. The reward window lays them in one wrapping row instead,
+   with no slot behind them. */
+.gr-loot{list-style:none;margin:0 auto;padding:0;display:grid;grid-template-columns:repeat(var(--gr-cols,3),40px);gap:4px 8px;justify-content:center}
+.gr-cell{position:relative;display:grid;place-items:center;width:40px;height:36px}
+.gr-cell img{width:36px;height:32px;object-fit:contain;image-rendering:pixelated}
+.guide-rewards .gr-stack{position:absolute;left:1px;top:0;font:12px/1 var(--rs);color:#ff0;text-shadow:1px 1px 0 #000;pointer-events:none}
+.guide-rewards .gr-stack.is-k{color:#fff}.guide-rewards .gr-stack.is-m{color:#0f8}
+.gr-loot.is-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 10px;max-width:100%}
+.guide-rewards .gr-worth{margin:0;text-align:center;text-wrap:balance;font:16px/1.3 var(--rs);color:var(--gr-ink)}
+.guide-rewards .gr-worth b{font-weight:700;color:#7a1d06}
+/* A casket's or chest's note: the worth line's font, a little smaller, balanced so no word sits alone on a line. */
+.guide-rewards .gr-note{margin:0;max-width:44ch;text-align:center;text-wrap:balance;font:15px/1.35 var(--rs);color:var(--gr-ink)}
+.guide-rewards .gr-note .guide-ref img{display:none}
+
+/* Casket: the casket on its plate, the title, the items and their worth, all centred. */
+.is-casket .gr-sheet{justify-items:center}
+
+/* Chest: the game's stone reward window. */
+.guide-rewards.is-chest{--gr-ink:#e7e4dc;--gr-muted:#a59a80;--gr-title:#ff981f;max-width:520px}
+.gr-window{display:grid;border:6px solid transparent;border-image:url(/icons/ui-reward/steelborder.png) 30 25 / 30px 25px / 0 repeat;
+ background:#3e3529 url(/icons/ui-reward/tradebacking.png) repeat;background-origin:border-box;image-rendering:pixelated;box-shadow:0 3px 10px #0006}
+.gr-bar{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:30px;padding:2px 12px 4px}
+.gr-bar::after{content:'';position:absolute;left:-1px;right:-1px;bottom:-3px;height:6px;background:url(/icons/ui-reward/steelborder-divider.png) 0 -15px repeat-x}
+.gr-bar img{display:block;width:22px;height:22px;object-fit:contain;flex:none;image-rendering:auto}
+.guide-rewards .gr-bar h3{margin:0;min-width:0;font:700 17px/22px var(--rs);color:#ff981f;text-shadow:1px 1px 0 #000;text-align:center;text-wrap:balance}
+.gr-pane{display:grid;gap:12px;justify-items:center;padding:16px 14px 14px}
+.is-chest .gr-worth{color:#e7e4dc;text-shadow:1px 1px 0 #000}
+.is-chest .gr-worth b{color:#ff0;font-weight:400}
+.is-chest .gr-note{color:#e7e4dc;text-shadow:1px 1px 0 #000}
+.is-chest .gr-list>li{font-size:13px}
+
+@media (max-width:600px){
+ .gr-sheet{margin:0 18px;padding:20px 14px 18px}
+ .gr-roll::before,.gr-roll::after{width:24px;height:24px;top:-1px}
+ .gr-body{gap:12px}
+ .guide-rewards .gr-kicker{font-size:21px}
+ .gr-head h3{font-size:16px}
+}
+
+/* Editor (GuideRewardsEditor.tsx); item and line lists reuse the map stop editor's (guide-map.css). */
+.gr-editor{display:grid;gap:14px}
+.gr-edit-variants{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.gr-edit-variants .btn{justify-content:center;min-height:40px}
+.gr-edit-row{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:12px}
+.gr-edit-row>.gr-edit-title:only-child{grid-column:1/-1}
+.gr-edit-picture{display:grid;grid-template-columns:28px minmax(0,1fr) 30px;align-items:center;gap:8px;font-size:13px;color:var(--text)}
+.gr-edit-picture img{width:26px;height:26px;object-fit:contain;image-rendering:pixelated}
+.gr-edit-picture button,.gr-edit-xp button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;border-radius:5px;background:none;color:#cfc4a8}
+.gr-edit-picture button:hover,.gr-edit-xp button:hover{background:#ffffff10}
+.gr-edit-xp{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.gr-edit-xp li{display:grid;grid-template-columns:24px minmax(0,1fr) 120px 30px;align-items:center;gap:8px}
+.gr-edit-xp img{width:22px;height:22px;object-fit:contain}
+.gr-edit-xp select,.gr-edit-xp input{min-width:0;width:100%}
+.gr-edit-tiers{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.gr-edit-tiers .btn{flex-direction:column;justify-content:center;gap:2px;min-height:56px;padding:4px 2px;font-size:12px}
+.gr-edit-tiers img{width:36px;height:32px;object-fit:contain;image-rendering:pixelated}
+.gr-edit-source{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;gap:8px}
+.gr-edit-source img{width:24px;height:24px;object-fit:contain}
+.gr-edit-source select{min-width:0;width:100%}
+.gr-edit-preview{display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--line)}
+.gr-edit-preview>small{color:var(--muted);font-size:12px}
+@media (max-width:600px){.gr-edit-tiers{grid-template-columns:repeat(3,minmax(0,1fr))}.gr-edit-row{grid-template-columns:minmax(0,1fr) 96px}.gr-edit-xp li{grid-template-columns:24px minmax(0,1fr) 96px 30px}}

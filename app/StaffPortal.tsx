@@ -1,8 +1,9 @@
 'use client';
 import {StaffPlayers,type DirectoryPlayer} from './StaffPlayers';
+import {StaffDonations} from './StaffDonations';
 import {StaffCorrections} from './StaffCorrections';
 import {StaffCases} from './StaffCases';
-import {StaffOverview,StaffPeople,type Change,type OwnershipCase,type ReviewState} from './StaffWorkspace';
+import {StaffOverview,StaffPeople,type Change,type OwnershipCase,type PublishedGuide,type ReviewState} from './StaffWorkspace';
 import type {StaffPerson} from '@/lib/staff-people';
 import {StaffAccess,type StaffMember,type AuditEntry} from './StaffAccess';
 import type {EditableStaffRole,StaffPermissions} from '@/lib/staff-permissions';
@@ -16,7 +17,7 @@ import {StaffTabs,STAFF_TABS,staffTabFrom,correctionSectionFrom,type CorrectionS
 import {PublicHeader} from './Community';
 import {PersonName} from './StaffBadge';
 import {STAFF_LABEL,type StaffRole} from '@/lib/staff-policy';
-type Dashboard={planningTargets:PlanningTarget[];observations:Observation[];viewer:{id:string;name:string;role:StaffRole;prefix:'Sir'|null;permissions:StaffPermissions};players:DirectoryPlayer[];playerCount?:number;changes:Change[];overrides:{target:string;payload:string}[];pets:string[];members:StaffMember[];audit:AuditEntry[];rolePermissions:Record<EditableStaffRole,StaffPermissions>|null;cases?:OwnershipCase[];people?:StaffPerson[]};
+type Dashboard={planningTargets:PlanningTarget[];observations:Observation[];viewer:{id:string;name:string;role:StaffRole;prefix:'Sir'|null;permissions:StaffPermissions};players:DirectoryPlayer[];playerCount?:number;changes:Change[];overrides:{target:string;payload:string}[];pets:string[];members:StaffMember[];audit:AuditEntry[];rolePermissions:Record<EditableStaffRole,StaffPermissions>|null;cases?:OwnershipCase[];guides?:PublishedGuide[];people?:StaffPerson[]};
 function allowedTabs(v:Dashboard['viewer']):StaffTabId[]{
  const manager=v.role==='admin'||v.role==='owner';
  return ['overview',...(manager?['players'] as const:[]),'ownership',...(v.permissions.corrections||v.permissions.planning||v.permissions.review?['corrections'] as const:[]),...(v.permissions.guides?['guides'] as const:[]),...(manager?['permissions'] as const:[]),...(v.role==='owner'?['discord'] as const:[])];
@@ -53,8 +54,9 @@ export function StaffPortal({initialTab}:{initialTab?:StaffTabId}={}){
   <StaffTabs allowed={allowed} active={active} onSelect={navigate}/>
   <section id="staff-panel" className="staff-window-body" role="tabpanel" aria-labelledby={'staff-tab-'+active}>
    <header className="staff-area-heading"><h2>{meta.title}</h2><p>{meta.description}</p></header>
-   {active==='overview'&&viewer&&<StaffOverview changes={data.changes} cases={data.cases??[]} memberCount={viewer.role==='owner'?data.members.length:null} viewer={viewer} onNavigate={navigate} onFilter={state=>{setHistoryState(state);navigate('corrections','history');}}/>}
+   {active==='overview'&&viewer&&<StaffOverview changes={data.changes} cases={data.cases??[]} guides={data.guides??[]} memberCount={viewer.role==='owner'?data.members.length:null} viewer={viewer} onNavigate={navigate} onFilter={state=>{setHistoryState(state);navigate('corrections','history');}}/>}
    {active==='players'&&canManage&&<StaffPlayers players={data.players} total={data.playerCount??data.players.length} owner={canManage} corrections={viewer.permissions.corrections} onSearch={query=>{setQ(query);load(query).catch(e=>setError(e.message));}} onAccess={name=>{setGrantName(name);navigate('permissions');}} onHistory={name=>{setHistoryQuery(name);setHistoryState('all');navigate('corrections','history');}} onOwnership={name=>{const u=new URL(window.location.href);u.searchParams.set('player',name);window.history.replaceState(window.history.state,'',u.pathname+u.search);navigate('ownership');}}/>}
+   {active==='players'&&viewer?.role==='owner'&&<StaffDonations/>}
    {active==='ownership'&&viewer&&<StaffCases role={viewer.role}/>}
    {active==='corrections'&&viewer&&<StaffCorrections viewer={viewer} changes={data.changes} planningTargets={data.planningTargets} overrides={data.overrides??[]} observations={data.observations} pets={data.pets} busy={busy} section={section} onSection={next=>navigate('corrections',next)} onAction={action} historyQuery={historyQuery} setHistoryQuery={setHistoryQuery} historyState={historyState} setHistoryState={setHistoryState}/>}
    {active==='permissions'&&canManage&&data.rolePermissions&&<StaffAccess members={data.members} audit={data.audit} rolePermissions={data.rolePermissions} viewer={viewer} busy={busy} onSave={action} grantName={grantName} setGrantName={setGrantName}/>}

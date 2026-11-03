@@ -1,0 +1,45 @@
+/* Anonymous donation receipt: the public number and the once-only claim code. */
+.donation-receipt{display:grid;gap:10px;padding:14px 16px;border:1px solid #4f8a3b;border-radius:8px;background:#1d2a18}
+.donation-receipt-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.donation-receipt-head b{font-size:16px}
+.donation-receipt-head span{font-size:12px;color:var(--muted)}
+.donation-receipt-code{display:flex;align-items:center;gap:10px}
+.donation-receipt-code code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;padding:9px 12px;border:1px solid var(--line);border-radius:6px;background:var(--sunk);font-size:14px;letter-spacing:.04em;user-select:all}
+.donation-receipt-code .btn{display:inline-flex;align-items:center;gap:6px;min-height:40px}
+.donation-receipt small{font-size:12px;color:var(--muted)}
+/* Owner's donations panel in the staff portal. */
+.community-panel.staff-donations{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:16px}
+.staff-donation-form{display:grid;grid-template-columns:110px 100px minmax(0,1fr) minmax(0,1fr) auto auto;gap:10px;align-items:end}
+.staff-donation-form label:not(.account-choice){display:grid;gap:4px;font-size:11px;color:var(--muted)}
+.staff-donation-form input:not([type=checkbox]),.staff-donation-form select{min-height:40px;min-width:0;width:100%;box-sizing:border-box}
+.staff-donation-form .account-choice{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 11px;border:1px solid var(--line);border-radius:6px;background:var(--sunk);font-size:12px}
+.staff-donation-form .btn{min-height:40px}
+.staff-donation-list{list-style:none;margin:0;padding:0;display:grid}
+.staff-donation-list li{display:grid;grid-template-columns:90px minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 80px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.staff-donation-list li span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.staff-donation-list li.is-void{opacity:.55}
+@media(max-width:800px){.staff-donation-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.staff-donation-form .btn{grid-column:1/-1}
+ .staff-donation-list li{grid-template-columns:80px minmax(0,1fr) auto}.staff-donation-list li>span:nth-of-type(2),.staff-donation-list li>span:nth-of-type(3){display:none}}
+/* Support page: who a donation supports. One helper line, then one row: name, amount, continue. */
+.community-panel.donation-picker{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.donation-picker h2{margin:0}
+.donation-help{margin:-4px 0 0;font-size:13px;color:var(--muted)}
+.donation-fields{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:end;padding-top:14px;border-top:1px solid var(--line)}
+.donation-field{display:grid;gap:5px;min-width:0}
+.donation-field>span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--dim)}
+.donation-field input[aria-invalid=true]{border-color:var(--bad)}
+.donation-field input,.donation-field select{height:40px;min-width:0;width:100%;box-sizing:border-box}
+.donation-amounts{display:grid;grid-template-columns:repeat(4,64px);gap:6px}
+.donation-amounts button{height:40px;border:1px solid var(--line-2);border-radius:var(--radius);background:var(--sunk);color:var(--muted);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+.donation-amounts button:hover{border-color:var(--line-3);color:var(--text)}
+.donation-amounts button[aria-pressed=true]{border-color:#a8661a;background:var(--warn-bg);color:var(--text)}
+.donation-custom{display:flex;align-items:center;height:40px;border:1px solid #a8661a;border-radius:var(--radius);background:var(--sunk);padding-left:8px;box-sizing:border-box}
+.donation-custom span{color:var(--muted);font-weight:700;font-size:14px}
+.donation-custom input{height:38px;border:0;background:none;padding:0 6px 0 3px;width:100%;min-width:0;font-weight:700}
+.donation-go{height:40px;justify-content:center}
+.donation-picker .fine{margin:0}
+@media(max-width:800px){
+ .donation-fields{grid-template-columns:minmax(0,1fr)}
+ .donation-amounts{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .donation-go{width:100%;min-height:44px}
+}

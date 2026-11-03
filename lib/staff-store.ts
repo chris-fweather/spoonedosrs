@@ -4,13 +4,15 @@ import {HttpError,readSession} from './auth';
 import {staffPeople} from './staff-people';
 import {db,sameOrigin} from './storage';
 import {publicMessage} from './request-body';
-import {evidenceUrl,mayGrant,mayReviewProposal,STAFF_LABEL,type StaffRole} from './staff-policy';
+import {evidenceUrl,mayGrant,mayReviewProposal,proposerRankGuard,STAFF_LABEL,staffTitle,type StaffRole} from './staff-policy';
 import {publicStaff} from './staff-data';
 import {rateCatalogue} from './rate-catalogue';
 import seed from './catalogue.json';
 import {discordAvatarUrl} from './session';
+import {rankHistory,type RankEvent} from './staff-rank-history';
+import {guideTopicImage} from './guide-topics';
 
-type StaffMember={discord_id:string;role:StaffRole;prefix:'Sir'|null;revision:string};
+type StaffMember={discord_id:string;role:StaffRole;prefix:'Sir'|null;title:string|null;revision:string};
 type Change={id:number;kind:'rate'|'record';target:string;payload:string;source:string;reason:string;base_revision:number;actor_id:string;actor_name:string;state:string;reviewer_id:string|null;reviewer_name?:string|null;created_at:string;reviewed_at:string|null};
 type AreaRow=Record<StaffArea,number>;
 /** Saved rank defaults. Until the role migration runs, every rank uses the shipped defaults. */
@@ -37,15 +39,22 @@ export async function staffDashboard(req:Request) {
  const user=await requireStaff(req);
  // Admins and the owner see the player directory, the team, rank permissions and access history; admins edit helpers' and moderators' access, rank defaults stay the owner's.
  const manager=user.role==='admin'||user.role==='owner';
- const changes=user.permissions.corrections||user.permissions.planning||user.permissions.review?await db().prepare("SELECT c.*,COALESCE(r.global_name,r.username) AS reviewer_name,(SELECT role FROM staff_members WHERE discord_id=c.actor_id) AS actor_role,(SELECT role FROM staff_members WHERE discord_id=c.reviewer_id) AS reviewer_role FROM staff_changes c LEFT JOIN users r ON r.discord_id=c.reviewer_id WHERE c.state='pending' OR c.id IN (SELECT id FROM staff_changes ORDER BY id DESC LIMIT 100) ORDER BY c.id DESC").all<Change>():{results:[]};
+ const changes=user.permissions.corrections||user.permissions.planning||user.permissions.review?await db().prepare("SELECT c.*,COALESCE(r.global_name,r.username) AS reviewer_name FROM staff_changes c LEFT JOIN users r ON r.discord_id=c.reviewer_id WHERE c.state='pending' OR c.id IN (SELECT id FROM staff_changes ORDER BY id DESC LIMIT 100) ORDER BY c.id DESC").all<Change>():{results:[]};
  // Notes and decision reasons on corrections, shown in each correction's timeline.
  const changeIds=changes.results.map(c=>'change:'+c.id);
  const notes=changeIds.length?(await db().prepare(`SELECT a.target_id,a.action,a.actor_id,a.detail,a.created_at,COALESCE(u.global_name,u.username) AS actor_name FROM staff_audit a LEFT JOIN users u ON u.discord_id=a.actor_id WHERE a.action IN ('correction-note','correction-review') AND a.target_id IN (SELECT value FROM json_each(?)) ORDER BY a.id`).bind(JSON.stringify(changeIds)).all<{target_id:string;action:string;actor_id:string;detail:string;created_at:string;actor_name:string|null}>()).results:[];
  const roles=manager?await roleDefaults():[];
- type MemberRow={discord_id:string;role:StaffRole;prefix:string|null;username:string;global_name:string|null;avatar:string|null;linked_names:string} & Record<StaffArea,number|null>;
- const members=manager ? (await db().prepare('SELECT s.discord_id,s.role,s.prefix,u.username,u.global_name,u.avatar,p.guides,p.publish,p.corrections,p.planning,p.review,p.ownership,p.holds,(SELECT json_group_array(display_name) FROM claimed_names c WHERE c.discord_id=s.discord_id) AS linked_names FROM staff_members s JOIN users u ON u.discord_id=s.discord_id LEFT JOIN staff_permissions p ON p.discord_id=s.discord_id ORDER BY s.role,u.username').all<MemberRow>()).results
+ type MemberRow={discord_id:string;role:StaffRole;prefix:string|null;title:string|null;username:string;global_name:string|null;avatar:string|null;linked_names:string} & Record<StaffArea,number|null>;
+ const members=manager ? (await db().prepare('SELECT s.discord_id,s.role,s.prefix,s.title,u.username,u.global_name,u.avatar,p.guides,p.publish,p.corrections,p.planning,p.review,p.ownership,p.holds,(SELECT json_group_array(display_name) FROM claimed_names c WHERE c.discord_id=s.discord_id) AS linked_names FROM staff_members s JOIN users u ON u.discord_id=s.discord_id LEFT JOIN staff_permissions p ON p.discord_id=s.discord_id ORDER BY s.role,u.username').all<MemberRow>()).results
   .map(({avatar,...m})=>({...m,avatarUrl:avatar?discordAvatarUrl(m.discord_id,avatar):null,custom:m.guides!==null,permissions:staffPermissions(m.role,m,roles.find(r=>r.role===m.role))})) : [];
- const audit=manager ? (await db().prepare('SELECT a.*,COALESCE(au.global_name,au.username) AS actor_name,COALESCE(tu.global_name,tu.username) AS target_name FROM staff_audit a LEFT JOIN users au ON au.discord_id=a.actor_id LEFT JOIN users tu ON tu.discord_id=a.target_id WHERE a.action NOT IN (\'correction-note\',\'correction-review\') ORDER BY a.id DESC LIMIT 50').all()).results : [];
+ // Names are coloured by the rank each person held when the row happened, not by their rank today (see rankHistory).
+ const [rankEvents,currentRanks]=await Promise.all([
+  db().prepare("SELECT id,target_id,action,detail,created_at FROM staff_audit WHERE action IN ('grant','revoke') ORDER BY id").all<RankEvent>(),
+  db().prepare('SELECT discord_id,role FROM staff_members').all<{discord_id:string;role:StaffRole}>(),
+ ]);
+ const roleAt=rankHistory(rankEvents.results,new Map(currentRanks.results.map(r=>[r.discord_id,r.role])));
+ const audit=manager ? (await db().prepare('SELECT a.*,COALESCE(au.global_name,au.username) AS actor_name,COALESCE(tu.global_name,tu.username) AS target_name FROM staff_audit a LEFT JOIN users au ON au.discord_id=a.actor_id LEFT JOIN users tu ON tu.discord_id=a.target_id WHERE a.action NOT IN (\'correction-note\',\'correction-review\') ORDER BY a.id DESC LIMIT 50').all<{id:number;actor_id:string|null;target_id:string|null}>()).results
+  .map(a=>({...a,actor_role:roleAt(a.actor_id,{beforeId:a.id}),target_role:roleAt(a.target_id,{beforeId:a.id})})) : [];
  // What each rank opens by default; the owner column is always every area.
  const rolePermissions=manager?Object.fromEntries(EDITABLE_STAFF_ROLES.map(role=>[role,staffPermissions(role,null,roles.find(r=>r.role===role))])):null;
  const q=new URL(req.url).searchParams.get('q')?.trim().toLowerCase()??'';
@@ -54,10 +63,14 @@ export async function staffDashboard(req:Request) {
  const playerCount=manager?((await db().prepare('SELECT COUNT(*) AS n FROM claimed_names').first<{n:number}>())?.n??0):0;
  const players=manager?(await db().prepare(`SELECT c.display_name AS name,c.discord_id AS discordId,u.username AS discordName,c.claimed_at AS linkedAt,s.role,COALESCE(v.visibility,'public') AS visibility,(SELECT json_group_array(display_name) FROM claimed_names all_names WHERE all_names.discord_id=c.discord_id) AS linked_names,js.pets,js.log,js.quest_points AS quests,json_extract(js.data,'$.accountMode') AS accountMode,json_extract(j.data,'$.sourcesCheckedAt') AS checkedAt,st.amount_minor AS donationMinor,st.currency AS donationCurrency,COALESCE(pp.show_donation,1) AS donationShown FROM claimed_names c JOIN users u ON u.discord_id=c.discord_id LEFT JOIN profile_supporter_totals st ON st.rsn=c.rsn LEFT JOIN profile_presentation pp ON pp.rsn=c.rsn LEFT JOIN staff_members s ON s.discord_id=c.discord_id LEFT JOIN profile_visibility v ON v.rsn=c.rsn LEFT JOIN journal_summaries js ON js.rsn=c.rsn LEFT JOIN journals j ON j.id=c.rsn WHERE instr(lower(c.display_name),?)>0 OR instr(lower(u.username),?)>0 ORDER BY c.display_name LIMIT 30`).bind(q.slice(0,80),q.slice(0,80)).all()).results:[];
  // Recent ownership requests for the overview feed; helpers only see routine ones, as in the Ownership tab.
- const cases=(await db().prepare(`SELECT id,rsn,action,state,created_at,reviewed_at,creator_id,creator_name,reviewer_id,target_id,protected FROM staff_cases ${user.role==='helper'?'WHERE protected=0':''} ORDER BY COALESCE(reviewed_at,created_at) DESC LIMIT 20`).all<{creator_id:string;reviewer_id:string|null;target_id:string|null}>()).results;
+ const cases=(await db().prepare(`SELECT id,rsn,action,state,created_at,reviewed_at,creator_id,creator_name,reviewer_id,target_id,source_id,protected FROM staff_cases ${user.role==='helper'?'WHERE protected=0':''} ORDER BY COALESCE(reviewed_at,created_at) DESC LIMIT 20`).all<{creator_id:string;reviewer_id:string|null;target_id:string|null;created_at:string;reviewed_at:string|null}>()).results
+  .map(c=>{const at=c.reviewed_at??c.created_at;return {...c,creator_role:roleAt(c.creator_id,{at}),reviewer_role:roleAt(c.reviewer_id,{at})};});
+ // Published guides join the overview feed: who published which guide, with its topic icon.
+ const guides=(await db().prepare('SELECT id,title,published,published_at,publisher_id FROM community_guides WHERE published IS NOT NULL AND published_at IS NOT NULL ORDER BY published_at DESC LIMIT 10').all<{id:string;title:string;published:string;published_at:string;publisher_id:string|null}>()).results
+  .map(g=>{let activity='';try{activity=String((JSON.parse(g.published) as {activity?:unknown}).activity??'');}catch{}return {id:g.id,title:g.title,image:guideTopicImage(activity)??null,published_at:g.published_at,publisher_id:g.publisher_id,publisher_role:roleAt(g.publisher_id,{at:g.published_at})};});
  // Everyone these lists name, as the site shows them (main name, scimitar, Sir, the Generous).
- const people=await staffPeople([user.id,...(players as {discordId:string}[]).map(p=>p.discordId),...members.map(m=>m.discord_id),...changes.results.flatMap(c=>[c.actor_id,c.reviewer_id]),...(audit as {actor_id:string|null;target_id:string|null}[]).flatMap(a=>[a.actor_id,a.target_id]),...cases.flatMap(c=>[c.creator_id,c.reviewer_id,c.target_id])]);
- return {players,playerCount,observations,rolePermissions,viewer:{id:user.id,name:user.globalName||user.username,role:user.role,prefix:user.prefix,permissions:user.permissions},members,changes:changes.results.map(c=>({...c,image:changeImage(c.kind,c.target),notes:notes.filter(n=>n.target_id==='change:'+c.id).map(n=>({kind:n.action==='correction-review'?'reason':'note',actorId:n.actor_id,actorName:n.actor_name,text:n.detail,at:n.created_at}))})),audit,cases,people,
+ const people=await staffPeople([user.id,...(players as {discordId:string}[]).map(p=>p.discordId),...members.map(m=>m.discord_id),...changes.results.flatMap(c=>[c.actor_id,c.reviewer_id]),...(audit as {actor_id:string|null;target_id:string|null}[]).flatMap(a=>[a.actor_id,a.target_id]),...cases.flatMap(c=>[c.creator_id,c.reviewer_id,c.target_id]),...guides.map(g=>g.publisher_id)]);
+ return {players,playerCount,observations,rolePermissions,viewer:{id:user.id,name:user.globalName||user.username,role:user.role,prefix:user.prefix,permissions:user.permissions},members,changes:changes.results.map(c=>({...c,actor_role:roleAt(c.actor_id,{at:c.reviewed_at??c.created_at}),reviewer_role:roleAt(c.reviewer_id,{at:c.reviewed_at??c.created_at}),image:changeImage(c.kind,c.target),notes:notes.filter(n=>n.target_id==='change:'+c.id).map(n=>({kind:n.action==='correction-review'?'reason':'note',actorId:n.actor_id,actorName:n.actor_name,text:n.detail,at:n.created_at}))})),audit,cases,guides,people,
   planningTargets:user.permissions.planning?planningCatalogue():[],overrides:user.permissions.planning?(await db().prepare("SELECT kind,target,payload,source,revision FROM staff_overrides WHERE kind='rate'").all()).results:[],targets:user.permissions.corrections&&q.length>=2?rateCatalogue().filter(t=>`${t.source} ${t.table} ${t.item}`.toLowerCase().includes(q)).slice(0,60):[],pets:seed.pets.map(p=>p.name)};
 }
 export async function staffAction(req:Request,body:Record<string,unknown>) {
@@ -79,26 +92,40 @@ export async function staffAction(req:Request,body:Record<string,unknown>) {
    database.prepare(`INSERT INTO staff_audit(actor_id,target_id,action,detail,created_at) SELECT ?,?,'role-permissions',?,? WHERE ${owner}`).bind(actor.id,'role:'+body.role,JSON.stringify({role:body.role,from:before,to:permissions}),now,actor.id),
   ]);if(!results[0].meta.changes)throw new HttpError(409,'Staff access changed. Refresh and retry.');return;
  }
- if(body.action==='grant'||body.action==='permissions') {
+ if(body.action==='grant'||body.action==='permissions'||body.action==='title') {
   if(actor.role!=='admin'&&actor.role!=='owner')throw new HttpError(403,'Only admins can manage staff.');
   // Ranks and a member's own access both follow mayGrant: the owner manages everyone, admins manage helpers and moderators.
   if(typeof body.username!=='string'||!/^[A-Za-z0-9 _-]{1,12}$/.test(body.username.trim()))throw new HttpError(400,'Enter a linked RuneScape name.');
   const linked=await database.prepare('SELECT discord_id FROM claimed_names WHERE rsn=?').bind(body.username.trim().toLowerCase()).first<{discord_id:string}>();
   if(!linked)throw new HttpError(400,'That name must be linked to a Discord account first.');
   const current=await database.prepare('SELECT * FROM staff_members WHERE discord_id=?').bind(linked.discord_id).first<StaffMember>();
-  const role=body.action==='permissions'?current?.role??null:body.role;
+  const role=body.action==='grant'?body.role:current?.role??null;
   if(role!==null&&role!=='helper'&&role!=='moderator'&&role!=='admin')throw new HttpError(400,'Choose a valid staff role.');
   if(!mayGrant(actor,{id:linked.discord_id,role:current?.role??null},role))throw new HttpError(403,'You cannot change your own rank or manage that rank.');
+  if(body.action==='title'){
+   // The hover title follows the same reach as a member's access: the owner titles everyone else, admins title helpers and moderators.
+   if(!current)throw new HttpError(400,'Grant a staff role before choosing a title.');
+   let title:string|null;try{title=staffTitle(body.title);}catch(e){throw new HttpError(400,publicMessage(e,'Choose a valid title.'));}
+   if(title===current.title)return;
+   const revision=crypto.randomUUID();
+   const results=await database.batch([
+    database.prepare("UPDATE staff_members SET title=?,revision=? WHERE discord_id=? AND revision=? AND EXISTS(SELECT 1 FROM staff_members WHERE discord_id=? AND role=? AND role IN ('owner','admin'))").bind(title,revision,linked.discord_id,current.revision,actor.id,actor.role),
+    database.prepare("INSERT INTO staff_audit(actor_id,target_id,action,detail,created_at) SELECT ?,?,'title',?,? WHERE EXISTS(SELECT 1 FROM staff_members WHERE discord_id=? AND revision=?)").bind(actor.id,linked.discord_id,JSON.stringify({from:current.title??null,to:title}),now,linked.discord_id,revision),
+   ]);if(!results[0].meta.changes)throw new HttpError(409,'Staff access changed. Refresh and retry.');return;
+  }
   if(body.action==='permissions'){
    if(!current)throw new HttpError(400,'Grant a staff role before choosing permissions.');
    // null removes the member's own row, so their rank defaults apply again.
    let permissions:StaffPermissions|null=null;if(body.permissions!==null)try{permissions=parseStaffPermissions(body.permissions);}catch(e){throw new HttpError(400,publicMessage(e,'Choose valid workspace permissions.'));}
    const revision=crypto.randomUUID();
+   // The audit keeps the access before and after, so the history can say which permission changed ("gave … Publish guides").
+   const [own,defaults]=await Promise.all([database.prepare('SELECT guides,publish,corrections,planning,review,ownership,holds FROM staff_permissions WHERE discord_id=?').bind(linked.discord_id).first<AreaRow>(),roleDefaults()]);
+   const rankDefault=defaults.find(r=>r.role===current.role),before=staffPermissions(current.role,own,rankDefault),after=permissions??staffPermissions(current.role,null,rankDefault);
    const results=await database.batch([
     database.prepare("UPDATE staff_members SET revision=? WHERE discord_id=? AND revision=? AND EXISTS(SELECT 1 FROM staff_members WHERE discord_id=? AND role=? AND role IN ('owner','admin'))").bind(revision,linked.discord_id,current.revision,actor.id,actor.role),
     permissions?database.prepare('INSERT INTO staff_permissions(discord_id,guides,publish,corrections,planning,review,ownership,holds) SELECT discord_id,?,?,?,?,?,?,? FROM staff_members WHERE discord_id=? AND revision=? ON CONFLICT(discord_id) DO UPDATE SET guides=excluded.guides,publish=excluded.publish,corrections=excluded.corrections,planning=excluded.planning,review=excluded.review,ownership=excluded.ownership,holds=excluded.holds').bind(+permissions.guides,+permissions.publish,+permissions.corrections,+permissions.planning,+permissions.review,+permissions.ownership,+permissions.holds,linked.discord_id,revision)
      :database.prepare('DELETE FROM staff_permissions WHERE discord_id=? AND EXISTS(SELECT 1 FROM staff_members WHERE discord_id=? AND revision=?)').bind(linked.discord_id,linked.discord_id,revision),
-    database.prepare("INSERT INTO staff_audit(actor_id,target_id,action,detail,created_at) SELECT ?,?,'permissions',?,? WHERE EXISTS(SELECT 1 FROM staff_members WHERE discord_id=? AND revision=?)").bind(actor.id,linked.discord_id,JSON.stringify(permissions??{reset:true}),now,linked.discord_id,revision)
+    database.prepare("INSERT INTO staff_audit(actor_id,target_id,action,detail,created_at) SELECT ?,?,'permissions',?,? WHERE EXISTS(SELECT 1 FROM staff_members WHERE discord_id=? AND revision=?)").bind(actor.id,linked.discord_id,JSON.stringify(permissions?{from:before,to:after}:{reset:true,from:before,to:after}),now,linked.discord_id,revision)
    ]);if(!results[0].meta.changes)throw new HttpError(409,'Staff access changed. Refresh and retry.');return;
   }
   const revision=crypto.randomUUID();
@@ -159,14 +186,14 @@ export async function staffAction(req:Request,body:Record<string,unknown>) {
   const reviewReason=async()=>{if(reason)await database.prepare("INSERT INTO staff_audit(actor_id,target_id,action,detail,created_at) VALUES(?,?,'correction-review',?,?)").bind(actor.id,'change:'+change.id,reason,now).run();};
   if(!mayReviewProposal(actor.role,proposer?.role))throw new HttpError(403,`A ${STAFF_LABEL[proposer!.role]} proposed this. Someone of that rank or higher decides it.`);
   if(body.decision==='rejected'){
-   const r=await database.prepare(`UPDATE staff_changes SET state='rejected',reviewer_id=?,reviewed_at=? WHERE id=? AND state='pending' AND EXISTS(SELECT 1 FROM staff_members s WHERE s.discord_id=? AND s.role=? AND ${areaGuard('review')})`).bind(actor.id,now,change.id,actor.id,actor.role).run();if(!r.meta.changes)throw new HttpError(409,'Access or proposal changed. Refresh.');await reviewReason();return;
+   const r=await database.prepare(`UPDATE staff_changes SET state='rejected',reviewer_id=?,reviewed_at=? WHERE id=? AND state='pending' AND actor_id<>? AND EXISTS(SELECT 1 FROM staff_members s WHERE s.discord_id=? AND s.role=? AND ${areaGuard('review')} AND ${proposerRankGuard('staff_changes.actor_id','s.role')})`).bind(actor.id,now,change.id,actor.id,actor.id,actor.role).run();if(!r.meta.changes)throw new HttpError(409,'Access or proposal changed. Refresh.');await reviewReason();return;
   }
   const result=await database.batch([
    database.prepare(`INSERT INTO staff_overrides(kind,target,payload,source,revision)
     SELECT kind,target,payload,source,id FROM staff_changes WHERE id=? AND state='pending'
     AND COALESCE((SELECT revision FROM staff_overrides o WHERE o.kind=staff_changes.kind AND o.target=staff_changes.target),0)=base_revision
-    AND EXISTS(SELECT 1 FROM staff_members s WHERE s.discord_id=? AND s.role=? AND ${areaGuard('review')})
-    ON CONFLICT(kind,target) DO UPDATE SET payload=excluded.payload,source=excluded.source,revision=excluded.revision`).bind(change.id,actor.id,actor.role),
+    AND actor_id<>? AND EXISTS(SELECT 1 FROM staff_members s WHERE s.discord_id=? AND s.role=? AND ${areaGuard('review')} AND ${proposerRankGuard('staff_changes.actor_id','s.role')})
+    ON CONFLICT(kind,target) DO UPDATE SET payload=excluded.payload,source=excluded.source,revision=excluded.revision`).bind(change.id,actor.id,actor.id,actor.role),
    database.prepare("UPDATE staff_changes SET state='approved',reviewer_id=?,reviewed_at=? WHERE id=? AND state='pending' AND EXISTS(SELECT 1 FROM staff_overrides WHERE revision=?)").bind(actor.id,now,change.id,change.id),
   ]);if(!result[0].meta.changes)throw new HttpError(409,'A newer correction or role change prevents publication. Refresh and submit a new proposal.');await reviewReason();return;
  }

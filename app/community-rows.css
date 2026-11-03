@@ -47,3 +47,35 @@
 .site .collector-list .identity-text{justify-items:start;text-align:left}
 .site .collector-list .identity-text>b{justify-content:flex-start}
 .site .collector-list .identity-text>.achievement-title{text-align:left}
+
+/* One row height on every board (leaderboard, home and support previews): players, Not synced, Open place and loading
+   rows all match the Open place row. The first grid row is fixed; an opened preview adds its own row below it. Names,
+   titles and badges stay on one line and are sized to fit inside it. */
+.site .community-panel .collector-list>li{min-height:0;padding-block:0;grid-template-rows:51px;grid-auto-rows:auto}
+.site .community-panel .collector-list>li>.collector-preview{margin-bottom:10px}
+.site .community-panel .collector-list .identity-text{gap:1px}
+.site .community-panel .collector-list .identity-text>b{flex-wrap:nowrap;white-space:nowrap;min-width:0;min-height:18px;line-height:18px}
+.site .community-panel .collector-list .identity-text .player-username{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.site .community-panel .collector-list .identity-text .rs-title{flex:0 100 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.site .community-panel .collector-list .identity-text>.achievement-title{line-height:14px;white-space:nowrap}
+.site .community-panel .collector-list :is(.identity-prefix,.identity-mode){height:18px}
+.site .community-panel .collector-list .identity-prefix .staff-rank{height:18px}
+.site .community-panel .collector-list .identity-prefix .staff-word{line-height:18px}
+.site .community-panel .collector-list .identity-prefix .rank-icon{width:18px;height:18px;flex:0 0 18px}
+.site .community-panel .collector-list .identity-prefix .rank-weapon{width:18px;height:18px}
+.site .community-panel .collector-list .collector-score{gap:1px}
+.site .community-panel .collector-list .collector-score b{line-height:1.15}
+.site .community-panel .collector-list .collector-score small{line-height:1.3}
+
+/* Badges sit above the row's stretched link, so hovering or tapping one opens its card (the rest of the row still opens the player). */
+.collector-identity .staff-rank,.collector-identity .prefix-hover,.collector-identity .account-mode-badge,.collector-identity .rs-title>span,.collector-identity .achievement-help{position:relative;z-index:2}
+/* Names line up down a board: every row keeps one slot for the rank scimitar (or supporter coin) with its staff word
+   ("Sir"), wide enough for both and centred, and one for the account badge, empty or not, so a name starts in the same
+   place whatever badges its row has. */
+.site .collector-list .identity-prefix:empty,.site .collector-list .identity-mode:empty{display:flex}
+.site .collector-list .identity-prefix{width:var(--prefix-slot,24px);justify-content:center}
+.site .collector-list .identity-mode{width:13px;justify-content:center}
+/* A page of the board with no account modes drops the empty mode column, so the name sits by the scimitar. */
+.site .collector-list.no-modes .identity-mode{display:none}
+.site .community-panel .collector-list{--prefix-slot:22px}
+@media(max-width:520px){.site .collector-list{--prefix-slot:22px}}

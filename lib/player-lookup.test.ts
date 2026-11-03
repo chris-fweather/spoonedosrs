@@ -99,7 +99,7 @@ test('a first search asks all four sources once and saves stats, the collection 
  const {journalStats}=await import('./community.ts');
  const {calls,fetcher}=sources({hiscores:()=>Response.json({skills,activities:[]}),runeprofile:()=>Response.json(runeprofile)});
  const {lookup,journal}=await discoverPlayer('Test player',{...structuredClone(initial),username:'Test player'},fetcher,true);
- assert.deepEqual([...calls].sort(),['api.runeprofile.com','api.wiseoldman.net','secure.runescape.com','templeosrs.com']);
+ assert.deepEqual([...calls].sort(),['api.runeprofile.com','api.wiseoldman.net','api.wiseoldman.net','secure.runescape.com','templeosrs.com'],'WOM is asked for the snapshot and the achievements');
  assert.deepEqual({state:lookup.state,hiscores:lookup.hiscores,runeprofile:lookup.runeprofile,temple:lookup.temple,wom:lookup.wom},{state:'found',hiscores:'found',runeprofile:'found',temple:'not_found',wom:'not_found'});
  assert.ok(journal);assert.equal('syncReport' in journal,false);
  assert.deepEqual(journal.hiscores.skills,skills);assert.equal(journal.log?.obtained,1);assert.equal(journal.profile?.combat[0].completed,5);

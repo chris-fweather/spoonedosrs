@@ -29,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{DEV&&<div className="dev-banner" role="note">Dev environment: test data, not the live site</div>}{children}<footer className="legal-footer"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://github.com/chris-fweather/SpoonedOSRS/releases" target="_blank" rel="noopener noreferrer" title="Source code for each version">v{__SPOONED_RELEASE__.version} · Source code</a></footer></body>
+      <body className="antialiased">{DEV&&<div className="dev-banner" role="note">Dev environment: test data, not the live site</div>}{children}<footer className="legal-footer"><nav aria-label="Site information"><a href="/privacy">Privacy</a><i aria-hidden="true">·</i><a href="/terms">Terms</a><i aria-hidden="true">·</i><a href="/credits">Credits</a><i aria-hidden="true">·</i><a href="https://github.com/chris-fweather/SpoonedOSRS/releases" target="_blank" rel="noopener noreferrer" title="Source code for each version">v{__SPOONED_RELEASE__.version} · Source code</a></nav><span className="legal-footer-note">Fan project, not affiliated with Jagex</span></footer></body>
     </html>
   );
 }

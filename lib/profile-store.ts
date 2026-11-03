@@ -7,14 +7,17 @@ import {parsePresentation, selectedTitle, signatureTitle, type Presentation} fro
 import {HttpError, ensureAuthTables, readSession} from './auth';
 import {assertFlair, coerceFlair, displayTitle, DONATOR_TITLE, emptyEquipped, badgeCatalogue, rankClaims, type BoardRow, type StoredFlair} from './flair';
 import {journalForViewer, validVisibility, parseDetails, DEFAULT_DETAILS, type ProfileDetails, type Visibility} from './profile-privacy';
-import {publicStaff, publicStaffList} from './staff-data';
+import {guideWriters, publicStaff, publicStaffList} from './staff-data';
+import {cleanNamePrefix, earnedPrefix, shownPrefix} from './name-prefix';
 import type {Journal} from './model';
 import {journalStats, type CommunityStats} from './community';
 import {accountName, db, readJournal, sameOrigin} from './storage';
 import {publicMessage} from './request-body';
+import {verifiedSql} from './verified-profile';
 
 type ClaimRow = {
   discord_id: string;
+  verified?: number;
   companion_pet: string | null;
   display_piece: string | null;
   equipped: string | null;
@@ -24,13 +27,12 @@ type ClaimRow = {
 };
 
 
-type StyleRow={staff_badge:Presentation['staffBadge'];staff_prefix:Presentation['staffPrefix'];title_choice:string;show_donation:number;amount_minor:number|null;currency:string|null};
+type StyleRow={staff_badge:Presentation['staffBadge'];staff_prefix:Presentation['staffPrefix'];title_choice:string;show_donation:number;amount_minor:number|null;currency:string|null;supporter?:number|null};
 /** Only known values reach the page: anything else stored in a style row (a bad import, a test fixture) reads as unset. */
 const BADGES=['helper','moderator','admin','owner','gilded'];
 const cleanBadge=(v:unknown):Presentation['staffBadge']=>BADGES.includes(v as string)?v as Presentation['staffBadge']:null;
-const cleanPrefix=(v:unknown):Presentation['staffPrefix']=>v==='Sir'?'Sir':null;
-function presentation(row:Partial<StyleRow>|null):Presentation{return {staffBadge:cleanBadge(row?.staff_badge),staffPrefix:cleanPrefix(row?.staff_prefix),titleChoice:row?.title_choice??'auto',showDonation:row?.show_donation!==0};}
-function donation(row:Partial<StyleRow>|null){return {amountMinor:row?.show_donation===0?null:row?.amount_minor??null,currency:row?.currency??'USD',hidden:row?.show_donation===0,badge:row?.staff_badge==='gilded'?'gilded' as const:null,supporter:(row?.amount_minor??0)>0};}
+function presentation(row:Partial<StyleRow>|null):Presentation{return {staffBadge:cleanBadge(row?.staff_badge),staffPrefix:cleanNamePrefix(row?.staff_prefix),titleChoice:row?.title_choice??'auto',showDonation:row?.show_donation!==0};}
+function donation(row:Partial<StyleRow>|null){return {amountMinor:row?.show_donation===0?null:row?.amount_minor??null,currency:row?.currency??'USD',hidden:row?.show_donation===0,badge:row?.staff_badge==='gilded'?'gilded' as const:null,supporter:row?.supporter===1};}
 
 type OptionsRow={details:string;skin:string;background:Appearance['background']};
 async function profileOptions(name:string){const row=await db().prepare('SELECT details,skin,background FROM profile_options WHERE rsn=?').bind(name.toLowerCase()).first<OptionsRow>();return {background:row?.background??'none',details:row?parseDetails(JSON.parse(row.details)):DEFAULT_DETAILS,skin:row?.skin&&Object.hasOwn(SKIN_TONES,row.skin)?row.skin:'default'};}
@@ -43,7 +45,7 @@ export async function publicProfile(username: unknown, viewerId: string | null):
   const name = accountName(username);
   await ensureAuthTables();
   const row = await db().prepare(
-    `SELECT c.discord_id, c.companion_pet, c.display_piece, c.equipped, c.pinned_mark, u.title, v.visibility
+    `SELECT c.discord_id, c.companion_pet, c.display_piece, c.equipped, c.pinned_mark, u.title, v.visibility, ${verifiedSql('c')} AS verified
      FROM claimed_names c JOIN users u ON u.discord_id = c.discord_id LEFT JOIN profile_visibility v ON v.rsn=c.rsn WHERE c.rsn = ?`,
   ).bind(name.toLowerCase()).first<ClaimRow>();
   if (!row) return {companionPet: null, displayPiece: null, equipped: emptyEquipped(), pinnedMark: null, title: displayTitle(name, null), canEdit: false};
@@ -55,17 +57,18 @@ export async function publicProfile(username: unknown, viewerId: string | null):
     pinnedMark: row.pinned_mark,
     title: row.title,
   });
-  const style=await db().prepare('SELECT p.*,COALESCE(pd.amount_minor,d.amount_minor) AS amount_minor,COALESCE(pd.currency,d.currency) AS currency FROM claimed_names c LEFT JOIN profile_presentation p ON p.rsn=c.rsn LEFT JOIN supporter_totals d ON d.discord_id=c.discord_id LEFT JOIN profile_supporter_totals pd ON pd.rsn=c.rsn WHERE c.rsn=?').bind(name.toLowerCase()).first<StyleRow>();
+  const style=await db().prepare('SELECT p.*,pd.amount_minor,pd.currency,pd.supporter FROM claimed_names c LEFT JOIN profile_presentation p ON p.rsn=c.rsn LEFT JOIN profile_support pd ON pd.rsn=c.rsn WHERE c.rsn=?').bind(name.toLowerCase()).first<StyleRow>();
   const body=await db().prepare('SELECT body_type AS body,hair_color AS hair FROM profile_appearance WHERE rsn=?').bind(name.toLowerCase()).first<Appearance>();
   const options=await profileOptions(name);
-  const supporter=(style?.amount_minor??0)>0||row.title===DONATOR_TITLE;
+  const supporter=style?.supporter===1;
   clean.title=supporterTitle(style?.amount_minor,style?.currency);
-  const prefs=presentation(style), role=await publicStaff(row.discord_id), isOwner=role?.role==='owner';
+  const prefs=presentation(style), [role,writers]=await Promise.all([publicStaff(row.discord_id),guideWriters([row.discord_id])]), isOwner=role?.role==='owner';
+  const writer=writers.has(row.discord_id), prefix=shownPrefix(prefs.staffPrefix,role?.role,writer);
   const chosen=badgeCatalogue(journal).find(m=>m.id===row.pinned_mark&&m.unlocked);
   if(chosen)clean.pinnedMark=chosen.id;
-  const staff=role?{...role,displayRole:isOwner&&prefs.staffBadge!=='gilded'?prefs.staffBadge:null,displayPrefix:prefs.staffPrefix}:null;
+  const staff=role?{...role,displayRole:isOwner&&prefs.staffBadge!=='gilded'?prefs.staffBadge:null,displayPrefix:prefix}:null;
   const pet=journal.pets.find(p=>p.id===clean.companionPet&&p.obtained);
-  return {...clean,...prefs,supporter,details:options.details,appearance:parseAppearance({...body??DEFAULT_APPEARANCE,skin:options.skin,background:options.background}),donation:donation(style),ownerShowcase:!!chosen&&!chosen.unlocked, title: displayTitle(name, clean.title), visibility:row.visibility??'public', canEdit: viewerId === row.discord_id, staff,showcase:{badge:chosen??null,pet:pet?{id:pet.id,name:pet.name}:null,achievementTitle:selectedTitle(journal,prefs.titleChoice,clean.pinnedMark,isOwner,supporter,staff?.role)}};
+  return {...clean,...prefs,supporter,details:options.details,appearance:parseAppearance({...body??DEFAULT_APPEARANCE,skin:options.skin,background:options.background}),donation:donation(style),ownerShowcase:!!chosen&&!chosen.unlocked, title: displayTitle(name, clean.title), visibility:row.visibility??'public', verified:!!row.verified, canEdit: viewerId === row.discord_id, staff,namePrefix:role?null:prefix,earnedPrefix:earnedPrefix(role?.role,writer),showcase:{badge:chosen??null,pet:pet?{id:pet.id,name:pet.name}:null,achievementTitle:selectedTitle(journal,prefs.titleChoice,clean.pinnedMark,isOwner,supporter,staff?.role)}};
 }
 
 export async function profileJournal(request:Request, username:unknown):Promise<Journal> {
@@ -93,13 +96,13 @@ export async function saveProfile(request: Request, username: unknown, input: {d
   const options=await profileOptions(name);
   let details:ProfileDetails;try{details=input.details===undefined?options.details:parseDetails(input.details);}catch(e){throw new HttpError(400,publicMessage(e,'Choose which profile details to share.'));}
   const journal = await readJournal(name);
-  const role=await publicStaff(session.id);
-  const prior=await db().prepare('SELECT p.*,COALESCE(pd.amount_minor,d.amount_minor) AS amount_minor,COALESCE(pd.currency,d.currency) AS currency FROM claimed_names c LEFT JOIN profile_presentation p ON p.rsn=c.rsn LEFT JOIN supporter_totals d ON d.discord_id=c.discord_id LEFT JOIN profile_supporter_totals pd ON pd.rsn=c.rsn WHERE c.rsn=?').bind(name.toLowerCase()).first<StyleRow>();
+  const [role,writers]=await Promise.all([publicStaff(session.id),guideWriters([session.id])]);
+  const prior=await db().prepare('SELECT p.*,pd.amount_minor,pd.currency,pd.supporter FROM claimed_names c LEFT JOIN profile_presentation p ON p.rsn=c.rsn LEFT JOIN profile_support pd ON pd.rsn=c.rsn WHERE c.rsn=?').bind(name.toLowerCase()).first<StyleRow>();
   const entitledTitle=supporterTitle(prior?.amount_minor,prior?.currency);
   if(input.title!=null&&input.title!==entitledTitle)throw new HttpError(403,'That title is not unlocked.');
   const extras=Object.fromEntries(['staffBadge','staffPrefix','titleChoice','showDonation'].filter(k=>k in input).map(k=>[k,input[k as keyof typeof input]]));
   let prefs:Presentation;
-  try{prefs=parsePresentation(extras,presentation(prior),journal,role,{amountMinor:prior?.amount_minor??null,currency:prior?.currency??'USD',hidden:false},(prior?.amount_minor??0)>0||owner.title===DONATOR_TITLE);}catch(e){throw new HttpError(400,publicMessage(e,'Choose valid title and badge options.'));}
+  try{prefs=parsePresentation(extras,presentation(prior),journal,role,{amountMinor:prior?.amount_minor??null,currency:prior?.currency??'USD',hidden:false},prior?.supporter===1,writers.has(session.id));}catch(e){throw new HttpError(400,publicMessage(e,'Choose valid title and badge options.'));}
   let clean;
   try { clean = assertFlair(journal, {...input, title: entitledTitle}); }
   catch (error) { throw new HttpError(400, publicMessage(error, 'Invalid profile choice.')); }
@@ -117,7 +120,7 @@ export async function leaderboard(names?:string[]): Promise<BoardRow[]> {
   if(names?.length===0)return [];
   // Public reads use deployed migrations; avoid DDL and backfills on the homepage cold path.
   const result = await db().prepare(
-    `SELECT COALESCE(c.display_name,j.name) as name, c.discord_id, c.pinned_mark, c.companion_pet, u.title as title, j.data as data,o.details,p.staff_badge,p.staff_prefix,p.title_choice,p.show_donation,COALESCE(pd.amount_minor,d.amount_minor) AS amount_minor,COALESCE(pd.currency,d.currency) AS currency
+    `SELECT COALESCE(c.display_name,j.name) as name, c.discord_id, c.pinned_mark, c.companion_pet, u.title as title, j.data as data,o.details,p.staff_badge,p.staff_prefix,p.title_choice,p.show_donation,pd.amount_minor,pd.currency,pd.supporter
      FROM (SELECT rsn FROM journal_summaries UNION SELECT rsn FROM claimed_names) names
      LEFT JOIN journal_summaries j ON j.rsn=names.rsn
      LEFT JOIN claimed_names c ON c.rsn=names.rsn
@@ -125,18 +128,18 @@ export async function leaderboard(names?:string[]): Promise<BoardRow[]> {
      LEFT JOIN profile_visibility v ON v.rsn=names.rsn
      LEFT JOIN profile_options o ON o.rsn=names.rsn
      LEFT JOIN profile_presentation p ON p.rsn=c.rsn
-     LEFT JOIN supporter_totals d ON d.discord_id=c.discord_id LEFT JOIN profile_supporter_totals pd ON pd.rsn=c.rsn
+     LEFT JOIN profile_support pd ON pd.rsn=c.rsn
      WHERE COALESCE(v.visibility,'public')='public'
      AND (c.rsn IS NOT NULL OR NOT EXISTS(SELECT 1 FROM profile_link_owners r WHERE r.rsn=j.rsn))
      ${names?`AND names.rsn IN (${names.map(()=>'?').join(',')})`:""}`,
   ).bind(...(names??[]).map(n=>n.toLowerCase())).all<{name: string; discord_id:string; pinned_mark:string|null; companion_pet:string|null; title: string | null; data: string | null; details:string|null} & StyleRow>();
-  const supporters=new Set(result.results.filter(row=>row.title===DONATOR_TITLE||(row.amount_minor??0)>0).map(row=>row.name));
+  const supporters=new Set(result.results.filter(row=>row.supporter===1).map(row=>row.name));
   result.results.forEach(row=>{row.title=supporterTitle(row.amount_minor,row.currency);});
-  const staff = await publicStaffList();
-  const supporterRanks=supporterPositions(result.results
-    .filter(row=>supporters.has(row.name))
-    .map(row=>({name:row.name,amountMinor:row.amount_minor,currency:row.currency??'USD'})));
-  const rows = result.results.map(row => publicBoardMemo(JSON.stringify([row,staff.get(row.discord_id),supporterRanks.get(row.name)]),()=>{
+  // A board page asks only about its own rows' accounts; the full board reads every writer at once.
+  const [staff,writers] = await Promise.all([publicStaffList(),guideWriters(names?[...new Set(result.results.map(row=>row.discord_id).filter(Boolean))]:undefined)]);
+  // Each profile is ranked on its own total: a donation supports the one profile it was given to.
+  const supporterRanks=supporterPositions(result.results.filter(row=>supporters.has(row.name)).map(row=>({name:row.name,amountMinor:row.amount_minor,currency:row.currency??'USD'})));
+  const rows = result.results.map(row => publicBoardMemo(JSON.stringify([row,staff.get(row.discord_id),supporterRanks.get(row.name),writers.has(row.discord_id)]),()=>{
     let stats: CommunityStats | undefined;
     let pets = 0;
     let log = 0;
@@ -155,8 +158,8 @@ export async function leaderboard(names?:string[]): Promise<BoardRow[]> {
         accountMode=journal.accountMode??null;
       } catch { /* Missing or invalid public totals remain unranked. */ }
     }
-    const rank=staff.get(row.discord_id);
-    return {accountMode,supporter:supporters.has(row.name),supporterRank:supporterRanks.get(row.name)??null, donation:donation(row), name: row.name, title: displayTitle(row.name, row.title === DONATOR_TITLE ? DONATOR_TITLE : null), pets, log, hasJournal: !!stats, stats, staff:rank?{...rank,displayRole:((b)=>rank.role==='owner'&&b&&b!=='gilded'?b:null)(cleanBadge(row.staff_badge)),displayPrefix:cleanPrefix(row.staff_prefix)}:null, achievementTitle: earnedTitle, featuredPet};
+    const rank=staff.get(row.discord_id), prefix=shownPrefix(row.staff_prefix,rank?.role,writers.has(row.discord_id));
+    return {accountMode,supporter:supporters.has(row.name),supporterRank:supporterRanks.get(row.name)??null, donation:donation(row), name: row.name, title: displayTitle(row.name, row.title === DONATOR_TITLE ? DONATOR_TITLE : null), pets, log, hasJournal: !!stats, stats, staff:rank?{...rank,displayRole:((b)=>rank.role==='owner'&&b&&b!=='gilded'?b:null)(cleanBadge(row.staff_badge)),displayPrefix:prefix}:null, namePrefix:rank?null:prefix, achievementTitle: earnedTitle, featuredPet};
   }));
   return rankClaims(rows);
 }

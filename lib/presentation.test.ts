@@ -31,6 +31,22 @@ test('Sir is available to staff without granting badge overrides',()=>{
  assert.throws(()=>parsePresentation({staffPrefix:'Sir'},prior,initial,null));
  assert.throws(()=>parsePresentation({staffPrefix:'Sir'},prior,initial,null));
 });
+test('with Squire on, helpers and guide writers save Squire, Sir outranks it, and anyone else is refused',()=>{
+ const save=(input:object,staff:{role:'helper'|'moderator'|'admin'|'owner';prefix:null}|null,writer=false,squire=true)=>parsePresentation(input,prior,initial,staff,undefined,false,writer,squire).staffPrefix;
+ assert.equal(save({staffPrefix:'Squire'},{role:'helper',prefix:null}),'Squire');
+ // A helper's Sir kept from before reads as the prefix they earn now.
+ assert.equal(save({staffPrefix:'Sir'},{role:'helper',prefix:null}),'Squire');
+ assert.equal(save({staffPrefix:'Squire'},null,true),'Squire');
+ for(const role of ['moderator','admin','owner'] as const)assert.equal(save({staffPrefix:'Squire'},{role,prefix:null},true),'Sir');
+ assert.throws(()=>save({staffPrefix:'Squire'},null,false));
+ assert.throws(()=>save({staffPrefix:'Sir'},null,false));
+ // Squire off (the live site): guide writers earn nothing, every staff rank keeps Sir.
+ assert.throws(()=>save({staffPrefix:'Squire'},null,true,false));
+ assert.equal(save({staffPrefix:'Squire'},{role:'helper',prefix:null},false,false),'Sir');
+ // A prefix no longer earned switches off quietly when saving something else.
+ assert.equal(parsePresentation({titleChoice:'none'},{...prior,staffPrefix:'Squire'},initial,null,undefined,false,false,true).staffPrefix,null);
+ assert.throws(()=>save({staffPrefix:'Lord'},{role:'owner',prefix:null}));
+});
 test('completion titles require complete data, while milestone and quest titles remain understated',()=>{
  const j=structuredClone(initial);
  assert.equal(selectedTitle(j,'completionist',null),null);

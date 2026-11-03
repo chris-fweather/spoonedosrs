@@ -7,6 +7,7 @@ import {Area, AreaChart, Bar, BarChart, CartesianGrid, ReferenceDot, ReferenceLi
 import {oddsCurve,petChartRecord} from '@/lib/odds-chart';
 import {petUnitLabel} from '@/lib/pet-record';
 import {selectedMethod} from '@/lib/estimates';
+import {otherMethods} from '@/lib/hunt-history';
 import {expectedHours, likelihood, type Pet} from '@/lib/model';
 import {chanceAfter, chanceTone, num, pct, shortNumber} from '@/lib/ui';
 import {Meter} from './Meter';
@@ -79,7 +80,7 @@ export function QuickestHunts({pets, onOpen, limit, compact, pageSize}: {pets: P
 export function PetOdds({pet}: {pet: Pet}) {
   const {method:m,label:markerLabel} = petChartRecord(pet);
   const rate = m?.rate ?? 0;
-  if(pet.huntHistory?.length)return <p className="fine">Historical chance combines your saved method segments. A single-rate curve would misrepresent this mixed hunt.</p>;
+  if(otherMethods(pet).some(x=>x.rate))return <p className="fine">Your chance combines several methods. A single-rate curve would misrepresent this mixed hunt.</p>;
   if (!m || !rate) return <p className="muted">Add a drop rate under Progress &amp; notes to see odds.</p>;
   const unit = petUnitLabel(pet,m.unit);
   const xp = m.unit === 'XP';
@@ -140,7 +141,7 @@ export function PetOdds({pet}: {pet: Pet}) {
 /** Compact odds for the side pop-out: milestones + small cumulative curve. */
 export function OddsMini({pet}: {pet: Pet}) {
   const {method:m,label:markerLabel} = petChartRecord(pet);
-  if (!m?.rate||pet.huntHistory?.length) return null;
+  if (!m?.rate||otherMethods(pet).some(x=>x.rate)) return null;
   return <DropOddsMini probability={1/m.rate} current={m.kc} unit={petUnitLabel(pet,m.unit)} continuous={m.unit === 'XP'} markerLabel={markerLabel}/>;
 }
 

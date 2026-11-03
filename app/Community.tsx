@@ -21,7 +21,9 @@ import {PlayerSearch, SiteAuth, SiteBrand} from './SiteHeader';
 import {FittedScore} from './FittedScore';
 import {AchievementTitle} from './AchievementTitle';
 import {AccountModeBadge} from './AccountModeBadge';
-import {StaffPrefix} from './StaffBadge';
+import {NamePrefixWord,StaffPrefix} from './StaffBadge';
+import {BadgeHover} from './BadgeCard';
+import {supporterTitleInfo} from '@/lib/badge-info';
 import {CommunityDistribution} from './CommunityDistribution';
 
 export function PublicHeader({page, onError}: {page?: string; onError: (message: string) => void}) {
@@ -60,11 +62,11 @@ export function CommunityStatus({rows, error, retry}: {rows: BoardRow[] | null; 
 }
 /** The community's running totals as banner counters; they refresh with every board load. */
 export function HeroTotals({totals}:{totals?:{journals:number;pets:number;log:number}|null}){
-  const stats=[{label:'public journals',value:totals?.journals,icon:'/icons/navigation/stats-icon.png'},{label:'pets collected',value:totals?.pets,icon:'/brand/rocky-mascot.webp'},{label:'log slots unlocked',value:totals?.log,icon:'/icons/navigation/collection-log-icon.png'}];
+  const stats=[{label:'public journals',value:totals?.journals,icon:'/icons/navigation/stats-icon.png'},{label:'pets collected',value:totals?.pets,icon:'/brand/rocky-mascot.webp'},{label:'log slots unlocked',value:totals?.log,icon:'/ui/collection-log-icon.png'}];
   return <div className="page-hero-totals">{stats.map(s=><span key={s.label} className="page-hero-stat"><img src={s.icon} alt=""/><b>{s.value==null?'—':num(s.value,0)}</b>{s.label}</span>)}</div>;
 }
 export function CommunityChat() {return <ProfileChat embedded/>;}
-function ChatGuideContent(){return <div><figure><img src="/ui/friends-chat-example.png" alt="OSRS Friends Chat interface example from the Wiki"/><figcaption>Yellow tab: Friends Chat · Blue tab: Clan. In-game interface example from the OSRS Wiki.</figcaption></figure><section><h3><img src="/icons/community/friends-chat.png" alt=""/> Friends Chat</h3><ol><li>Open the tab with the Friends Chat icon above.</li><li>Choose <b>Join Chat</b> and enter <b>SpoonedOSRS</b>.</li><li>Type <code>/ Hello!</code> (one slash) to speak in Friends Chat.</li></ol><h3><img src="/icons/community/clan-chat.png" alt=""/> Clan Chat as a guest</h3><ol><li>Open the Clan tab and switch to the guest chat panel.</li><li>Use <b>Find</b> to search for <b>SpoonedOSRS</b>, then join as a guest.</li><li>Type <code>{'/// Hello!'}</code> (three slashes) to speak as a guest.</li></ol><p>Already a clan member? Use <code>{'// Hello!'}</code> (two slashes) for your own clan chat.</p><p><a href="https://oldschool.runescape.wiki/w/Chat-channel" target="_blank" rel="noreferrer">Friends Chat guide ↗</a> · <a href="https://oldschool.runescape.wiki/w/Clan" target="_blank" rel="noreferrer">Clan guide ↗</a></p></section></div>;}
+function ChatGuideContent(){return <div><figure><img src="/ui/friends-chat-example.png" alt="OSRS Friends Chat interface example from the Wiki"/><figcaption>Yellow tab: Friends Chat · Blue tab: Clan. In-game interface example from the OSRS Wiki.</figcaption></figure><section><h3><img src="/ui/friends-chat.png" alt=""/> Friends Chat</h3><ol><li>Open the tab with the Friends Chat icon above.</li><li>Choose <b>Join Chat</b> and enter <b>SpoonedOSRS</b>.</li><li>Type <code>/ Hello!</code> (one slash) to speak in Friends Chat.</li></ol><h3><img src="/ui/clan-chat.png" alt=""/> Clan Chat as a guest</h3><ol><li>Open the Clan tab and switch to the guest chat panel.</li><li>Use <b>Find</b> to search for <b>SpoonedOSRS</b>, then join as a guest.</li><li>Type <code>{'/// Hello!'}</code> (three slashes) to speak as a guest.</li></ol><p>Already a clan member? Use <code>{'// Hello!'}</code> (two slashes) for your own clan chat.</p><p><a href="https://oldschool.runescape.wiki/w/Chat-channel" target="_blank" rel="noreferrer">Friends Chat guide ↗</a> · <a href="https://oldschool.runescape.wiki/w/Clan" target="_blank" rel="noreferrer">Clan guide ↗</a></p></section></div>;}
 function CopyChatNameButton({label='Copy name'}:{label?:string}) {
  const [status,setStatus]=useState<'idle'|'copied'|'failed'>('idle');
  useEffect(()=>{if(status==='idle')return;const timer=setTimeout(()=>setStatus('idle'),2200);return()=>clearTimeout(timer);},[status]);
@@ -76,7 +78,7 @@ export function ProfileChat({embedded=false}:{embedded?:boolean}) {
  const [guide,setGuide]=useState<'game'|'discord'|null>(null),id=useId();
  return <><aside id="join-in-game" className={`profile-chat community-join-cards ${embedded?'embedded':''}`} aria-label="Join the Spooned OSRS community">
   <section className="community-join-section community-game" aria-label="Join us in game">
-   <div className="profile-chat-heading"><strong><img className="community-heading-icon" src="/icons/community/game-chat.png" alt=""/> Join us in game</strong><span><img src="/icons/community/friends-chat.png" alt=""/> Friends Chat <i>+</i><img src="/icons/community/clan-chat.png" alt=""/> Clan Chat</span></div>
+   <div className="profile-chat-heading"><strong><img className="community-heading-icon" src="/ui/game-chat.png" alt=""/> Join us in game</strong><span><img src="/ui/friends-chat.png" alt=""/> Friends Chat <i>+</i><img src="/ui/clan-chat.png" alt=""/> Clan Chat</span></div>
    <div className="community-join-actions"><button type="button" className="profile-chat-toggle" aria-haspopup="dialog" aria-expanded={guide==='game'} aria-controls={guide==='game'?id:undefined} onClick={()=>setGuide('game')}>How to join →</button><CopyChatNameButton/></div>
   </section>
   <section className="community-join-section community-discord" aria-label="Spooned OSRS on Discord">
@@ -112,10 +114,11 @@ function CommunityIdentity({row,fallbackTitle,onPreview,expanded,previewId,rank}
  const place=podium(rank);
  const achievement=row.achievementTitle??fallbackTitle;
  return <a className="collector-name collector-identity" title={onPreview?`Preview ${row.name}’s collection`:`View ${row.name}’s profile`} onPointerEnter={()=>{if(onPreview){void loadPreviewModule();void loadCollectorPreview(row.name).catch(()=>{});}}} onFocus={()=>{if(onPreview){void loadPreviewModule();void loadCollectorPreview(row.name).catch(()=>{});}}} aria-expanded={onPreview?expanded:undefined} aria-controls={expanded?previewId:undefined} onClick={e=>{if(onPreview&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.altKey){e.preventDefault();onPreview();}}} href={'/player/'+encodeURIComponent(row.name)}>
-  <span className="identity-prefix"><StaffPrefix staff={row.staff} donation={row.donation} showHelp={false}/></span>
-  <span className="identity-mode"><AccountModeBadge mode={row.accountMode} showHelp={false}/></span>
-  <span className="identity-text"><b><span className={rankNameClass(row.staff)}>{row.name}</span>{row.title&&<small className="rs-title">{row.title}</small>}{place&&<img className={`podium-crown podium-${place}`} src={`/icons/ranks/crown-${PODIUM[place-1].toLowerCase()}.png`} alt={`${PODIUM[place-1]} crown, rank ${place}`}/>}</b>
-   {achievement&&<AchievementTitle label={achievement} showHelp={false}/>}
+  {/* Badges show the same cards as on the profile. */}
+  <span className="identity-prefix"><StaffPrefix staff={row.staff} donation={row.donation} tabIndex={-1} showWord={false}/></span>
+  <span className="identity-mode"><AccountModeBadge mode={row.accountMode} tabIndex={-1}/></span>
+  <span className="identity-text"><b>{/* Sir or Squire reads with the name, so every scimitar sits in the same slot. */}<NamePrefixWord staff={row.staff} prefix={row.namePrefix} tabIndex={-1}/><span className={rankNameClass(row.staff)}>{row.name}</span>{row.title&&<small className="rs-title"><BadgeHover info={supporterTitleInfo(row.title,row.donation)} tabIndex={-1}>{row.title}</BadgeHover></small>}{place&&<img className={`podium-crown podium-${place}`} src={`/icons/ranks/crown-${PODIUM[place-1].toLowerCase()}.png`} alt={`${PODIUM[place-1]} crown, rank ${place}`}/>}</b>
+   {achievement&&<AchievementTitle label={achievement} tabIndex={-1}/>}
   </span>
  </a>;
 }
@@ -128,7 +131,7 @@ export function CollectorList({rows, metric = 'pets', query = '', limit, pageSiz
   const slice = communityPage(ranked,serverPaging?0:page,pageSize,limit);
   const shown = slice.items;
   const label = metric==='xp'&&skill?`${skill} XP`:BOARD_METRICS.find(m => m.id === metric)!.label;
-  return <>{!ranked.length && query && <p className="community-notice">No players match this filter. Search a RuneScape name above to open any profile.</p>}<ol className="collector-list">{shown.map(({row, rank}) => {
+  return <>{!ranked.length && query && <p className="community-notice">No players match this filter. Search a RuneScape name above to open any profile.</p>}<ol className={'collector-list'+(shown.some(({row})=>row.accountMode&&row.accountMode!=='normal')?'':' no-modes')}>{shown.map(({row, rank}) => {
     const value = metricValue(row, metric, skill);
     return <li key={row.name}><RankCell rank={rank} label={rank ? `Rank ${rank}` : 'Unranked'}/><CommunityIdentity row={row} rank={rank} onPreview={expandable?()=>setPreview(preview===row.name?null:row.name):undefined} expanded={preview===row.name} previewId={previewId}/><span className={`collector-score ${value!==null&&num(value,0).length>8?'collector-score-long':''}`}><FittedScore text={value == null ? '—' : num(value, 0)}/><small>{value == null ? 'Not synced' : label}</small></span>{expandable&&preview===row.name&&<Suspense fallback={<span className="collector-preview" role="status">Loading preview…</span>}><CollectorPreview key={row.name} name={row.name} id={previewId} metric={metric}/></Suspense>}</li>;
   })}{!query&&<EmptyBoardRows count={pageSize-shown.length}/>}</ol><CommunityPager slice={serverPaging?{...slice,current:serverPaging.page,pages:serverPaging.pages}:slice} setPage={serverPaging?.onPage??setPage} label={`${label} rankings`}/></>;
@@ -146,7 +149,7 @@ export function SupporterList({rows,pageSize=5,limit,query='',expandable=false,s
  const currencies=[...new Set(rows.filter(r=>r.donation&&(r.supporterRank!=null||(!r.donation.hidden&&r.donation.amountMinor!==null))).map(r=>r.donation!.currency))].sort();
  const currency=currencies.includes(chosenCurrency)?chosenCurrency:currencies[0]??'USD';
  const slice=communityPage(rankedSupporters(rows,currency).filter(({row})=>row.name.toLowerCase().includes(query.trim().toLowerCase())),serverPaging?0:page,pageSize,limit);
- return <>{currencies.length>1&&<label className="supporter-currency">Donation currency<select value={currency} onChange={e=>{setCurrency(e.target.value);setPage(0);}}>{currencies.map(c=><option key={c}>{c}</option>)}</select></label>}<ol className="collector-list supporter-list">{slice.items.map(({row:r,rank})=><li key={r.name}><RankCell rank={rank} label={rank?`Supporter rank ${rank}`:'Amount not ranked'}/><CommunityIdentity row={r} rank={rank} onPreview={expandable?()=>setPreview(preview===r.name?null:r.name):undefined} expanded={preview===r.name} previewId={previewId}/><span className="collector-score"><b>{r.donation?.hidden?'—':r.donation?.amountMinor==null?'?':new Intl.NumberFormat('en-US',{style:'currency',currency:r.donation.currency,maximumFractionDigits:2}).format(r.donation.amountMinor/100)}</b><small>{r.donation?.hidden?'Hidden':r.donation?.amountMinor==null?'Unknown':r.donation.currency}</small></span>{expandable&&preview===r.name&&<Suspense fallback={<span className="collector-preview" role="status">Loading preview…</span>}><CollectorPreview name={r.name} id={previewId}/></Suspense>}</li>)}{!query&&<EmptyBoardRows count={pageSize-slice.items.length}/>}</ol><CommunityPager slice={serverPaging?{...slice,current:serverPaging.page,pages:serverPaging.pages}:slice} setPage={serverPaging?.onPage??setPage} label="Supporters"/></>;
+ return <>{currencies.length>1&&<label className="supporter-currency">Donation currency<select value={currency} onChange={e=>{setCurrency(e.target.value);setPage(0);}}>{currencies.map(c=><option key={c}>{c}</option>)}</select></label>}<ol className={'collector-list supporter-list'+(slice.items.some(({row})=>row.accountMode&&row.accountMode!=='normal')?'':' no-modes')}>{slice.items.map(({row:r,rank})=><li key={r.name}><RankCell rank={rank} label={rank?`Supporter rank ${rank}`:'Amount not ranked'}/><CommunityIdentity row={r} rank={rank} onPreview={expandable?()=>setPreview(preview===r.name?null:r.name):undefined} expanded={preview===r.name} previewId={previewId}/><span className="collector-score"><b>{r.donation?.hidden?'—':r.donation?.amountMinor==null?'?':new Intl.NumberFormat('en-US',{style:'currency',currency:r.donation.currency,maximumFractionDigits:2}).format(r.donation.amountMinor/100)}</b><small>{r.donation?.hidden?'Hidden':r.donation?.amountMinor==null?'Unknown':r.donation.currency}</small></span>{expandable&&preview===r.name&&<Suspense fallback={<span className="collector-preview" role="status">Loading preview…</span>}><CollectorPreview name={r.name} id={previewId}/></Suspense>}</li>)}{!query&&<EmptyBoardRows count={pageSize-slice.items.length}/>}</ol><CommunityPager slice={serverPaging?{...slice,current:serverPaging.page,pages:serverPaging.pages}:slice} setPage={serverPaging?.onPage??setPage} label="Supporters"/></>;
 }
 export function PlayerComparison({rows}: {rows: BoardRow[]}) {
  const [left,setLeft]=useState(''),[right,setRight]=useState('average');
@@ -175,4 +178,8 @@ export function PlayerComparison({rows}: {rows: BoardRow[]}) {
  </section>;
 }
 
+/** A board while it loads: the loaded rows' height and columns (rank, badge, name and title, total), then the pager, so nothing moves. */
+export function BoardSkeleton({count,label='Loading leaderboard'}:{count:number;label?:string}){
+ return <><ol className="collector-list board-loading" aria-label={label} aria-busy="true">{Array.from({length:count},(_,i)=><li className="board-loading-row" key={i} aria-hidden="true"><span className="bl-rank"><i/></span><span className="bl-identity"><i className="bl-badge"/><span><i/><i/></span></span><span className="bl-score"><i/><i/></span></li>)}</ol><div className="board-loading-pager" aria-hidden="true"><Pagination page={0} pages={1} onPage={()=>{}} label="Loading"/></div></>;
+}
 function EmptyBoardRows({count}:{count:number}) {return <>{Array.from({length:Math.max(0,count)},(_,i)=><li className="collector-placeholder" key={'empty-'+i} aria-label="Empty leaderboard place"><span className="collector-rank">—</span><span className="empty-player"><span/>Open place</span><span className="collector-score">—</span></li>)}</>;}

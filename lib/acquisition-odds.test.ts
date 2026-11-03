@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {initial,likelihood} from './model.ts';
 import {oddsMethod,usesAcquisition,mixedFarmingMethod,normalizeRates} from './estimates.ts';
-import {petRateLines} from './pet-rates.ts';
+import {petRateLines,hoursToMilestone} from './pet-rates.ts';
 import {acquisitionEffort} from './hunt-history.ts';
 test('Tempoross permits label resolves to reward rolls, never boss completions',()=>{
  const p=structuredClone(initial.pets.find(p=>p.name==='Tiny tempor')!);
@@ -42,4 +42,23 @@ test('method changes refresh Wiki denominators before save while preserving over
  const j=structuredClone(initial);j.hiscores.skills=[{name:'Farming',level:99,xp:14000000,rank:1}];const p=j.pets.find(p=>p.name==='Tangleroot')!;
  p.methods=[{...mixedFarmingMethod(99),name:'Palm tree',unit:'plants',rate:99999,rateOverride:false,kc:10}];normalizeRates(j);assert.equal(p.methods[0].rate,6525);
  p.methods[0].rateOverride=true;p.methods[0].rate=123;normalizeRates(j);assert.equal(p.methods[0].rate,123);
+});
+test('Penance Queen counts high-level gambles, with pace from Honour points',()=>{
+ const j=structuredClone(initial),p=j.pets.find(p=>p.name==='Pet Penance Queen')!;
+ assert.equal(p.methods[0].unit,'gambles');
+ p.methods=[{name:'Penance',unit:'kills',rate:1000,kph:4,kc:null,activity:'Penance',source:'Spreadsheet'}];
+ normalizeRates(j);
+ assert.deepEqual([p.methods[0].name,p.methods[0].unit,p.methods[0].activity,p.methods[0].kph],['High-level gambles','gambles',null,4]);
+ assert.ok(petRateLines(p,j).lines.some(l=>l.label==='Honour points per hour'&&l.value==='8,000'));
+});
+test('time left counts down to the next odds milestone instead of repeating the mean hunt',()=>{
+ assert.deepEqual(hoursToMilestone(100,0),{hours:100*Math.LN2,percent:50});
+ const phoenix=hoursToMilestone(100,0.667)!;assert.equal(phoenix.percent,90);assert.ok(Math.abs(phoenix.hours-(100*Math.log(10)+100*Math.log1p(-0.667)))<1e-9);assert.ok(phoenix.hours>119&&phoenix.hours<121);
+ assert.equal(hoursToMilestone(100,0.96),null);assert.equal(hoursToMilestone(null,0.2),null);
+});
+test('Tiny tempor gets an example permits-per-hour pace that a saved pace overrides',()=>{
+ const j=structuredClone(initial),p=j.pets.find(p=>p.name==='Tiny tempor')!;
+ p.methods=[{name:'Tempoross',unit:'games',rate:8000,kph:null,kc:12,activity:'Tempoross',source:'Spreadsheet'}];
+ normalizeRates(j);assert.equal(p.methods[0].unit,'rolls');assert.equal(p.methods[0].kph,80);assert.match(p.methods[0].source,/permits\/hour/);
+ p.methods[0].kph=120;p.methods[0].paceConfirmed=true;normalizeRates(j);assert.equal(p.methods[0].kph,120);
 });

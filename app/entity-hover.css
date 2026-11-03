@@ -1,0 +1,47 @@
+/* Skill cards (EntityHover.tsx): the same floating card and label/value cells as item price cards (item-price-card.css),
+   with the skill's name in the site's heading font and pills for free-to-play/members and the skill's type. */
+.floating-tooltip.skc-tip{width:320px;max-width:calc(100vw - 16px);padding:11px 12px 10px;font-size:12px}
+.skc{display:flex;flex-direction:column;gap:9px;white-space:normal}
+.skc-head{display:flex;align-items:center;gap:10px;min-width:0}
+.skc-head>img{width:30px;height:30px;object-fit:contain;flex:none;image-rendering:pixelated}
+.skc-title{display:grid;gap:3px;min-width:0}
+.skc-title>b{font:700 17px/1 var(--rs);color:var(--orange);text-shadow:1px 1px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skc-pills{display:flex;flex-wrap:wrap;gap:4px}
+.skc-pill{padding:1px 6px;border:1px solid #ffffff1c;border-radius:999px;color:#c9bfa6;font-size:10px;line-height:1.4;letter-spacing:.02em;white-space:nowrap}
+.skc-pill.is-members{border-color:#d8b25a55;color:#d8b25a}
+.skc-summary{color:#e7e4dc;font-size:12px;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.skc-cell{display:grid;gap:1px;align-content:start;min-width:0;padding:6px 8px;border-radius:5px;background:#ffffff08}
+.skc-cell small{color:#a39d8c;font-size:10px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skc-cell b{color:#f2e6c4;font-size:12.5px;line-height:1.3;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skc-grid>.skc-cell:first-child b{color:#f6e54e;font:700 18px/1.1 var(--rs);text-shadow:1px 1px 0 #000}
+/* A fact with the game's icon for what it names: the icon to the left of label and value, pixel-crisp. */
+.skc-cell.has-icon{grid-template-columns:24px minmax(0,1fr);column-gap:7px;align-items:center}
+.skc-cell.has-icon>img{grid-row:1/span 2;width:24px;height:24px;object-fit:contain;image-rendering:pixelated}
+.skc-foot{display:flex;justify-content:flex-end;padding-top:7px;border-top:1px solid #ffffff12;font-size:11px}
+.skc-foot a{display:inline-flex;align-items:center;gap:4px;color:#e9c97a;text-decoration:none}
+.skc-foot a:hover{text-decoration:underline}
+.skc-trigger{cursor:help}
+.skc-trigger:focus-visible{outline:2px solid #e9c97a;outline-offset:2px;border-radius:3px}
+/* Travel cards (EntityHover.tsx): the skill card's head, cells and footer, with what the destination is under its name
+   and a snippet of the world map's own tiles centred on where it lands. */
+.trc-what{display:flex;align-items:center;gap:6px;min-width:0;color:#c9bfa6;font-size:11.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trc-map{position:relative;display:block;width:100%;height:160px;overflow:hidden;border-radius:5px;background:#0e0d0b}
+.trc-map>img{position:absolute;max-width:none;pointer-events:none}
+.trc-marker{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#f6e54e;border:2px solid #1a1407;box-shadow:0 0 0 3px #f6e54e55,0 1px 4px #000}
+.trc-caption{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:14px 8px 5px;background:linear-gradient(transparent,#000000c0);font-size:11px;line-height:1.2}
+.trc-caption b{min-width:0;color:#f2e6c4;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:1px 1px 0 #000}
+.trc-caption small{flex:none;margin-left:auto;color:#c9bfa6;font-size:10px;font-variant-numeric:tabular-nums;text-shadow:1px 1px 0 #000}
+.trc-needs{display:grid;gap:6px;padding:0 2px}
+.trc-needs>span{display:flex;align-items:center;gap:9px;min-width:0}
+.trc-needs img{flex:none;width:20px;height:20px;object-fit:contain;image-rendering:pixelated}
+.trc-needs b{min-width:0;color:#f2e6c4;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trc-foot{justify-content:space-between}.trc-foot>a:last-child{margin-left:auto}
+/* Prayer and spell cards (EntityHover.tsx): the travel card's head and requirement list, then one cast's runes on one
+   row, each rune's icon with its amount. */
+.mgc-runes{display:flex;flex-wrap:nowrap;align-items:center;gap:14px;min-width:0;padding:7px 2px 0;border-top:1px solid #ffffff12;overflow:hidden}
+.mgc-runes>span{display:inline-flex;align-items:center;gap:5px;flex:none}
+.mgc-runes img{width:22px;height:22px;object-fit:contain;image-rendering:pixelated}
+/* The spellbook leads the runes, set off by a thin rule. */
+.mgc-runes>.mgc-book{padding-right:14px;border-right:1px solid #ffffff1c}
+.mgc-runes b{color:#f2e6c4;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}

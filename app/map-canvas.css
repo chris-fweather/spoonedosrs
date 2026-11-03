@@ -1,0 +1,36 @@
+/* Shared by the world map and guide maps (map-canvas.ts). */
+/* Exits: the way into or out of an area, sized by the map (iconSize), with an up or down arrow at a top corner. */
+.map-exit{background:none;border:0;cursor:pointer}
+.map-exit-glyph{display:block;width:100%;height:100%;object-fit:contain;transition:transform .12s}
+/* The game's own map sprites (public/icons/map/game): square pixels, no added shadow, as the game draws them. */
+.map-exit-glyph.is-pixel{image-rendering:pixelated!important}
+.map-exit:hover .map-exit-glyph,.map-exit:focus-visible .map-exit-glyph{transform:scale(1.15)}
+.map-exit:focus-visible{outline:2px solid #ffd36b;outline-offset:3px;border-radius:4px}
+/* A wider touch target than the art on touch screens. */
+@media (pointer:coarse){.map-exit::before{content:'';position:absolute;inset:-8px}}
+/* Hover cards over markers (map tooltips) and the tap card of an exit. */
+.leaflet-tooltip.map-tip{display:flex;flex-direction:column;gap:2px;width:max-content;max-width:380px;padding:7px 10px;background:#1d1a14f2;border:1px solid #514632;border-radius:6px;color:#efe6d2;font:inherit;font-size:13px;line-height:1.35;white-space:normal;box-shadow:0 6px 18px #000a}
+.leaflet-tooltip.map-tip::before{border-top-color:#514632}
+.map-tip b{font-weight:700;color:#ffd98f}
+.map-tip small{color:#b3a891;font-size:12px}
+.map-exit-card small,.leaflet-tooltip.map-tip small{white-space:nowrap}
+.map-tip ul{display:flex;flex-direction:column;gap:3px;margin:3px 0 0;padding:0;list-style:none;min-width:0}
+/* One line per row: the card grows to its widest row, up to its max-width, then the row text ends in an ellipsis. */
+.map-tip li{display:flex;align-items:center;gap:7px;white-space:nowrap;min-width:0}
+.map-tip li span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.map-tip li img{width:18px;height:18px;object-fit:contain;flex:none}
+.map-tip li.is-off{color:#8f8672}
+.map-tip li.is-off img{filter:grayscale(1);opacity:.6}
+.map-tip li.is-more{color:#b3a891;font-size:12px}
+.map-tip li small{flex:none;margin-left:auto;padding-left:14px}
+.map-exit-pop .leaflet-popup-content-wrapper{background:#1d1a14f5;border:1px solid #514632;border-radius:8px;color:#efe6d2;box-shadow:0 8px 22px #000b}
+.map-exit-pop .leaflet-popup-tip{background:#1d1a14f5;border:1px solid #514632}
+.map-exit-pop .leaflet-popup-content{margin:10px 12px;font:inherit}
+.map-exit-card{display:flex;flex-direction:column;gap:2px;min-width:160px}
+.map-exit-card b{font-size:14px;color:#ffd98f}
+.map-exit-card small{color:#b3a891;font-size:12px}
+.map-exit-card .map-exit-go{margin-top:8px;min-height:40px;justify-content:center}
+.map-back{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 12px;border:1px solid #c98a1c;border-radius:6px;background:#1d1a14f0;color:#ffd98f;font:inherit;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px #0008;cursor:pointer}
+.map-back:hover{background:#2a251ce8;border-color:#e99b27}
+.map-back svg{flex:none}
+@media (max-width:600px){.map-back{height:40px}}

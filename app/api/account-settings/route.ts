@@ -3,6 +3,7 @@ import { discordAvatarUrl } from "@/lib/session";
 import { characterPortrait } from "@/lib/account-menu";
 import { DEFAULT_APPEARANCE, type Appearance } from "@/lib/appearance";
 import { accountName, db, sameOrigin } from "@/lib/storage";
+import { verifiedSql } from "@/lib/verified-profile";
 import { requestJson, RequestError } from "@/lib/request-body";
 import {
   DEFAULT_DETAILS,
@@ -39,16 +40,21 @@ export async function GET(req: Request) {
     if (!user) throw new HttpError(401, "Sign in to manage your accounts.");
     const rows = await db()
       .prepare(
-        `SELECT c.display_name AS name,c.claimed_at AS claimedAt,r.linked_at AS linkedAt,COALESCE(v.visibility,'public') AS visibility,o.details,COALESCE(p.show_donation,1) AS showDonation,a.body_type AS body,a.hair_color AS hair,o.skin FROM claimed_names c LEFT JOIN profile_link_owners r ON r.rsn=c.rsn AND r.discord_id=c.discord_id LEFT JOIN profile_visibility v ON v.rsn=c.rsn LEFT JOIN profile_options o ON o.rsn=c.rsn LEFT JOIN profile_presentation p ON p.rsn=c.rsn LEFT JOIN profile_appearance a ON a.rsn=c.rsn WHERE c.discord_id=? ORDER BY c.display_name`,
+        `SELECT c.display_name AS name,c.claimed_at AS claimedAt,${verifiedSql("c")} AS verified,r.linked_at AS linkedAt,COALESCE(v.visibility,'public') AS visibility,o.details,COALESCE(p.show_donation,1) AS showDonation,COALESCE(p.show_supporter,1) AS showSupporter,CASE WHEN t.amount_minor>0 OR t.granted=1 THEN 1 ELSE 0 END AS supported,COALESCE(t.amount_minor,0) AS amountMinor,COALESCE(t.currency,'USD') AS currency,a.body_type AS body,a.hair_color AS hair,o.skin FROM claimed_names c LEFT JOIN profile_link_owners r ON r.rsn=c.rsn AND r.discord_id=c.discord_id LEFT JOIN profile_visibility v ON v.rsn=c.rsn LEFT JOIN profile_options o ON o.rsn=c.rsn LEFT JOIN profile_presentation p ON p.rsn=c.rsn LEFT JOIN profile_appearance a ON a.rsn=c.rsn LEFT JOIN profile_supporter_totals t ON t.rsn=c.rsn WHERE c.discord_id=? ORDER BY c.display_name`,
       )
       .bind(user.id)
       .all<{
         name: string;
         claimedAt: number;
+        verified: number;
         linkedAt: number | null;
         visibility: string;
         details: string | null;
         showDonation: number;
+        showSupporter: number;
+        supported: number;
+        amountMinor: number;
+        currency: string;
         body: string | null;
         hair: string | null;
         skin: string | null;
@@ -64,6 +70,9 @@ export async function GET(req: Request) {
           ...r,
           portrait: portrait(body, hair, skin),
           showDonation: !!r.showDonation,
+          showSupporter: !!r.showSupporter,
+          supported: !!r.supported,
+          verified: !!r.verified,
           details: r.details
             ? parseDetails(JSON.parse(r.details))
             : DEFAULT_DETAILS,
@@ -94,7 +103,8 @@ export async function POST(req: Request) {
     }
     if (
       !validVisibility(body.visibility) ||
-      typeof body.showDonation !== "boolean"
+      (body.showDonation !== undefined && typeof body.showDonation !== "boolean") ||
+      (body.showSupporter !== undefined && typeof body.showSupporter !== "boolean")
     )
       throw new HttpError(400, "Choose valid visibility settings.");
     const owned = await db()
@@ -116,9 +126,9 @@ export async function POST(req: Request) {
         .bind(JSON.stringify(details), name.toLowerCase(), user.id),
       db()
         .prepare(
-          "INSERT INTO profile_presentation(rsn,show_donation) SELECT rsn,? FROM claimed_names WHERE rsn=? AND discord_id=? ON CONFLICT(rsn) DO UPDATE SET show_donation=excluded.show_donation",
+          "INSERT INTO profile_presentation(rsn,show_donation,show_supporter) SELECT rsn,COALESCE(?,(SELECT show_donation FROM profile_presentation WHERE rsn=?),1),COALESCE(?,(SELECT show_supporter FROM profile_presentation WHERE rsn=?),1) FROM claimed_names WHERE rsn=? AND discord_id=? ON CONFLICT(rsn) DO UPDATE SET show_donation=excluded.show_donation,show_supporter=excluded.show_supporter",
         )
-        .bind(body.showDonation ? 1 : 0, name.toLowerCase(), user.id),
+        .bind(typeof body.showDonation === "boolean" ? (body.showDonation ? 1 : 0) : null, name.toLowerCase(), typeof body.showSupporter === "boolean" ? (body.showSupporter ? 1 : 0) : null, name.toLowerCase(), name.toLowerCase(), user.id),
     ]);
     return Response.json({ ok: true }, { headers });
   } catch (e) {

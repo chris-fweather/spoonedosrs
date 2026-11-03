@@ -40,8 +40,12 @@ button.perm-member-row:focus-visible{outline:2px solid var(--orange);outline-off
 .staff-avatar{width:40px;height:40px;border-radius:50%;flex:none;object-fit:cover;display:grid;place-items:center;font:600 16px/1 'DM Sans',sans-serif;color:var(--muted);background:#2e2a24}
 /* The open member: rank, own access and Remove rank. */
 .perm-editor{display:grid;gap:12px;margin:0 0 14px 52px;padding:14px;border:1px solid var(--line);border-radius:6px;background:var(--sunk)}
-.perm-field{display:grid;grid-template-columns:70px minmax(0,1fr);gap:10px;align-items:center}
+.perm-field{display:grid;grid-template-columns:76px minmax(0,1fr);gap:10px;align-items:center}
 .perm-label{font-size:12px;color:var(--muted)}
+/* Hover title: one text field, Save and Cancel beside it once it changes. */
+.perm-title{display:flex;align-items:center;gap:6px;min-width:0}
+.perm-title input{flex:1 1 auto;min-width:0;max-width:320px;min-height:36px}
+.perm-title .btn{flex:none}
 .perm-confirm{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border:1px solid #756548;border-radius:6px;background:#2b261d;font-size:12.5px}
 .perm-confirm>span{flex:1 1 180px;min-width:0}
 .perm-editor-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px}
@@ -156,7 +160,7 @@ button.perm-pick:disabled{opacity:.45;cursor:not-allowed}
 .perm-history-row.tone-up .ws-row-head{--state:#5fae5f}
 .perm-history-row.tone-down .ws-row-head{--state:#d0614f}
 .perm-history-row.tone-edit .ws-row-head{--state:#c9a24a}
-.perm-history-title{font-size:13px;line-height:1.5;color:var(--muted);min-width:0}
+.perm-history-title{display:block;font-size:13.5px;line-height:1.45;color:var(--muted);min-width:0}
 .perm-history-title b{color:var(--text)}
 .perm-history .ws-row-meta{margin-top:4px}
 .perm-history-more{margin-top:10px}
@@ -188,3 +192,7 @@ button.perm-pick:disabled{opacity:.45;cursor:not-allowed}
 .perm-history-title .audit-areas{margin-left:2px}
 .audit-plain{color:var(--text);font-weight:650}
 .perm-history-title em{font-style:normal;color:var(--dim)}
+/* Sentences in the access history: ranks and permissions inline on the text baseline, icons nudged to the middle, no pills. */
+.perm-history-title .rank-label,.audit-area{display:inline;white-space:nowrap;vertical-align:baseline}
+.perm-history-title .rank-label .rank-icon{display:inline-block;width:15px;height:17px;vertical-align:-3px;margin-right:4px}
+.audit-area img{display:inline-block;width:15px;height:15px;object-fit:contain;vertical-align:-3px;margin-right:4px}

@@ -1,24 +1,28 @@
 "use client";
-import {useContext, useEffect, useState, type FormEvent, type ReactNode} from "react";
+import {useEffect, useState, type FormEvent, type ReactNode} from "react";
 import {ChevronDown, Lock, Search} from "lucide-react";
 import {STAFF_AREAS, EDITABLE_STAFF_ROLES, type EditableStaffRole, type StaffArea, type StaffPermissions} from "@/lib/staff-permissions";
-import {mayGrant, STAFF_LABEL, STAFF_TONE, type StaffRole} from "@/lib/staff-policy";
+import {mayGrant, STAFF_LABEL, STAFF_TITLE_MAX, STAFF_TONE, type StaffRole} from "@/lib/staff-policy";
 import {RankIcon, RankLabel} from "./StaffBadge";
-import {Person, RsName, StaffPeople, timeAgo} from "./StaffWorkspace";
+import {Person, RS_NAME_ICON, RsName, timeAgo} from "./StaffWorkspace";
 import {RANK_STYLE} from "@/lib/staff-appearance";
 import {DiscordMark} from "./DiscordMark";
 import {Empty, ListTools, PanelHead} from "./StaffReview";
 import "./account-settings.css";
 import "./staff-access.css";
 type Viewer = {id: string; role: StaffRole};
-export type StaffMember = {discord_id: string; username: string; global_name: string | null; avatarUrl: string | null; role: StaffRole; linked_names: string; custom: boolean; permissions: StaffPermissions};
-export type AuditEntry = {id: number; action: string; detail: string; created_at: string; target_id: string; actor_id: string; actor_name: string | null; target_name: string | null};
+export type StaffMember = {discord_id: string; username: string; global_name: string | null; avatarUrl: string | null; role: StaffRole; linked_names: string;
+  /** The job title on their scimitar's hover card; null shows "Site <rank>". */
+  title?: string | null; custom: boolean; permissions: StaffPermissions};
+export type AuditEntry = {id: number; action: string; detail: string; created_at: string; target_id: string; actor_id: string; actor_name: string | null; target_name: string | null;
+  /** Each person's rank just before this change took effect (from the server's replay of rank changes). */
+  actor_role?: StaffRole | null; target_role?: StaffRole | null};
 type Save = (body: object, message: string) => Promise<boolean>;
 const RANKS: StaffRole[] = ["owner", "admin", "moderator", "helper"];
 const AREAS = Object.entries(STAFF_AREAS) as [StaffArea, string][];
 /** Short labels and the same official icons as the portal tabs. */
 const AREA_SHORT: Record<StaffArea, string> = {guides: "Write guides", publish: "Publish guides", corrections: "Propose drop rates", planning: "Propose kill rates", review: "Approve corrections", ownership: "Approve ownership", holds: "Hold names"};
-const AREA_ICON: Record<StaffArea, string> = {guides: "/icons/navigation/collection-log-icon.png", corrections: "/items/2347.png", planning: "/icons/navigation/combat-achievements-icon.png", review: "/icons/skills/defence.png", publish: "/icons/navigation/quest-list-icon.png", ownership: "/items/983.png", holds: "/icons/community/friends-list.png"};
+const AREA_ICON: Record<StaffArea, string> = {guides: "/icons/navigation/collection-log-icon.png", corrections: "/items/2347.png", planning: "/icons/navigation/combat-achievements-icon.png", review: "/icons/skills/defence.png", publish: "/ui/quest-list-icon.png", ownership: "/items/983.png", holds: RS_NAME_ICON};
 /** Access grouped by where it is used: guides, corrections and ownership. */
 const GROUPS: {id: string; title: string; icon: string; areas: [StaffArea, string][]; note?: string}[] = [
   {id: "guides", title: "Guides", icon: "/icons/navigation/collection-log-icon.png", areas: [["guides", "Write guides"], ["publish", "Publish guides"]]},
@@ -38,10 +42,10 @@ export function StaffAccess({members, audit, rolePermissions, viewer, busy, onSa
   const [open, setOpen] = useState<string | null>(null);
   return <div className="staff-access">
     <section className="community-panel perm-panel" aria-label="Team">
-      <PanelHead icon="/icons/community/friends-list.png" title="Team" badge={String(members.length)} text="Add staff, change ranks and fine-tune access. Nobody changes their own rank." />
+      <PanelHead icon="/ui/friends-list.png" title="Team" badge={String(members.length)} text="Add staff, change ranks and fine-tune access. Nobody changes their own rank." />
       <AddStaff viewer={viewer} busy={busy} onSave={onSave} name={grantName} setName={setGrantName} />
       <div className="perm-list-head" aria-hidden="true"><span>Member</span><span>Rank</span><span>Access</span></div>
-      <ul className="perm-members">{sorted.map((m) => <MemberRow key={m.discord_id + m.role + JSON.stringify(m.permissions) + m.custom} member={m} viewer={viewer} busy={busy} onSave={onSave} open={open === m.discord_id} onToggle={() => setOpen(open === m.discord_id ? null : m.discord_id)} />)}</ul>
+      <ul className="perm-members">{sorted.map((m) => <MemberRow key={m.discord_id + m.role + JSON.stringify(m.permissions) + m.custom + (m.title ?? "")} member={m} viewer={viewer} busy={busy} onSave={onSave} open={open === m.discord_id} onToggle={() => setOpen(open === m.discord_id ? null : m.discord_id)} />)}</ul>
     </section>
     <RankDefaults key={JSON.stringify(rolePermissions)} rolePermissions={rolePermissions} busy={busy} onSave={onSave} editable={viewer.role === "owner"} />
     <AccessHistory audit={audit} />
@@ -125,6 +129,7 @@ function MemberEditor({member: m, names, ranks, viewer, busy, onSave}: {member: 
       <RankChoices value={rank} ranks={ranks} name={"perm-rank-" + m.discord_id} disabled={busy} onChange={setRank} />
     </div>
     {rank !== m.role && <div className="perm-confirm"><span>Make {name} {rankWord(rank)}?</span><button type="button" className="btn sm primary" disabled={busy} onClick={() => void onSave({action: "grant", username: names[0], role: rank}, `${name} is now ${STAFF_LABEL[rank]}.`)}>Confirm</button><button type="button" className="btn sm ghost" disabled={busy} onClick={() => setRank(m.role)}>Cancel</button></div>}
+    {mayGrant(viewer, target, m.role) && <HoverTitle member={m} username={names[0]} busy={busy} onSave={onSave} />}
     {mayGrant(viewer, target, m.role) && <div className="perm-field"><span className="perm-label">Access</span>
       <AreaChoices value={areas} disabled={busy} label={`Access for ${name}`} onChange={setAreas} />
     </div>}
@@ -136,6 +141,19 @@ function MemberEditor({member: m, names, ranks, viewer, busy, onSave}: {member: 
         : <button type="button" className="link perm-remove" disabled={busy} onClick={() => setRemove(true)}>Remove rank</button>)}
     </div>
   </div>;
+}
+
+/** The job title on the member's scimitar hover card ("Head Admin"); empty shows the default "Site <rank>". The server validates it. */
+function HoverTitle({member: m, username, busy, onSave}: {member: StaffMember; username: string; busy: boolean; onSave: Save}) {
+  const [title, setTitle] = useState(m.title ?? ""), name = displayName(m);
+  const next = title.trim().replace(/\s+/g, " "), changed = next !== (m.title ?? "");
+  function save(e: FormEvent) {e.preventDefault();if (changed) void onSave({action: "title", username, title: next || null}, next ? `${name}'s hover title is now ${next}.` : `${name}'s hover title is back to Site ${STAFF_LABEL[m.role]}.`);}
+  return <form className="perm-field" onSubmit={save}><label className="perm-label" htmlFor={"perm-title-" + m.discord_id}>Hover title</label>
+    <span className="perm-title">
+      <input id={"perm-title-" + m.discord_id} value={title} maxLength={STAFF_TITLE_MAX} disabled={busy} placeholder={`Site ${STAFF_LABEL[m.role]}`} autoComplete="off" onChange={(e) => setTitle(e.target.value)} />
+      {changed && <><button className="btn sm primary" disabled={busy}>Save</button><button type="button" className="btn sm ghost" disabled={busy} onClick={() => setTitle(m.title ?? "")}>Cancel</button></>}
+    </span>
+  </form>;
 }
 
 /** What each rank opens by default. The owner row is always every area. */
@@ -162,38 +180,65 @@ function RankDefaults({rolePermissions, busy, onSave, editable}: {rolePermission
   </section>;
 }
 
-/** A rank change drawn as from → to, each rank with its scimitar and colour. */
-type Described = {tone: "up" | "down" | "edit"; icon: string; title: ReactNode; detail?: ReactNode};
-const areaChips = (areas: StaffPermissions | Record<string, unknown>) => <span className="audit-areas">{AREAS.filter(([k]) => areas[k]).map(([k]) => <span key={k} className="is-on"><img src={AREA_ICON[k]} alt="" />{AREA_SHORT[k]}</span>)}</span>;
-/** Each change as a short headline with the right icon (rank scimitar, area or guide), and the detail underneath. */
-/** A rank as a coloured chip with its scimitar. */
-const rankChip = (r: unknown) => r && (r as string) in STAFF_LABEL ? <span className={"rank-chip " + STAFF_TONE[r as StaffRole]}><RankIcon staff={{role: r as StaffRole, prefix: null}} />{STAFF_LABEL[r as StaffRole]}</span> : <span className="rank-chip is-none">Player</span>;
-/** The person a change was made to, in plain text: their rank is what the sentence is about. */
-function PlainName({id, fallback}: {id: string | null; fallback: string}) {
-  const person = useContext(StaffPeople).find((p) => p.id === id);
-  return <b className="audit-plain">{person?.display?.rsn ?? person?.name ?? fallback}</b>;
+type Described = {tone: "up" | "down" | "edit"; icon: string; title: ReactNode; by: ReactNode};
+/** A rank as its scimitar and the rank word in its colour, inline, no box. */
+const rankName = (r: unknown) => r && (r as string) in STAFF_LABEL ? <RankLabel role={r as StaffRole} /> : <b>Player</b>;
+/** Permissions as inline words with their icons: "Publish guides, Hold names and Write guides". */
+function areaList(keys: StaffArea[]) {
+  return <>{keys.map((k, i) => <span key={k}>{i ? (i === keys.length - 1 ? " and " : ", ") : null}<span className="audit-area"><img src={AREA_ICON[k]} alt="" /><b>{AREA_SHORT[k]}</b></span></span>)}</>;
 }
-/** One sentence per change, on one line: "Mira Vale promoted Bramble Pk to [Moderator]". */
+/** What changed between two sets of access: the permissions given and the ones removed. */
+function areaDiff(from: Record<string, unknown> | undefined, to: Record<string, unknown> | undefined) {
+  const keys = AREAS.map(([k]) => k);
+  return {gave: keys.filter((k) => !!to?.[k] && !from?.[k]), removed: keys.filter((k) => !to?.[k] && !!from?.[k])};
+}
+/** "can now Publish guides · can no longer Hold names" (or one half of it). */
+function diffWords(gave: StaffArea[], removed: StaffArea[]) {
+  return <>{gave.length ? <>can now {areaList(gave)}</> : null}{gave.length && removed.length ? <span className="ws-by-sep" aria-hidden="true">·</span> : null}{removed.length ? <>can no longer {areaList(removed)}</> : null}</>;
+}
+/**
+ * Each change as a title (what changed, about whom) and a by-line (who did it): "Bramble Pk promoted from Helper to Moderator",
+ * "by Mira Vale". Each name is coloured by the rank that person held just before the change took effect (actor_role and target_role,
+ * worked out on the server by replaying the rank changes in order; see lib/staff-rank-history.ts), so a newly promoted helper's name is plain.
+ */
 function describe(a: AuditEntry): Described {
-  const actor = <Person id={a.actor_id} fallback={a.actor_name ?? "Someone"} />, target = <PlainName id={a.target_id} fallback={a.target_name ?? "a former staff member"} />;
+  const actor = <Person id={a.actor_id} fallback={a.actor_name ?? "someone"} rankThen={a.actor_role ?? null} />, target = <Person id={a.target_id} fallback={a.target_name ?? "A former staff member"} rankThen={a.target_role ?? null} />;
+  const by = <>by {actor}</>;
   let d: Record<string, unknown> | null = null;try {d = JSON.parse(a.detail);} catch {}
   const rankIcon = (r: unknown) => RANK_STYLE[r as StaffRole]?.src ?? "/icons/community/settings-icon.png";
   if (a.action === "grant" && d) {
-    if (!d.from) return {tone: "up", icon: rankIcon(d.to), title: <>{actor} added {target} to the team as {rankChip(d.to)}</>};
+    if (!d.from) return {tone: "up", icon: rankIcon(d.to), by: <>Added by {actor}</>, title: <>{target} joined staff as {rankName(d.to)}</>};
     const up = RANKS.indexOf(d.to as StaffRole) < RANKS.indexOf(d.from as StaffRole);
-    return {tone: up ? "up" : "down", icon: rankIcon(d.to), title: <>{actor} {up ? "promoted" : "moved"} {target} {up ? "from" : "down from"} {rankChip(d.from)} to {rankChip(d.to)}</>};
+    return {tone: up ? "up" : "down", icon: rankIcon(d.to), by: <>{up ? "Promoted" : "Demoted"} by {actor}</>, title: <>{target} {up ? "promoted" : "demoted"} to {rankName(d.to)}</>};
   }
-  if (a.action === "revoke" && d) return {tone: "down", icon: rankIcon(d.from), title: <>{actor} removed {rankChip(d.from)} {target} from the team</>};
-  if (a.action === "permissions" && d) return d.reset ? {tone: "edit", icon: "/icons/community/settings-icon.png", title: <>{actor} reset {target}&apos;s access to their rank&apos;s defaults</>}
-    : {tone: "edit", icon: "/icons/community/settings-icon.png", title: <>{actor} set {target}&apos;s access to {AREAS.some(([k]) => d![k]) ? areaChips(d) : <em>nothing</em>}</>};
+  if (a.action === "revoke" && d) return {tone: "down", icon: rankIcon(d.from), by: <>Removed by {actor}</>, title: <>{target} removed from staff</>};
+  if (a.action === "permissions" && d) {
+    const role = a.target_role && a.target_role in STAFF_LABEL ? STAFF_LABEL[a.target_role] : null;
+    const edit = {tone: "edit" as const, icon: "/icons/community/settings-icon.png", by: <>Changed {by}</>};
+    // Older rows stored only the new access (or {reset:true}); newer rows store {from,to}.
+    if (d.reset) return {...edit, title: <>{target}&apos;s access reset to the {role ?? "rank"} defaults</>};
+    if (d.to && typeof d.to === "object") {
+      const {gave, removed} = areaDiff(d.from as Record<string, unknown>, d.to as Record<string, unknown>);
+      return {...edit, title: gave.length || removed.length ? <>{target} {diffWords(gave, removed)}</> : <>{target}&apos;s access saved <em>(no change)</em></>};
+    }
+    const on = AREAS.filter(([k]) => d![k]).map(([k]) => k);
+    return {...edit, title: <>{target}&apos;s access set to {on.length ? areaList(on) : <em>nothing</em>}</>};
+  }
+  if (a.action === "title" && d) {
+    const words = (t: unknown) => typeof t === "string" && t ? <b>{t}</b> : <em>the default</em>;
+    return {tone: "edit", icon: "/icons/community/settings-icon.png", by: <>Changed {by}</>, title: <>{target}&apos;s hover title set to {words(d.to)}{d.from ? <> (was {words(d.from)})</> : null}</>};
+  }
   if (a.action === "role-permissions" && d) {
-    const from = d.from as StaffPermissions, to = d.to as StaffPermissions;
-    const changed = Object.fromEntries(AREAS.filter(([k]) => from?.[k] !== to?.[k]).map(([k]) => [k, to[k]]));
-    return {tone: "edit", icon: rankIcon(d.role), title: <>{actor} modified {rankChip(d.role)} permissions{Object.keys(changed).length ? <>: <span className="audit-areas">{AREAS.filter(([k]) => k in changed).map(([k]) => <span key={k} className={changed[k] ? "is-on" : "is-off"}><img src={AREA_ICON[k]} alt="" />{AREA_SHORT[k]} {changed[k] ? "on" : "off"}</span>)}</span></> : <em> (no change)</em>}</>};
+    const {gave, removed} = areaDiff(d.from as Record<string, unknown>, d.to as Record<string, unknown>);
+    const rank = <>Every {rankName(d.role)}</>;
+    return {tone: "edit", icon: rankIcon(d.role), by: <>Changed {by}</>, title: gave.length || removed.length ? <>{rank} {diffWords(gave, removed)}</> : <>{rank}: access saved <em>(no change)</em></>};
   }
-  if (a.action === "guide-publish" || a.action === "guide-unpublish") return {tone: a.action === "guide-publish" ? "up" : "down", icon: "/icons/navigation/collection-log-icon.png", title: <>{actor} {a.action === "guide-publish" ? "published" : "unpublished"} the guide <b>{a.detail}</b></>};
+  if (a.action === "guide-publish" || a.action === "guide-unpublish") {
+    const published = a.action === "guide-publish";
+    return {tone: published ? "up" : "down", icon: "/icons/navigation/collection-log-icon.png", by: <>{published ? "Published" : "Unpublished"} {by}</>, title: <>Guide: <b>{a.detail}</b></>};
+  }
   const action = a.action.replace(/[-_]+/g, " ");
-  return {tone: "edit", icon: "/icons/community/settings-icon.png", title: <>{actor}: {action}</>, detail: d ? undefined : <>{a.detail}</>};
+  return {tone: "edit", icon: "/icons/community/settings-icon.png", by, title: <>{action[0].toUpperCase() + action.slice(1)}{d ? null : <>: {a.detail}</>}</>};
 }
 
 /** Which filter an entry belongs to. */
@@ -205,13 +250,13 @@ function AccessHistory({audit}: {audit: AuditEntry[]}) {
   const matching = audit.filter((a) => (kind === "all" || historyKind(a) === kind) && (!q || [a.actor_name, a.target_name, a.action, a.detail].some((v) => v?.toLowerCase().includes(q))));
   const rows = all || q ? matching : matching.slice(0, 8);
   return <section className="community-panel perm-panel" aria-label="Access history">
-    <PanelHead icon="/icons/navigation/collection-log-icon.png" title="Access history" text="Who changed ranks, access and published guides, newest first." />
+    <PanelHead icon="/icons/navigation/collection-log-icon.png" title="Access history" text="Who changed ranks, access, titles and published guides, newest first." />
     {audit.length ? <>
       <ListTools states={HISTORY_FILTERS.map((f) => ({id: f.id, label: f.label, count: f.id === "all" ? audit.length : audit.filter((a) => historyKind(a) === f.id).length}))} state={kind} onState={setKind} query={query} onQuery={setQuery} placeholder="Search staff, players or guides…" />
-      {rows.length ? <ol className="ws-list perm-history">{rows.map((a) => {const {tone, icon, title, detail} = describe(a);return <li key={a.id} className={"ws-row perm-history-row tone-" + tone}>
+      {rows.length ? <ol className="ws-list perm-history">{rows.map((a) => {const {tone, icon, title, by} = describe(a);return <li key={a.id} className={"ws-row perm-history-row tone-" + tone}>
         <div className="ws-row-head">
           <span className="ws-row-icon" aria-hidden="true"><img src={icon} alt="" /></span>
-          <span className="ws-row-main"><span className="perm-history-title">{title}</span>{detail && <span className="ws-row-meta">{detail}</span>}</span>
+          <span className="ws-row-main"><span className="perm-history-title">{title}</span><span className="ws-feed-by">{by}</span></span>
           <span className="ws-row-side"><time dateTime={a.created_at} title={new Date(a.created_at).toLocaleString()}>{timeAgo(a.created_at)}</time></span>
         </div>
       </li>;})}</ol> : <Empty icon="/icons/community/settings-icon.png" title="Nothing matches" text="Try another filter or search." />}

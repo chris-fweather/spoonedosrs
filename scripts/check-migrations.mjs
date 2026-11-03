@@ -23,6 +23,22 @@ try{
       // An approved hold from before 0027 must survive the staff_cases rebuild.
       database.prepare("INSERT INTO staff_cases(id,rsn,action,source_id,protected,reason,creator_id,creator_name,created_at,state) VALUES('release-case','release test','unlink','release-helper',0,'Held for the release check.','release-helper','Release helper','2026-01-01T00:00:00Z','approved')").run();
     }
+    if(file.startsWith('0030_')){
+      // Before 0031: one person's donations recorded per name, plus a total on a name nobody has linked.
+      database.prepare('INSERT INTO users(discord_id,username,updated_at) VALUES(?,?,0)').run('release-donor','Release donor');
+      for(const [rsn,at] of [['donor main',1],['donor alt',2]])database.prepare('INSERT INTO claimed_names(rsn,display_name,discord_id,claimed_at) VALUES(?,?,?,?)').run(rsn,rsn,'release-donor',at);
+      for(const [rsn,amount] of [['donor main',1000],['donor alt',2500],['unlinked donor',300]])database.prepare("INSERT INTO profile_supporter_totals(rsn,amount_minor,currency) VALUES(?,?,'USD')").run(rsn,amount);
+    }
+    if(file.startsWith('0031_')){
+    // 0031: a person's per-name totals become one total; the largest name is featured; unlinked names keep theirs.
+    assert.deepEqual({...database.prepare('SELECT amount_minor,currency,featured_rsn FROM supporter_totals WHERE discord_id=?').get('release-donor')},{amount_minor:3500,currency:'USD',featured_rsn:'donor alt'});
+    assert.deepEqual(database.prepare('SELECT rsn FROM profile_supporter_totals ORDER BY rsn').all().map(r=>r.rsn),['unlinked donor']);
+    }
+    if(file.startsWith('0033_')){
+      // Before 0034: an account-wide "the Generous" flag on a person with two linked names, and no donation.
+      database.prepare('INSERT INTO users(discord_id,username,updated_at,title) VALUES(?,?,0,?)').run('release-generous','Release generous','the Generous');
+      for(const [rsn,at] of [['generous b',2],['generous a',1]])database.prepare('INSERT INTO claimed_names(rsn,display_name,discord_id,claimed_at) VALUES(?,?,?,?)').run(rsn,rsn,'release-generous',at);
+    }
     if(file.startsWith('0023_')){
       // A Group Ironman synced before 0024: the old summary trigger dropped the account type.
       database.prepare('INSERT INTO journals(id,data,revision) VALUES(?,?,?)').run('board gim',JSON.stringify({username:'Board GIM',accountMode:'group_ironman',pets:[],log:null}),1);
@@ -51,6 +67,55 @@ try{
   database.prepare('UPDATE journals SET data=?,revision=2 WHERE id=?').run(JSON.stringify({username:'Board GIM',accountMode:'hardcore_group_ironman',pets:[],log:null}),'board gim');
   assert.equal(summaryMode('board gim'),'hardcore_group_ironman');
   assert.equal(summaryMode('release test'),null);
+  // 0032: plugin tokens are stored by hash only and each hash is unique; a received event is recorded once.
+  database.prepare("INSERT INTO plugin_tokens(id,discord_id,token_hash,label,created_at) VALUES('t1','release-helper','hash-1','PC',0)").run();
+  assert.throws(()=>database.prepare("INSERT INTO plugin_tokens(id,discord_id,token_hash,label,created_at) VALUES('t2','release-helper','hash-1','PC',0)").run());
+  database.prepare("INSERT INTO plugin_events(discord_id,event_id,rsn,type,received_at) VALUES('release-helper','e1','release test','PET',0)").run();
+  assert.throws(()=>database.prepare("INSERT INTO plugin_events(discord_id,event_id,rsn,type,received_at) VALUES('release-helper','e1','release test','PET',0)").run());
+  assert.throws(()=>database.prepare("INSERT INTO plugin_events(discord_id,event_id,rsn,type,received_at) VALUES('release-helper','e2','release test','OTHER',0)").run());
+  // A game account can be seen by two Discord accounts (one of them disputing the link), once each.
+  database.prepare("INSERT INTO plugin_accounts(account_key,discord_id,rsn,display_name,first_seen,last_seen) VALUES('k','a','release test','Release Test',0,0),('k','b','release test','Release Test',0,0)").run();
+  assert.throws(()=>database.prepare("INSERT INTO plugin_accounts(account_key,discord_id,rsn,display_name,first_seen,last_seen) VALUES('k','a','release test','Release Test',0,0)").run());
+  database.prepare("INSERT INTO notifications(id,discord_id,kind,rsn,created_at) VALUES('n1','a','link_review_requested','release test',0)").run();
+  assert.throws(()=>database.prepare("INSERT INTO notifications(id,discord_id,kind,rsn,created_at) VALUES('n2','a','spam','release test',0)").run());
+  // 0033: everyone starts listed on the Credits page and can only hide (0) or show (1) themselves.
+  assert.equal(database.prepare('SELECT credits_listed FROM users WHERE discord_id=?').get('release-helper')?.credits_listed,1);
+  database.prepare('UPDATE users SET credits_listed=0 WHERE discord_id=?').run('release-helper');
+  assert.throws(()=>database.prepare('UPDATE users SET credits_listed=2 WHERE discord_id=?').run('release-helper'));
+  // 0034: totals become a per-profile ledger. The person's total lands on their featured name only, not on every name;
+  // the unlinked name keeps its own; the old account-wide flag becomes a grant on the first linked name only.
+  assert.deepEqual(database.prepare('SELECT rsn,amount_minor,currency,granted FROM profile_supporter_totals ORDER BY rsn').all().map(r=>({...r})),[
+    {rsn:'donor alt',amount_minor:3500,currency:'USD',granted:0},{rsn:'generous a',amount_minor:0,currency:'USD',granted:1},{rsn:'unlinked donor',amount_minor:300,currency:'USD',granted:0}]);
+  assert.deepEqual({...database.prepare("SELECT donor_id,target_rsn,source FROM donations WHERE id='legacy-person:release-donor'").get()},{donor_id:'release-donor',target_rsn:'donor alt',source:'legacy'});
+  assert.deepEqual(database.prepare('SELECT rsn,supporter FROM profile_support ORDER BY rsn').all().map(r=>[r.rsn,r.supporter]),[['donor alt',1],['generous a',1],['unlinked donor',1]]);
+  // The recipient can hide it: the view then shows neither the amount nor supporter status.
+  database.prepare("INSERT INTO profile_presentation(rsn,show_supporter) VALUES('donor alt',0)").run();
+  assert.deepEqual({...database.prepare("SELECT amount_minor,supporter FROM profile_support WHERE rsn='donor alt'").get()},{amount_minor:null,supporter:0});
+  assert.throws(()=>database.prepare("UPDATE profile_presentation SET show_supporter=2 WHERE rsn='donor alt'").run());
+  // Anonymous numbers are unique; statuses and kinds are fixed lists.
+  const donation=(id,n)=>database.prepare("INSERT INTO donations(id,amount_minor,currency,anonymous_number,claim_hash,source,created_at,updated_at) VALUES(?,100,'USD',?,'h','staff',0,0)").run(id,n);
+  donation('anon-1',1);assert.throws(()=>donation('anon-2',1));
+  assert.throws(()=>database.prepare("UPDATE donations SET status='pending' WHERE id='anon-1'").run());
+  assert.throws(()=>database.prepare("INSERT INTO donations(id,amount_minor,currency,source,created_at,updated_at) VALUES('neg',-1,'USD','staff',0,0)").run());
+  // 0035: a claim looks the donation up by its code's hash, so a live hash is unique; claimed rows (NULL) never collide.
+  assert.throws(()=>donation('anon-3',3));
+  database.prepare("UPDATE donations SET claim_hash=NULL WHERE id='anon-1'").run();
+  donation('anon-4',4);
+  database.prepare("INSERT INTO donations(id,amount_minor,currency,source,created_at,updated_at) VALUES('signed-1',100,'USD','staff',0,0),('signed-2',100,'USD','staff',0,0)").run();
+  database.prepare("UPDATE donations SET claim_hash=NULL WHERE id='anon-4'").run();
+  assert.equal(database.prepare("SELECT count(*) AS n FROM donations WHERE claim_hash IS NULL AND id IN ('anon-1','anon-4','signed-1','signed-2')").get().n,4);
+  assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='donations_claim_hash'").get());
+  // Plugin tokens record their last sync.
+  database.prepare("UPDATE plugin_tokens SET last_sync_at=1,last_sync_rsn='release test',plugin_version='0.1.0' WHERE id='t1'").run();
+  // 0036: a game account proven through the plugin is bound to one Discord account at a time, under any name.
+  const bind=(discord,rsn)=>database.prepare("INSERT INTO plugin_account_owners(account_key,discord_id,rsn,rsn_at_binding,bound_at,updated_at) VALUES('k',?,?,?,0,0)").run(discord,rsn,rsn);
+  bind('a','release test');assert.throws(()=>bind('b','renamed test'),'a second binding for the same account');
+  // 0037: a staff member's hover title is optional and 2-32 characters; existing staff keep the default (NULL).
+  assert.equal(database.prepare('SELECT title FROM staff_members WHERE discord_id=?').get('release-helper').title,null);
+  database.prepare("UPDATE staff_members SET title='Guide Lead' WHERE discord_id='release-helper'").run();
+  assert.throws(()=>database.prepare("UPDATE staff_members SET title='x' WHERE discord_id='release-helper'").run(),'a one-character title');
+  assert.throws(()=>database.prepare('UPDATE staff_members SET title=? WHERE discord_id=?').run('x'.repeat(33),'release-helper'),'a 33-character title');
+  database.prepare("UPDATE staff_members SET title=NULL WHERE discord_id='release-helper'").run();
   assert.equal(database.prepare('PRAGMA integrity_check').get().integrity_check,'ok');
   assert.deepEqual(database.prepare('PRAGMA foreign_key_check').all(),[]);
   console.log(`${files.length} ordered migrations passed; pre-upgrade journal preserved.`);

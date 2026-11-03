@@ -52,8 +52,15 @@ try {
  await post({username:name,...prior,staffBadge:'owner'},h,400);
  await post({username:name,...prior,titleChoice:'beastmaster'},h,400);
  await post({username:name,...prior,pinnedMark:'pets-all'},h,400);
+ // Squire (helpers and guide writers) is dev only: on this production build a guide writer cannot choose it or show it.
+ await sql("INSERT INTO community_guides(id,author_id,title,draft,published,revision,updated_at,published_at,publisher_id) VALUES(?,?,'QA guide','{}','{}',1,'2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z',?)",['qa-squire-'+id,id,id]);
+ await post({username:name,...prior,staffPrefix:'Squire'},h,400);
+ const writerRow=(await get('/api/leaderboard')).rows.find(r=>r.name===name);
+ assert.ok(!writerRow.namePrefix&&!writerRow.staff,'no Squire on the production build');
+ assert.ok(!(await get('/api/profile?username='+encodeURIComponent(name))).namePrefix);
+ console.log('PASS: a guide writer gets no Squire on the production build.');
  await sql("INSERT INTO staff_members(discord_id,role,revision) VALUES(?,'owner','test')",[id]);
- await sql("INSERT INTO supporter_totals(discord_id,amount_minor,currency) VALUES(?,500,'USD')",[id]);
+ await sql("INSERT INTO profile_supporter_totals(rsn,amount_minor,currency) VALUES(?,500,'USD')",[rsn]);
  await post({username:name,...prior,pinnedMark:'pets-all'},h,400);
  for(const style of ['helper','moderator','admin','owner']){
   await post({username:name,...prior,staffBadge:style,staffPrefix:'Sir',pinnedMark:'pets-5',titleChoice:'beastmaster',showDonation:true,amountMinor:999999},h);
@@ -61,7 +68,7 @@ try {
   assert.equal(f.staff.role,'owner');assert.equal(f.staff.displayRole,style);assert.equal(f.ownerShowcase,false);assert.equal(f.pinnedMark,'pets-5');assert.equal(f.showcase.achievementTitle,'the Beastmaster');assert.equal(f.donation.amountMinor,500);
  }
  await sql("UPDATE users SET title='the Generous' WHERE discord_id=?",[id]);
- await sql("INSERT INTO profile_supporter_totals(rsn,amount_minor,currency) VALUES(?,10000,'USD')",[rsn]);
+ await sql("UPDATE profile_supporter_totals SET amount_minor=10000 WHERE rsn=?",[rsn]);
  assert.equal((await get('/api/profile?username='+encodeURIComponent(name))).donation.amountMinor,10000);
  assert.equal((await get('/api/leaderboard')).rows.find(r=>r.name===name).donation.amountMinor,10000);
  await post({username:name,...prior,staffBadge:'gilded',showDonation:true},h);
@@ -111,6 +118,7 @@ try {
 } finally {
  for(const table of ['profile_link_owners','profile_supporter_totals','profile_options','profile_appearance','profile_presentation','profile_visibility','claimed_names'])await sql(`DELETE FROM ${table} WHERE rsn=?`,[rsn]);
  await sql("DELETE FROM claimed_names WHERE rsn IN ('qa owner a','qa owner b')");
+ await sql('DELETE FROM community_guides WHERE author_id=?',[id]);
  await sql('DELETE FROM journals WHERE id=?',[rsn]);await sql('DELETE FROM staff_members WHERE discord_id=?',[id]);await sql('DELETE FROM supporter_totals WHERE discord_id=?',[id]);await sql('DELETE FROM users WHERE discord_id=?',[id]);
 }
 await dispose();

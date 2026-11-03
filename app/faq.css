@@ -1,0 +1,11 @@
+/* Questions as an accordion (Support and Plugin pages). */
+.support-faq{display:grid;gap:8px}
+.support-faq-item{border:1px solid var(--line);border-radius:6px;background:var(--sunk);overflow:hidden}
+.support-faq-item.is-open{border-color:#8a6a2e}
+.support-faq-item>button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:13px 16px;border:0;background:none;color:var(--text);font-size:14px;font-weight:600;text-align:left}
+.support-faq-item>button:hover{background:#ffffff05}
+.support-faq-item>button svg{flex:none;color:var(--muted);transition:transform .2s}
+.support-faq-item.is-open>button svg{transform:rotate(180deg);color:var(--gold)}
+.support-faq-item>div{padding:0 16px 14px}
+.support-faq-item p{margin:0;font-size:13px;line-height:1.6;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){.support-faq-item>button svg{transition:none}}

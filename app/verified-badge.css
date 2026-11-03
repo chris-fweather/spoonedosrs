@@ -1,0 +1,4 @@
+/* Verified through the RuneLite plugin: a green line icon beside the name, never boxed. */
+.verified-badge{display:inline-flex;align-items:center;align-self:center;flex:none;color:var(--good);line-height:0;cursor:default}
+.verified-badge svg{display:block}
+.char-name .profile-name-lines>b>.verified-badge{height:23px}

@@ -1,8 +1,10 @@
 // Wiki skill-pet rates at the player's level. Spreadsheet figures stay labeled as unverified.
 import {petUnitLabel} from './pet-record';
 import raw from './skill-pet-rates.json';
-import type {Journal, Pet} from './model';
-import {lifetimeSkill, phoenixRollChance, oddsMethod,usesAcquisition} from './estimates';
+import type {Journal, Method, Pet} from './model';
+import {lapMethod} from './agility-laps';
+import {isTreeRun, treeRunStats} from './farming-runs';
+import {lifetimeSkill, phoenixRollChance, oddsMethod,usesAcquisition, HONOUR_PER_GAMBLE} from './estimates';
 
 export {atLevel, wikiMethod, methodWiki, skillPetFormula} from './skill-rates';
 import {atLevel, wikiMethod, type WikiMethod, skillPetFormula} from './skill-rates';
@@ -33,6 +35,21 @@ export function petRateLines(pet: Pet, journal: Journal): PetOutlook {
     const chance=m.rate&&m.kc!=null?(m.kc===0?0:m.unit==='XP'?-Math.expm1(-m.kc/m.rate):-Math.expm1(m.kc*Math.log1p(-1/m.rate))):null;
     const hours=m.rate&&m.kph?m.rate/m.kph:null;
     return {lines:[{label:'Personal estimate',value:m.rate?`${m.unit==='XP'?'Mean ': '1 / '}${m.rate.toLocaleString()} ${petUnitLabel(pet,m.unit)}`:'No personal estimate set'}],note:[m.source,'Your planning estimate. This does not change the game drop rate or other players’ profiles.'].filter(Boolean).join(' '),chance,hours,averageXp};
+  }
+  if (pet.name === 'Tangleroot' && isTreeRun(m)) {
+    const run = treeRunStats(skill?.level ?? 99), averageXp = m.rate;
+    const chance = m.rate && m.kc != null ? -Math.expm1(-m.kc / m.rate) : null;
+    const hours = m.rate && m.kph ? m.rate / m.kph : null;
+    const lines: RateLine[] = [
+      {label: 'Method', value: 'Tree run: 6 magic + 6 palm trees'},
+      {label: `Chance per run at level ${run.level}`, value: `1 / ${Math.round(run.runsPerPet).toLocaleString()}`},
+      {label: 'XP per run', value: Math.round(run.xp).toLocaleString()},
+      {label: 'Average XP', value: averageXp ? Math.round(averageXp).toLocaleString() : '—', tone: 'y'},
+      ...(chance !== null ? [{label: 'Chance at your Farming XP', value: `${(chance * 100).toFixed(1)}%`}] : []),
+      ...(hours !== null ? [{label: 'Mean hunt (active)', value: `~${Math.round(hours).toLocaleString()} h`, tone: 'y'}] : []),
+    ];
+    const note = `OSRS Wiki: each tree checked is one 1/(base − 25 × Farming level) roll (magic 9,368, palm 9,000). Average XP = XP per run ÷ −ln(chance of no pet in a run).${skill ? '' : ' Level 99 assumed until hiscores sync.'} Lifetime Farming XP also counts other crops, quests and lamps.`;
+    return {lines, note, chance, hours, averageXp};
   }
   if (m.unit === 'XP' || wikiMethod(pet.name, m.name)) {
     const lines: RateLine[] = [];
@@ -93,11 +110,12 @@ export function petRateLines(pet: Pet, journal: Journal): PetOutlook {
     hours = m.rate / m.kph;
     lines.push({label: 'Mean hunt', value: `~${Math.round(hours).toLocaleString()} h`, tone: 'y'});
   }
+  if (m.kph && m.kph > 0 && m.unit === 'gambles') lines.push({label: 'Honour points per hour', value: Math.round(m.kph * HONOUR_PER_GAMBLE).toLocaleString()});
   if (m.kph && m.kph > 0 && ['games', 'runs', 'raids', 'crates', 'rolls', 'uniques'].includes(m.unit)) {
     lines.push({label: `Minutes per ${m.unit.replace(/s$/, '')}`, value: (60 / m.kph).toFixed(1)});
   }
   const score = (name: string) => journal.hiscores.activities.find(a => a.name.toLowerCase() === name.toLowerCase())?.score;
-  if (pet.name === 'Phoenix'&&!usesAcquisition(pet)&&!pet.huntHistory?.length&&!pet.obtained) {
+  if (pet.name === 'Phoenix'&&!usesAcquisition(pet)&&!pet.obtained) {
     const subdues = score('Wintertodt');
     if (subdues != null) lines.push({label: 'Hiscores subdues', value: `${subdues.toLocaleString()} (not rolls)`});
     const firemaking=journal.hiscores.skills.find(s=>s.name==='Firemaking');
@@ -122,6 +140,16 @@ export function petRateLines(pet: Pet, journal: Journal): PetOutlook {
   return {lines, note: bits.filter(Boolean).join(' '), chance, hours, averageXp: null};
 }
 
+/** Hours of play until the chance of having the pet reaches its next milestone (50%, 90%, then 95%). A pet roll has
+ * no memory, so the mean hunt never shrinks; this counts down as you play instead. Effort so far comes from the chance
+ * itself (chance = 1 − e^(−hours ÷ mean)). */
+export function hoursToMilestone(meanHours: number | null, chance: number | null): {hours: number; percent: number} | null {
+  if (meanHours == null || !(meanHours > 0)) return null;
+  const done = chance && chance > 0 && chance < 1 ? -meanHours * Math.log1p(-chance) : 0;
+  const percent = [50, 90, 95].find(p => (chance ?? 0) < p / 100);
+  if (percent == null) return null;
+  return {hours: Math.max(0, -meanHours * Math.log1p(-percent / 100) - done), percent};
+}
 export function dropRateText(m: {name: string; rate: number | null} | undefined): string {
   if (!m?.rate) return '';
   if (m.name === '200 million Firemaking') return '1/5,000 ÷ 15';
@@ -131,4 +159,16 @@ export function dropRateText(m: {name: string; rate: number | null} | undefined)
 export function methodsForSkill(skill: string): {pet: string; methods: WikiMethod[]} | null {
   const hit = Object.entries(data.pets).find(([, p]) => p.skill === skill);
   return hit ? {pet: hit[0], methods: hit[1].methods} : null;
+}
+
+/** What one roll is for each skill when the Wiki has no XP per action for a method. */
+const ACTION_UNIT:Record<string,string>={Agility:'laps',Farming:'plants',Hunter:'catches',Fishing:'catches',Woodcutting:'logs',Mining:'ores',Runecraft:'crafts'};
+
+/** A Wiki skilling method as a method a player can add. With XP per action it counts XP (hiscores can fill it);
+ * otherwise it counts the action itself, like laps for an Agility course, with the per-action chance. */
+export function skillMethodChoice(skill:string,w:WikiMethod,level:number|null):Method {
+ if(skill==='Agility'){const lap=lapMethod(w.name,level??99);if(lap)return {...lap,source:lap.source+` OSRS Wiki: ${w.link}`};}
+ const calc=atLevel(w,level??99),xp=w.xp!=null&&calc?.expectedXp!=null;
+ const unit=xp?'XP':skill==='Thieving'?(/stall/i.test(w.name)?'thefts':'pickpockets'):ACTION_UNIT[skill]??'actions';
+ return {name:w.name,unit,kc:null,kph:null,rate:calc?(xp?calc.expectedXp:calc.actions):null,activity:null,rateConfirmed:!!calc,paceConfirmed:false,source:`OSRS Wiki: ${w.link}`};
 }

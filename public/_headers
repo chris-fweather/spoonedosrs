@@ -1,0 +1,30 @@
+# Cache rules for static files (Cloudflare Workers static assets read this file).
+# Without them every icon is served with max-age=0, so the browser re-checks hundreds of images on each page.
+
+# Built scripts and styles have content hashes in their names, so they never change.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Game artwork rarely changes: keep it a day, then refresh in the background for a week.
+/icons/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/items/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/pets/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/bosses/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/drops/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/portraits/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/ui/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/brand/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/fonts/*
+  Cache-Control: public, max-age=2592000
+
+# Map data changes with releases: an hour, then refresh in the background.
+/world-map/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400

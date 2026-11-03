@@ -44,7 +44,7 @@ export function CollectionLog({journal, log, onConnect, pop, canEdit=false, busy
     return () => { live = false; };
   }, [page?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!log || !log.tabs.length) return <ProfileEmpty section="Collection log" icon="/icons/navigation/collection-log-icon.png" canEdit={canEdit} busy={busy} onSync={onConnect}/>;
+  if (!log || !log.tabs.length) return <ProfileEmpty section="Collection log" icon="/ui/collection-log-icon.png" canEdit={canEdit} busy={busy} onSync={onConnect}/>;
 
   const kc = page ? pageKc(journal, page.name) : null;
   const openItem = (i: LogItem) => {
@@ -54,7 +54,7 @@ export function CollectionLog({journal, log, onConnect, pop, canEdit=false, busy
   };
 
   return <div className={`clog3 ${page ? 'is-open' : ''}`}>
-    <ProgressHeader icon="/icons/navigation/collection-log-icon.png" kicker="Collection log" done={log.obtained} total={log.total}/>
+    <ProgressHeader icon="/ui/collection-log-icon.png" kicker="Collection log" done={log.obtained} total={log.total}/>
     <FilterBar>
       <SearchBox label="Search collection log" placeholder="Search…" value={query} onChange={value => { setQuery(value); setSelected(''); }}/>
       <SortMenu label="Sort pages" value={sort} onChange={setSort} options={[{value: 'name', label: 'Name A–Z'}, {value: 'progress', label: 'Most complete'}]}/>

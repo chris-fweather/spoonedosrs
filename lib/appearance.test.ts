@@ -30,23 +30,32 @@ test('picker offers spaced pet and collection milestones while preserving legacy
  for(const id of ['pets-5','pets-10','pets-20','pets-30','pets-50','pets-all','clog-all'])assert.equal(featuredEmblem(id),true);
 });
 
-test('custom hats hide every recoloured hair face and retain the original face geometry',()=>{
- function attribute(g:any,id:number){const a=g.accessors[id],v=g.bufferViews[a.bufferView],buf=Buffer.from(g.buffers[v.buffer].uri.split(',')[1],'base64'),offset=(v.byteOffset??0)+(a.byteOffset??0);return Array.from({length:a.count*3},(_,i)=>buf.readFloatLE(offset+i*4));}
+test('a head item that hides the hair replaces the whole head, so no kit face shows through helmet visors',async()=>{
+ const {skinPixel}=await import('./skin-palette.ts');
  const read=(file:string)=>JSON.parse(readFileSync('public/models/look/'+file,'utf8'));
- for(const body of ['male','female'] as const){
-  const brown=read(headModel({body,hair:'brown'},false)),blonde=read(headModel({body,hair:'blonde'},false)),hat=read(headModel({body,hair:'blonde'},true));
-  for(let m=0;m<brown.meshes.length;m++)for(let p=0;p<brown.meshes[m].primitives.length;p++){
-   const original=brown.meshes[m].primitives[p],alternate=blonde.meshes[m].primitives[p],result=hat.meshes[m].primitives[p];
-   const colors=attribute(brown,original.attributes.COLOR_0),changed=attribute(blonde,alternate.attributes.COLOR_0),positions=attribute(brown,original.attributes.POSITION);
-   const expectedPositions:number[]=[],expectedColors:number[]=[];let hairFaces=0;
-   for(let i=0;i<colors.length;i+=9){if(colors.slice(i,i+9).some((c,k)=>c!==changed[i+k])){hairFaces++;continue;}expectedPositions.push(...positions.slice(i,i+9));expectedColors.push(...colors.slice(i,i+9));}
-   assert.ok(hairFaces>0);assert.ok(expectedPositions.length>0);
-   assert.deepEqual(attribute(hat,result.attributes.POSITION),expectedPositions,body+' face geometry preserved');
-   assert.deepEqual(attribute(hat,result.attributes.COLOR_0),expectedColors,body+' skin and eyes preserved');
-  }
-  for(const hair of HAIR_COLORS){assert.equal(headModel({body,hair},true),headModel({body,hair:'brown'},true));assert.equal(headModel({body,hair},false),appearanceModels.hair[body][hair]);}
+ function positions(g:any){const out:number[][]=[];for(const m of g.meshes)for(const p of m.primitives){const a=g.accessors[p.attributes.POSITION],v=g.bufferViews[a.bufferView],buf=Buffer.from(g.buffers[v.buffer].uri.split(',')[1],'base64'),o=(v.byteOffset??0)+(a.byteOffset??0);for(let i=0;i<a.count;i++)out.push([0,1,2].map(k=>buf.readFloatLE(o+(i*3+k)*4)));}return out;}
+ const span=(points:number[][],axis:number)=>[Math.min(...points.map(p=>p[axis])),Math.max(...points.map(p=>p[axis]))];
+ for(const body of ['male','female'] as const)for(const hair of HAIR_COLORS){
+  assert.equal(headModel({body,hair},true),null,`${body} ${hair}: no head kit under a helmet`);
+  assert.equal(headModel({body,hair},false),appearanceModels.hair[body][hair]);
  }
- assert.equal(headModel(parseAppearance({body:'auto',hair:'brown'}),true),'appearance/male-hat-head.gltf');
+ assert.equal(headModel(parseAppearance({body:'auto',hair:'brown'}),true),null);
+ // Slayer helmets (every colour and its imbued copy), and the other helmets the outfit picker groups into styles.
+ const helmets=['11864','11865','19639','19641','19643','19645','19647','19649','21264','21266','21888','21890','23073','23075','29816','29818',
+  '26382','28254','12931','13197','13199','24271','10828','11850','13579','13591','13603','13615','13627','24743','21061','30045','1163','2619','2627'];
+ for(const body of ['male','female'] as const){
+  const head=positions(read(appearanceModels.hair[body].brown)),[chin]=span(head,1),[left,right]=span(head,0);
+  for(const id of helmets){
+   const item=wearables.items[id];assert.ok(item?.wear.includes(8),id+' hides the hair');
+   const file=body==='male'?item.file:appearanceModels.femaleItems[id];assert.ok(file&&existsSync('public/models/look/'+file),`${body} ${id} model`);
+   // The item models the face itself: it reaches the chin and spans the head, so nothing is missing without the kit.
+   const points=positions(read(file!)),[low]=span(points,1),[minX,maxX]=span(points,0);
+   assert.ok(low<=chin+1,`${body} ${item.name} reaches the chin`);assert.ok(minX<=left+2&&maxX>=right-2,`${body} ${item.name} covers the head`);
+  }
+ }
+ // The face a helmet shows takes the chosen skin tone from its palette texture too.
+ const palette=read(wearables.items['11864'].file).images[0].uri as string;assert.match(palette,/^data:image\/png;base64,/);
+ assert.deepEqual(skinPixel([214,172,135],'default'),null);assert.ok(skinPixel([214,172,135],'dark'));assert.equal(skinPixel([60,60,48],'dark'),null);
 });
 
 test('quest and diary emblems require completion, while collection milestones remain',()=>{
@@ -71,4 +80,32 @@ test('mine and woodland are valid scenes with thumbnails; unknown scenes are ref
  }
  assert.throws(()=>parseAppearance({body:'male',hair:'brown',background:'moon'}));
  assert.match(readFileSync(new URL('../drizzle/0023_profile_scenes.sql',import.meta.url),'utf8'),/'mine','woodland'/);
+});
+
+test('every body, hair and skin choice recolours the base skin on both bodies',async()=>{
+ const {skinColor,BASE_SKIN_RGB}=await import('./skin-palette.ts');
+ const {SKIN_TONES}=await import('./appearance.ts');
+ const {wearables:w}=await import('./flair.ts');
+ const colours=(file:string)=>{const g=JSON.parse(readFileSync('public/models/look/'+file,'utf8'));const out:number[][]=[];for(const m of g.meshes)for(const p of m.primitives){const a=g.accessors[p.attributes.COLOR_0],v=g.bufferViews[a.bufferView],buf=Buffer.from(g.buffers[v.buffer].uri.split(',')[1],'base64'),o=(v.byteOffset??0)+(a.byteOffset??0);for(let i=0;i<a.count;i++)out.push([0,1,2].map(k=>buf.readFloatLE(o+(i*3+k)*4)));}return out;};
+ for(const body of ['male','female'] as const){
+  const kits=body==='female'?appearanceModels.femaleKits:w.kits;
+  for(const hair of HAIR_COLORS){
+   const files=kits.map(k=>k.part===0?headModel({body,hair},false):k.file);
+   const skin=files.flatMap(colours).filter(c=>c.every((v,i)=>Math.abs(v-BASE_SKIN_RGB[i])<1e-5));
+   assert.ok(skin.length>300,`${body} ${hair} has skin to recolour`);
+   for(const tone of Object.keys(SKIN_TONES) as (keyof typeof SKIN_TONES)[]){
+    const next=skinColor(skin[0],tone);
+    if(tone==='default')assert.equal(next,null);else assert.ok(next&&next.every(Number.isFinite),`${body} ${hair} ${tone}`);
+   }
+  }
+ }
+});
+
+test('character scenes are off: saved scenes stay valid but every character shows the plain background',async()=>{
+ const {CHARACTER_SCENES,shownBackground}=await import('./appearance.ts');
+ assert.equal(CHARACTER_SCENES,false);
+ const saved=parseAppearance({body:'female',hair:'red',background:'castle'});
+ assert.equal(saved.background,'castle');
+ assert.equal(shownBackground(saved),'none');assert.equal(shownBackground(undefined),'none');
+ assert.equal(shownBackground(saved,true),'castle');assert.equal(shownBackground({},true),'none');
 });

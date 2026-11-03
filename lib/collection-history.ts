@@ -1,4 +1,5 @@
 import type {Journal} from './model';
+import {milestoneEvents} from './skill-milestones';
 
 /** Acquisition dates are calendar days, never import or first-seen timestamps. */
 export function validCollectionDate(value: unknown): value is string {
@@ -18,14 +19,23 @@ export function setCollectionDate(j: Journal, id: number, date: unknown): Journa
   if (!Number.isSafeInteger(id) || !validCollectionDate(date)) throw Error('Choose a valid collection date, or leave it blank.');
   if (!j.log?.tabs.some(t => t.pages.some(p => p.items.some(i => i.id === id && i.quantity > 0)))) throw Error('Sync this collected item before recording its date.');
   const pet = j.pets.find(p => p.id === String(id));
-  if (pet) return {...j, pets: j.pets.map(p => p.id === pet.id ? {...p, obtained: true, date} : p)};
+  // Setting a date, or clearing it, is the player's confirmation of anything the plugin recorded.
+  if (pet) return {...j, pets: j.pets.map(p => {
+    if (p.id !== pet.id) return p;
+    const confirmed = {...p, obtained: true, date};
+    delete confirmed.unconfirmed;
+    return confirmed;
+  })};
   const dates = {...j.collectionDates};
   if (date) dates[String(id)] = date;
   else delete dates[String(id)];
-  return {...j, collectionDates: dates};
+  const unconfirmedDates = j.unconfirmedDates?.filter(other => other !== String(id));
+  return {...j, collectionDates: dates, unconfirmedDates: unconfirmedDates?.length ? unconfirmedDates : undefined};
 }
 
-export type CollectionEvent = {id: string; kind: 'pets' | 'log'; name: string; date: string; image: string};
+export type TimelineKind = 'pets' | 'log' | 'skills';
+/** One dated thing on the Player timeline: a pet, a collection log slot or a skill milestone. */
+export type CollectionEvent = {id: string; kind: TimelineKind; name: string; date: string; image: string; approximate?: boolean};
 export function collectionEvents(j: Journal): {events: CollectionEvent[]; undated: number} {
   if (j.restricted) return {events: [], undated: 0};
   const events: CollectionEvent[] = [];
@@ -42,5 +52,6 @@ export function collectionEvents(j: Journal): {events: CollectionEvent[]; undate
     if (date) events.push({id: 'log:' + i.id, kind: 'log', name: i.name, date, image: `/items/${i.id}.png`});
     else undated++;
   }
+  for (const m of milestoneEvents(j)) events.push({id: 'skill:' + m.key, kind: 'skills', name: m.name, date: m.date, image: m.image, ...(m.approximate ? {approximate: true} : {})});
   return {events: events.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)), undated};
 }

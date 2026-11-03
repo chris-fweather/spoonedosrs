@@ -42,7 +42,7 @@ function PreviewTotals({journal:j,metric}:{journal:Journal;metric:BoardMetric}){
  const cards=[{metric:'pets',label:'Pets',icon:'/brand/rocky-mascot.webp',done:available.pets?j.pets.filter(p=>p.obtained).length:null,total:j.pets.length},
   metric==='combat'
    ?{metric:'combat',label:'Combat tasks',icon:'/icons/navigation/combat-achievements.png',done:available.combat?combat!.reduce((n,c)=>n+c.completed,0):null,total:combat?.reduce((n,c)=>n+c.total,0)??0}
-   :{metric:'log',label:'Collection log',icon:'/icons/navigation/collection-log-icon.png',done:j.log?.obtained??null,total:j.log?.total??0},
+   :{metric:'log',label:'Collection log',icon:'/ui/collection-log-icon.png',done:j.log?.obtained??null,total:j.log?.total??0},
   {metric:'xp',label:'Total level',icon:'/icons/navigation/stats-icon.png',done:overall&&overall.level>0?overall.level:null,total:BOARD_SKILLS.length*99}];
  return <div className="preview-totals" role="list" aria-label="Public progress summary">{cards.map(c=><div role="listitem" key={c.label} className={metric===c.metric?'current':undefined} aria-current={metric===c.metric?'true':undefined}>
   <img src={c.icon} alt=""/><small>{c.label}</small>

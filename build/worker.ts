@@ -3,11 +3,22 @@ import handler from "vinext/server/fetch-handler";
 
 declare const __SPOONED_ENV__: string;
 
+/** Paths the dev environment answers without its owner sign-in. */
+const DEV_OPEN_PATHS=new Set(['/api/auth/dev-login','/api/plugin/manifest','/api/plugin/sync','/api/plugin/profile','/api/share']);
+
 export default {
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext) {
     const started=performance.now(),path=new URL(request.url).pathname;
+    // Map tiles are public game imagery and a map screen asks for dozens: answer them first, from the edge cache, without
+    // the dev sign-in check, the per-IP API budget or the app.
+    if(path==='/api/map-tile'&&(request.method==='GET'||request.method==='HEAD')){
+      const {mapTile}=await import('../lib/map-tile');
+      return securityHeaders(await mapTile(request,ctx));
+    }
     // The dev environment is private: everything except its sign-in page needs the owner's dev session.
-    if(__SPOONED_ENV__==='dev'&&path!=='/api/auth/dev-login'){
+    // The RuneLite plugin cannot hold a dev session: sync uses its own token, and the profile and share card reads
+    // show only public data (the dev database holds only the owner's profile).
+    if(__SPOONED_ENV__==='dev'&&!DEV_OPEN_PATHS.has(path)){
       const {readSession}=await import('../lib/auth');
       if(!(await readSession(request))){
         if(path.startsWith('/api/'))return securityHeaders(Response.json({error:'Sign in to the dev environment first.'},{status:401,headers:{'Cache-Control':'no-store'}}));

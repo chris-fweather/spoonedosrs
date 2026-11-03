@@ -48,7 +48,7 @@ export function ShareCard({profile,art,character,pet,badge,mode,prefix,nameColor
     <div style={{display:'flex',alignItems:'center',gap:14,height:nameSize+8}}>
      {badge&&<img alt="" src={badge} width={44} height={nameSize} style={{objectFit:'contain'}}/>}
      {mode&&<img alt="" src={mode} width={30} height={38} style={{objectFit:'contain'}}/>}
-     {prefix&&<span style={{display:'flex',...pixel,fontSize:nameSize,lineHeight:1,color:'#ffcf3f',textShadow:'0 3px 0 #000'}}>{prefix}</span>}
+     {prefix&&<span style={{display:'flex',...pixel,fontSize:nameSize,lineHeight:1,color:prefix==='Squire'?'#a9bccf':'#ffcf3f',textShadow:'0 3px 0 #000'}}>{prefix}</span>}
      <span style={{display:'flex',...pixel,fontSize:nameSize,lineHeight:1,color:nameColor??'#f6f1e4',textShadow:'0 3px 0 #000'}}>{profile.name}</span>
      {profile.title&&<span style={{display:'flex',...pixel,fontSize:30,lineHeight:1,color:'#ffcf3f',textShadow:'0 2px 0 #000',paddingTop:Math.round(nameSize*0.3)}}>{profile.title}</span>}
     </div>

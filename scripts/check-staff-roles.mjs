@@ -56,6 +56,27 @@ assert.deepEqual(audit.map(([action,detail])=>[action,JSON.parse(detail)]),[['gr
 await api('/api/staff',await auth('helper'),{action:'prefix',prefix:'Lord'},400);
 await api('/api/staff',await auth('helper'),{action:'prefix',prefix:'Sir'});
 assert.equal((await api('/api/staff/access',await auth('helper'))).staff.prefix,'Sir');
+// Hover titles: the same reach as a member's access; validated, trimmed, empty clears, and logged in the access history.
+const title=async(who,target,value,status=200)=>api('/api/staff',await auth(who),{action:'title',username:names[target],title:value},status);
+await title('helper','moderator','Mod Lead',403);
+await title('moderator','helper','Guide Lead',403);
+await title('admin','admin','Head Admin',403);
+await title('admin','admin2','Head Admin',403);
+await title('admin','owner','Founder',400);
+await title('owner','owner','Founder',400);
+await title('admin','stranger','Guide Lead',400);
+for(const bad of ['A','x'.repeat(33),'<b>Lead</b>',42])await title('admin','helper',bad,400);
+await title('admin','helper','  Guide   Lead ');
+assert.equal((await api('/api/staff/access',await auth('helper'))).staff.title,'Guide Lead');
+assert.equal((await api('/api/staff',await auth('admin'))).members.find(m=>m.discord_id===people.helper).title,'Guide Lead');
+await title('admin','helper','Guide Lead');
+await title('owner','admin2','Head Admin');
+assert.equal((await api('/api/staff/access',await auth('admin2'))).staff.title,'Head Admin');
+await title('admin','helper','');
+assert.equal((await api('/api/staff/access',await auth('helper'))).staff.title,null);
+const titleAudit=await sql("SELECT actor_id,target_id,detail FROM staff_audit WHERE action='title' ORDER BY id");
+assert.deepEqual(titleAudit.map(([actor,target,detail])=>[actor,target,JSON.parse(detail)]),[[people.admin,people.helper,{from:null,to:'Guide Lead'}],[people.owner,people.admin2,{from:null,to:'Head Admin'}],[people.admin,people.helper,{from:'Guide Lead',to:null}]],'one row per real change; saving the same title again logs nothing');
+await api('/api/staff',await auth('admin','https://evil.example'),{action:'title',username:names.helper,title:'Evil'},403);
 
 // Corrections: evidence is required, helpers propose but cannot approve, and nobody approves their own proposal.
 const record={action:'propose',kind:'record',pet:'Pet chaos elemental',username:'SR Target',count:420,unit:'kills',reason:'Screenshot shows the drop at 420 kills.',source:'https://example.com/proof.png'};
@@ -108,6 +129,14 @@ await api('/api/staff',await auth('admin'),{...record,count:427});
 const [[adminChange]]=await sql("SELECT id FROM staff_changes WHERE actor_id=? AND state='pending'",[people.admin]);
 await api('/api/staff',await auth('moderator'),{action:'review',id:adminChange,decision:'approved'},403);
 await api('/api/staff',await auth('owner'),{action:'review',id:adminChange,decision:'rejected'});
+// Every kind of correction (drop rate, kill rate & XP, dry-streak record) keeps the rank rule, for approvals and rejections alike.
+for(const [kind,target,payload] of [['rate','Kraken|Kraken|Pet kraken',JSON.stringify({denominator:3000})],['rate','planning:["Pet kraken"]',JSON.stringify({planning:true,pace:90,unit:'kills'})],['record','Pet chaos elemental',JSON.stringify({pet:'Pet chaos elemental',username:'SR Admin',count:500,unit:'kills'})]]){
+ await sql("INSERT INTO staff_changes(kind,target,payload,source,reason,base_revision,actor_id,actor_name,state,created_at) VALUES(?,?,?,'https://example.com/x','Admin proposal for the rank rule.',0,?,'SR Admin','pending','2026-01-02T00:00:00Z')",[kind,target,payload,people.admin]);
+ const [[id]]=await sql("SELECT id FROM staff_changes WHERE actor_id=? AND state='pending' ORDER BY id DESC LIMIT 1",[people.admin]);
+ for(const decision of ['approved','rejected'])await api('/api/staff',await auth('moderator'),{action:'review',id,decision},403);
+ assert.deepEqual(await sql('SELECT state,reviewer_id FROM staff_changes WHERE id=?',[id]),[['pending',null]],kind+' '+target+' stays pending for a higher rank');
+ await api('/api/staff',await auth('admin2'),{action:'review',id,decision:'rejected'});
+}
 // Notes and decision reasons join the correction's timeline and stay out of the access history.
 await api('/api/staff',await auth('helper'),{action:'correction-note',id:adminChange,note:'x'},400);
 await api('/api/staff',await auth('helper'),{action:'correction-note',id:adminChange,note:'Checked the Wiki history too.'});
@@ -135,8 +164,8 @@ assert.equal((await api('/api/staff',await auth('helper'))).viewer.permissions.c
 await api('/api/staff',await auth('admin'),{action:'permissions',username:names.helper,permissions:null});
 assert.equal((await api('/api/staff',await auth('helper'))).viewer.permissions.corrections,true);
 assert.equal((await api('/api/staff',await auth('owner'))).members.find(m=>m.discord_id===people.helper).custom,false);
-assert.deepEqual((await sql("SELECT actor_id,detail FROM staff_audit WHERE action='permissions' AND target_id=? ORDER BY id",[people.helper])).map(([actor,detail])=>[actor,JSON.parse(detail)]),
- [[people.owner,guidesOnly],[people.admin,{reset:true}]],'every member grant is in the audit trail, with who made it');
+assert.deepEqual((await sql("SELECT actor_id,detail FROM staff_audit WHERE action='permissions' AND target_id=? ORDER BY id",[people.helper])).map(([actor,detail])=>{const d=JSON.parse(detail);return [actor,d.from,d.to,d.reset];}),
+ [[people.owner,shipped.helper,guidesOnly,undefined],[people.admin,guidesOnly,shipped.helper,true]],'every member grant is in the audit trail, with who made it and the access before and after');
 // End to end: custom access opens exactly what it says, on the read and on the write, for a moderator too.
 await api('/api/staff',await auth('admin'),{action:'permissions',username:names.moderator,permissions:{guides:false,publish:false,corrections:false,planning:true,review:false,ownership:true,holds:true}});
 const modView=await api('/api/staff',await auth('moderator'));

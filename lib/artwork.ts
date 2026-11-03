@@ -22,5 +22,5 @@ const PAGE:Record<string,string>={
 };
 export function pageIcon(name:string){
  const hit=bossArtwork(name)||PAGE[name.toLowerCase()];
- return hit||'/icons/navigation/collection-log-icon.png';
+ return hit||'/ui/collection-log-icon.png';
 }

@@ -5,13 +5,13 @@ import {equippedIds, wearables, type Equipped} from '@/lib/flair';
 
 import {HoverTip} from './HoverTip';
 import {Info} from 'lucide-react';
-import {DEFAULT_APPEARANCE,appearanceModels,equipmentModel,headModel,type Appearance} from '@/lib/appearance';
-import {skinColor} from '@/lib/skin-palette';
+import {DEFAULT_APPEARANCE,appearanceModels,equipmentModel,headModel,shownBackground,type Appearance} from '@/lib/appearance';
+import {skinColor,skinPixel} from '@/lib/skin-palette';
 import {petPlacement} from '@/lib/pet-presentation';
 
 type Props = {appearance?:Appearance; equipped: Equipped; petId: string | null; petName: string | null; petDescription?:string; username?: string; interactive?: boolean};
 
-type Tex = {magFilter: number; minFilter: number; generateMipmaps: boolean; needsUpdate: boolean; wrapS: number; wrapT: number; offset: {x: number; y: number}};
+type Tex = {image?: unknown; magFilter: number; minFilter: number; generateMipmaps: boolean; needsUpdate: boolean; wrapS: number; wrapT: number; offset: {x: number; y: number}};
 type Mat = {name?: string; map?: Tex | null};
 type MeshNode = {
   traverse(fn: (obj: MeshNode) => void): void;
@@ -40,6 +40,27 @@ function sharpen(root: MeshNode) {
       map.needsUpdate = true;
     }
   });
+}
+
+/** Item faces (a face under a helmet, bare hands) are coloured by palette textures: repaint their base skin pixel. */
+function skinTexture(map: Tex, tone: NonNullable<Appearance['skin']>) {
+  const image = map.image as CanvasImageSource & {width: number; height: number} | undefined;
+  if (!image?.width || !image.height || tone === 'default') return;
+  const canvas = document.createElement('canvas');
+  canvas.width = image.width; canvas.height = image.height;
+  const context = canvas.getContext('2d', {willReadFrequently: true});
+  if (!context) return;
+  context.drawImage(image, 0, 0);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  let changed = false;
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    const next = skinPixel(pixels.data.subarray(i, i + 3), tone);
+    if (next) { pixels.data.set(next, i); changed = true; }
+  }
+  if (!changed) return;
+  context.putImageData(pixels, 0, 0);
+  map.image = canvas;
+  map.needsUpdate = true;
 }
 
 function flowMaps(root: MeshNode): {map: Tex; du: number; dv: number}[] {
@@ -72,7 +93,8 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
   const [appearance,setAppearance]=useState('');
   const [attempt,setAttempt]=useState(0);
   const [renderedLook,setRenderedLook]=useState('');
-  const look = equippedIds(equipped).join(',') + '|' + (petId ?? '') + '|' + (username ?? '') + '|' + bodyLook.body + '|' + bodyLook.hair + '|' + (bodyLook.skin??'default')+'|'+(bodyLook.background??'none');
+  const background=shownBackground(bodyLook);
+  const look = equippedIds(equipped).join(',') + '|' + (petId ?? '') + '|' + (username ?? '') + '|' + bodyLook.body + '|' + bodyLook.hair + '|' + (bodyLook.skin??'default')+'|'+background;
 
   useEffect(() => {
     const el = host.current;
@@ -86,7 +108,7 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
       const THREE = await import('three');
       const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js');
       if (dead) return;
-      const scenic=!!bodyLook.background&&bodyLook.background!=='none';
+      const scenic=background!=='none';
       const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
       const renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -134,7 +156,7 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
           if(dead){disposeNode(gltf.scene);return null;}
           sharpen(gltf.scene);
           if(scenic)gltf.scene.traverse((obj:any)=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;}});
-          if(parent===actor&&bodyLook.skin){gltf.scene.traverse(obj=>{const colors=obj.geometry?.getAttribute('color');if(!colors)return;for(let i=0;i<colors.count;i++){const next=skinColor([colors.getX(i),colors.getY(i),colors.getZ(i)],bodyLook.skin!);if(next)colors.setXYZ(i,next[0],next[1],next[2]);}colors.needsUpdate=true;});}
+          if(parent===actor&&bodyLook.skin){gltf.scene.traverse(obj=>{const colors=obj.geometry?.getAttribute('color');if(colors){for(let i=0;i<colors.count;i++){const next=skinColor([colors.getX(i),colors.getY(i),colors.getZ(i)],bodyLook.skin!);if(next)colors.setXYZ(i,next[0],next[1],next[2]);}colors.needsUpdate=true;}for(const material of Array.isArray(obj.material)?obj.material:obj.material?[obj.material]:[])if(material.map)skinTexture(material.map,bodyLook.skin!);});}
           flowing.push(...flowMaps(gltf.scene));
           parent.add(gltf.scene);
           return gltf.scene;
@@ -150,7 +172,7 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
       for (const kit of bodyKits) {
         if (kit.hide >= 0 && covered.has(kit.hide)) continue;
         const file=kit.part===0?headModel(bodyLook,covered.has(8)):kit.file;
-        await add('/models/look/' + file + '?base=cache-jaw-v3', 'body', actor);
+        if(file)await add('/models/look/' + file + '?base=cache-jaw-v3', 'body', actor);
       }
       for (const id of equippedIds(equipped)) {
         const item = wearables.items[id];
@@ -187,7 +209,7 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
       const size = frame.getSize(new THREE.Vector3());
       const mid = frame.getCenter(new THREE.Vector3());
       let scenery:{update:(time:number)=>void}|null=null;
-      if(scenic){const {buildProfileScene}=await import('@/lib/profile-scene');if(dead){release();return;}scenery=buildProfileScene(scene,bodyLook.background as SceneKind,Math.max(playerSize.y,80),playerBounds.min.y);const extent=playerSize.y*3;Object.assign(key.shadow.camera,{left:-extent,right:extent,top:extent,bottom:-extent,near:1,far:extent*6});}
+      if(scenic){const {buildProfileScene}=await import('@/lib/profile-scene');if(dead){release();return;}scenery=buildProfileScene(scene,background as SceneKind,Math.max(playerSize.y,80),playerBounds.min.y);const extent=playerSize.y*3;Object.assign(key.shadow.camera,{left:-extent,right:extent,top:extent,bottom:-extent,near:1,far:extent*6});}
       const distance = Math.max(size.y, size.x, 80) * 2.55;
       camera.position.set(mid.x, mid.y, mid.z + distance);
       camera.lookAt(mid.x, mid.y, mid.z);
@@ -290,5 +312,5 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
     return () => { dead = true; cleanup(); };
   }, [look, petId, petName, interactive, attempt]); // eslint-disable-line react-hooks/exhaustive-deps -- look already encodes equipped ids
 
-  return <div className={'char-view wallpaper-'+(bodyLook.background??'none')} aria-busy={renderedLook!==look+'|'+attempt&&appearance!=='Character not loaded'}>{renderedLook!==look+'|'+attempt&&appearance!=='Character not loaded'&&<div className="character-loading" role="status"><span className="loading-spinner"/><span>Loading character…</span></div>}<div style={{visibility:renderedLook===look+'|'+attempt?'visible':'hidden'}} className="character-canvas" ref={host} tabIndex={interactive?0:undefined} role="img" aria-label="Character preview. Drag or use left and right arrow keys to rotate. Press Home to face forward."/>{petId&&petDescription&&<HoverTip className="companion-info" label={petDescription} content={<PetTooltip description={petDescription}/> }><img src={`/pets/${petId}.png`} alt={petName??'Following pet'}/></HoverTip>}{appearance==='Character not loaded'&&<div className="character-fallback"><p>Character not loaded</p><button type="button" onClick={()=>setAttempt(n=>n+1)}>Try again</button></div>}{appearance && <span className="appearance-info" onPointerDown={e=>e.stopPropagation()}><button type="button" aria-label="Character appearance information"><Info size={15}/></button><span role="tooltip">{appearance}</span></span>}</div>;
+  return <div className={'char-view wallpaper-'+background} aria-busy={renderedLook!==look+'|'+attempt&&appearance!=='Character not loaded'}>{renderedLook!==look+'|'+attempt&&appearance!=='Character not loaded'&&<div className="character-loading" role="status"><span className="loading-spinner"/><span>Loading character…</span></div>}<div style={{visibility:renderedLook===look+'|'+attempt?'visible':'hidden'}} className="character-canvas" ref={host} tabIndex={interactive?0:undefined} role="img" aria-label="Character preview. Drag or use left and right arrow keys to rotate. Press Home to face forward."/>{petId&&petDescription&&<HoverTip className="companion-info" label={petDescription} content={<PetTooltip description={petDescription}/> }><img src={`/pets/${petId}.png`} alt={petName??'Following pet'}/></HoverTip>}{appearance==='Character not loaded'&&<div className="character-fallback"><p>Character not loaded</p><button type="button" onClick={()=>setAttempt(n=>n+1)}>Try again</button></div>}{appearance && <span className="appearance-info" onPointerDown={e=>e.stopPropagation()}><button type="button" aria-label="Character appearance information"><Info size={15}/></button><span role="tooltip">{appearance}</span></span>}</div>;
 }

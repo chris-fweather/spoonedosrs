@@ -1,17 +1,17 @@
 'use client';
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import './profile-release.css';
 import './overview-pets.css';
 import './profile-placeholders.css';
 import {ReleaseStamp} from './ReleaseStamp';
 import {releaseOrder} from '@/lib/release-dates';
 import activityNames from '@/lib/activity-catalogue.json';
-import {ChevronRight, ExternalLink, Settings} from 'lucide-react';
+import {ChevronRight, ExternalLink} from 'lucide-react';
 import {rankTier} from '@/lib/rank-rewards';
 import {SkillRankIcon,skillRankLabel} from './SkillRankIcon';
-import {badgeTier, displayTitle, earnedMarks, emptyEquipped, type StoredFlair} from '@/lib/flair';
+import {achievementTitle, displayTitle, earnedMarks, emptyEquipped, type StoredFlair} from '@/lib/flair';
 import {selectedTitle} from '@/lib/presentation';
-import {collectedDate,companionDescription} from '@/lib/pet-presentation';
+import {collectedDate,companionDescription,petHoverLines} from '@/lib/pet-presentation';
 import './profile-identity.css';
 import {HoverTip} from './HoverTip';
 import {ProfileStaffControls} from './ProfileStaffControls';
@@ -19,13 +19,16 @@ import {ProfileIdentity} from './ProfileIdentity';
 import {ProfileEditor} from './ProfileEditor';
 import {ReputationButton} from './ReputationButton';
 import {AchievementEmblem} from './AchievementEmblem';
+import {BadgeHover} from './BadgeCard';
+import {emblemInfo} from '@/lib/badge-info';
 import {LookStage} from './Look';
 import type {Journal, Pet} from '@/lib/model';
 import {progressAvailability} from '@/lib/progress-availability';
-import {expectedHours} from '@/lib/model';
-import {petSkill, totalEffort} from '@/lib/estimates';
+import {petSkill} from '@/lib/estimates';
 import {bossArtwork} from '@/lib/artwork';
 import {DryMeter, QuickestHunts} from './ProgressCharts';
+import {LuckHunts, PetSummary, luckHours} from './PetSummary';
+import {petLuck} from '@/lib/pet-luck';
 import {atLevel, methodWiki, methodsForSkill} from '@/lib/pet-rates';
 import {compact, num, wiki} from '@/lib/ui';
 import {Meter, Count} from './Meter';
@@ -50,23 +53,26 @@ export const emptyFlair: ProfileFlair = {companionPet: null, displayPiece: null,
 
 export function PlayerCard({journal: j, flair, onFlair, viewerKey='guest', reputationPreview}: {journal: Journal; flair: ProfileFlair; onFlair: (next: ProfileFlair) => Promise<boolean>; viewerKey?:string; reputationPreview?:number}) {
   const [editing,setEditing]=useState(false);
+  // The settings preview copies the portrait's shape, so it frames the character exactly as the profile will.
+  const stage=useRef<HTMLDivElement>(null),[portraitAspect,setPortraitAspect]=useState<number>();
+  const openEditor=()=>{const el=stage.current;if(el?.clientWidth&&el.clientHeight)setPortraitAspect(el.clientWidth/el.clientHeight);setEditing(true);};
   const clean=flair, title=displayTitle(j.username,clean.title), earnedTitle=flair.showcase?flair.showcase.achievementTitle:(j.restricted?null:selectedTitle(j,clean.titleChoice??'auto',clean.pinnedMark,flair.staff?.role==='owner',title==='the Generous',flair.staff?.role));
   // Privacy lives in Account settings; older ?settings=privacy links go there.
-  useEffect(()=>{const settings=new URLSearchParams(location.search).get('settings');if(!flair.canEdit||settings===null)return;if(settings==='privacy')location.replace('/account');else setEditing(true);},[flair.canEdit]);
+  useEffect(()=>{const settings=new URLSearchParams(location.search).get('settings');if(!flair.canEdit||settings===null)return;if(settings==='privacy')location.replace('/account?tab=profiles');else openEditor();},[flair.canEdit]);
   const mark=flair.showcase?.badge??earnedMarks(j).find(m=>m.id===clean.pinnedMark);
   const companion=flair.showcase?.pet??j.pets.find(p=>p.id===clean.companionPet&&p.obtained);
   const total=j.hiscores.skills.find(s=>s.name==='Overall');
   return <div className="osrs-panel char-card">
-    <ProfileIdentity username={j.username} accountMode={j.accountMode} staff={flair.staff} donation={flair.donation} title={title} earnedTitle={earnedTitle}/>
-    <div className="char-stage">
+    <ProfileIdentity username={j.username} accountMode={j.accountMode} staff={flair.staff} namePrefix={flair.namePrefix} donation={flair.donation} title={title} earnedTitle={earnedTitle} verified={flair.verified}/>
+    <div className="char-stage" ref={stage}>
       <LookStage appearance={clean.appearance} equipped={clean.equipped} petId={companion?.id??null} petName={companion?.name??null} petDescription={companion?companionDescription(j,companion.id,companion.name):undefined} username={j.username}/>
       <ReputationButton key={`${j.username}:${viewerKey}`} username={j.username} viewerKey={viewerKey} previewCount={reputationPreview}/>
-      {mark && <div className="char-stamps"><span className="char-stamp" aria-label={`${badgeTier(mark.id)} · ${mark.name}`}><AchievementEmblem mark={mark}/></span></div>}
+      {mark && <div className="char-stamps"><BadgeHover className="char-stamp" info={emblemInfo(mark,achievementTitle(j,mark.id))}><AchievementEmblem mark={mark}/></BadgeHover></div>}
       {!flair.canEdit&&viewerKey!=='guest'&&<ProfileStaffControls username={j.username} viewerKey={viewerKey} identity={{username:j.username,accountMode:j.accountMode,staff:flair.staff,donation:flair.donation,title,earnedTitle}}/>}
-      {flair.canEdit && <button type="button" className="portrait-settings" aria-label="Profile settings" title="Profile settings" onClick={()=>setEditing(true)}><Settings size={19}/></button>}
+      {flair.canEdit && <button type="button" className="portrait-settings" aria-label="Profile settings" title="Profile settings" onClick={openEditor}><img className="settings-icon" src="/icons/community/settings-icon.png" alt="" width={19} height={19}/></button>}
     </div>
     <div className="char-meta"><span><small>Combat</small><b>{combatLevel(j)??'—'}</b></span><span><small>Total</small><b>{total?num(total.level,0):'—'}</b></span></div>
-    {editing && flair.canEdit && <ProfileEditor journal={j} flair={flair} onSave={onFlair} onClose={()=>setEditing(false)}/>}
+    {editing && flair.canEdit && <ProfileEditor journal={j} flair={flair} portraitAspect={portraitAspect} onSave={onFlair} onClose={()=>setEditing(false)}/>}
   </div>;
 }
 
@@ -95,10 +101,15 @@ export function SkillsPanel({journal: j, pop}: {journal: Journal; pop: PopApi}) 
   </div>;
 }
 
+/** Hiscores entries listed under Activities rather than Boss ranks. */
+export const isOtherActivity=(name:string)=>/points|bounty hunter|clue scrolls| - rank|zeal|rifts closed|glory|collections logged/i.test(name);
+/** Every boss the hiscores rank, so the loading skeleton reserves the same grid. */
+export const BOSS_RANK_COUNT=activityNames.filter(name=>!isOtherActivity(name)).length;
+
 /** Public activity records only; hidden counts are already removed from the journal API. */
 export function ActivityRanks({journal}:{journal:Journal}){
  const [group,setGroup]=useState<'bosses'|'activities'>('bosses');
- const other=(name:string)=>/points|bounty hunter|clue scrolls| - rank|zeal|rifts closed|glory|collections logged/i.test(name);
+ const other=isOtherActivity;
  const knownRows=journal.hiscores.activities.filter(a=>group==='activities'?other(a.name):!other(a.name));
  const unknown=knownRows.length===0;
  const rows=(unknown?activityNames.filter(name=>group==='activities'?other(name):!other(name)).map(name=>({name,rank:-1,score:-1})):knownRows).slice().sort(group==='bosses'?releaseOrder('bosses'):()=>0);
@@ -160,6 +171,15 @@ function SkillMethods({journal: j, skill, level, open, setOpen}: {journal: Journ
   </div>;
 }
 
+/** The Overview's progress rows, shared with the loading skeleton so both show the same labels and art. */
+export const OVERVIEW_PROGRESS = [
+  {k: 'Pets', img: '/brand/rocky-mascot.webp', view: 'Pets'},
+  {k: 'Collection log', img: '/ui/collection-log-icon.png', view: 'Collection log'},
+  {k: 'Quest points', img: '/ui/quest-point-icon.png', view: 'Quests'},
+  {k: 'Diary tasks', img: '/ui/achievement-diaries-icon.png', view: 'Diaries'},
+  {k: 'Combat achievements', img: '/icons/navigation/combat-achievements.png', view: 'Combat'},
+] as const;
+
 export function Overview({journal: j, go, onOpen}: {journal: Journal; go: (view: string) => void; onOpen: (p: Pet) => void}) {
   const available=progressAvailability(j);
   const owned = j.pets.filter(p => p.obtained);
@@ -167,17 +187,16 @@ export function Overview({journal: j, go, onOpen}: {journal: Journal; go: (view:
   const quests = p?.quests ?? [];
   const qp = quests.filter(q => q.state === 'finished').reduce((s, q) => s + q.points, 0), qpAll = quests.reduce((s, q) => s + q.points, 0);
   const tiers = p?.diaries.flatMap(d => d.tiers) ?? [];
-  const left = j.pets.filter(x => !x.obtained);
-  const hoursLeft = left.reduce((s, x) => s + (expectedHours(x) ?? 0), 0);
+  const [pets, log, questRow, diaryRow, combatRow] = OVERVIEW_PROGRESS;
   const rows = [
-    {k: 'Pets', known: available.pets, img: '/brand/rocky-mascot.webp', done: owned.length, all: j.pets.length, view: 'Pets'},
-    {k: 'Collection log', known: available.log, img: '/icons/navigation/collection-log-icon.png', done: j.log?.obtained ?? 0, all: j.log?.total ?? 0, view: 'Collection log'},
-    {k: 'Quest points', known: available.quests, img: '/icons/navigation/quest-point-icon.png', done: qp, all: qpAll, view: 'Quests'},
-    {k: 'Diary tasks', known: available.diaries, img: '/icons/navigation/achievement-diaries-icon.png', done: tiers.reduce((s, t) => s + t.completed, 0), all: tiers.reduce((s, t) => s + t.total, 0), view: 'Diaries'},
-    {k: 'Combat achievements', known: available.combat, img: '/icons/navigation/combat-achievements.png', done: p?.combat.reduce((s, c) => s + c.completed, 0) ?? 0, all: p?.combat.reduce((s, c) => s + c.total, 0) ?? 0, view: 'Combat'},
+    {...pets, known: available.pets, done: owned.length, all: j.pets.length},
+    {...log, known: available.log, done: j.log?.obtained ?? 0, all: j.log?.total ?? 0},
+    {...questRow, known: available.quests, done: qp, all: qpAll},
+    {...diaryRow, known: available.diaries, done: tiers.reduce((s, t) => s + t.completed, 0), all: tiers.reduce((s, t) => s + t.total, 0)},
+    {...combatRow, known: available.combat, done: p?.combat.reduce((s, c) => s + c.completed, 0) ?? 0, all: p?.combat.reduce((s, c) => s + c.total, 0) ?? 0},
   ];
   return <div className="ov">
-    <div className="ov-top">
+    <div className="ov-top is-full">
       <div className="ov-prog">{rows.map(t => <button type="button" key={t.k} className="prog-row" onClick={() => go(t.view)}>
         <img src={t.img} alt=""/>
         <span className="prog-label">{t.k}</span>
@@ -185,28 +204,30 @@ export function Overview({journal: j, go, onOpen}: {journal: Journal; go: (view:
         <span className={`prog-val ${t.known?'':'is-unknown'}`}>{t.known?<><Count done={t.done} total={t.all}>{num(t.done, 0)}</Count>/{num(t.all, 0)}</>:"Not synced"}</span>
         <ChevronRight size={14}/>
       </button>)}</div>
-      <div className="ov-kpis">
-        <div><span>Pets left</span><b>{available.pets?left.length:'—'}</b>{!available.pets&&<small>{j.pets.length} pets in the catalogue</small>}</div>
-        <div><span>Mean hunt budget</span><b>{available.pets?num(hoursLeft, 0):'—'}</b><small>{available.pets?`${left.filter(p => expectedHours(p) !== null).length}/${left.length} hunts with a rate & pace`:'Sync collection progress'}</small></div>
-        <div><span>Estimated effort</span><b>{available.attempts?num(totalEffort(j), 0):'—'}</b><small>{available.attempts?'includes KC / pace estimates':'No recorded attempts yet'}</small></div>
-      </div>
     </div>
+    <PetSummary journal={j} known={available.pets}/>
     {<div className={`ov-pets ${available.pets?'':'pets-unknown'}`}>
       <div className="sec-h"><h3>Pets collected</h3><span className="sm">{available.pets?<Count done={owned.length} total={j.pets.length}/>:"Not synced"}</span></div>
       <div className="petlog-grid">{[...j.pets].sort(releaseOrder('pets')).map(x=>{
         const collected=available.pets&&x.obtained;
         const status=!available.pets?'Not synced':collected?`Obtained${x.date?' · '+collectedDate(x.date):''}`:'Not collected yet';
-        const details=companionDescription(j,x.id,x.name).split('\n').slice(1).filter(line=>line!=='Not collected'&&line!=='Obtained'&&!line.startsWith('Collected:')&&(available.pets||line.startsWith('Current ')));
-        const label=[x.name,x.category,status,...details].join(' · ');
+        const record=petHoverLines(j,x),details=[available.pets?record.obtained:null,record.current].filter((line):line is string=>!!line);
+        // Luck as in the Pet summary: expected hours minus the hours the pet took (or has taken so far).
+        const luck=available.pets?petLuck(x).luck:null,luckLine=luck!==null&&luck!==0?`${luckHours(luck)} ${luck>0?'lucky':'unlucky'}`:null;
+        const label=[x.name,x.category,status,...details,...(luckLine?[luckLine]:[])].join(' · ');
         return <HoverTip key={x.id} tabIndex={-1} className="overview-pet-trigger" label={label} content={<span className="overview-pet-tip">
           <strong>{x.name}</strong><small>{x.category}</small><ReleaseStamp name={x.name} kind="pets"/><b className={collected?'good':'muted'}>{status}</b>
-          {details.length>0&&<span className="overview-pet-record">{details.map((line,index)=><span key={index}>{line}</span>)}</span>}
+          {(details.length>0||luckLine)&&<span className="overview-pet-record">{details.map((line,index)=><span key={index}>{line}</span>)}{luckLine&&<b className={luck!>0?'good':'bad'}>{luckLine}</b>}</span>}
         </span>}><button type="button" className={collected?'got':''} aria-label={label} onClick={()=>onOpen(x)}><img src={`/pets/${x.id}.png`} alt="" loading="lazy"/></button></HoverTip>;
       })}</div>
     </div>}
     <div className="ov-two">
-      {available.attempts&&<DryMeter pets={j.pets} onOpen={onOpen} limit={7} title="Driest hunts" compact/>}
-      {available.pets&&<QuickestHunts pets={j.pets} onOpen={onOpen} limit={7} compact/>}
+      {available.attempts&&<DryMeter pets={j.pets} onOpen={onOpen} limit={3} title="Driest hunts" compact/>}
+      {available.pets&&<QuickestHunts pets={j.pets} onOpen={onOpen} limit={3} compact/>}
     </div>
+    {available.pets&&owned.length>0&&<div className="ov-two">
+      <LuckHunts journal={j} onOpen={onOpen} limit={3} lucky/>
+      <LuckHunts journal={j} onOpen={onOpen} limit={3} lucky={false}/>
+    </div>}
   </div>;
 }

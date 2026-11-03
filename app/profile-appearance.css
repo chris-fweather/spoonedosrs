@@ -87,3 +87,38 @@
 
 /* Pet emblems use the site's Rocky, which is painted art rather than pixel art. */
 .achievement-emblem.pet-emblem img,.achievement-emblem img[src$="rocky-mascot.webp"]{image-rendering:auto}
+
+/* Settings preview: the character sits in a box shaped like the profile portrait (--portrait-aspect, measured when the
+ * dialog opens), so the preview frames and zooms the character exactly as the portrait will. */
+.profile-studio .studio-model{position:relative;container-type:size}
+.profile-studio .studio-model .char-view{inset:auto;left:50%;top:50%;transform:translate(-50%,-50%);width:min(100cqw,calc(100cqh * var(--portrait-aspect,.8)));height:min(100cqh,calc(100cqw / var(--portrait-aspect,.8)))}
+
+/* Hair colour and skin tone: compact rows of round swatches. 40px tap targets, the chosen one ringed in gold. */
+.profile-studio .compact-appearance .colour-picker{border:0;padding:0;margin:14px 0 0;min-width:0}
+.profile-studio .compact-appearance .colour-picker legend{align-items:baseline;flex-wrap:wrap;margin-bottom:4px}
+.profile-studio .compact-appearance .colour-picker legend>small{flex-basis:100%;font-size:11px;font-weight:400;color:var(--muted)}
+.profile-studio .colour-swatches{display:flex;flex-wrap:wrap;gap:2px;margin-left:-6px}
+.profile-studio .colour-swatch{display:grid;place-items:center;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+.profile-studio .colour-swatch>i{display:block;width:26px;height:26px;border-radius:50%;box-shadow:inset 0 0 0 1px #ffffff2e,0 0 0 1px #0000004d;transition:box-shadow .12s,transform .12s}
+.profile-studio .colour-swatch:hover>i{transform:scale(1.08)}
+.profile-studio .colour-swatch[aria-checked=true]>i{box-shadow:inset 0 0 0 1px #ffffff2e,0 0 0 2px var(--panel,#1c1b17),0 0 0 4px var(--gold)}
+.profile-studio .colour-swatch:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+@media(prefers-reduced-motion:reduce){.profile-studio .colour-swatch>i{transition:none}.profile-studio .colour-swatch:hover>i{transform:none}}
+@media(min-width:651px){.profile-studio .studio-preview .studio-model{height:auto;min-height:0;max-height:none;flex:none;aspect-ratio:var(--portrait-aspect,.8)}}
+.profile-studio .compact-appearance{max-width:570px}
+/* Styles of the chosen item (lib/item-variants.ts): a tray under its row, notched at the card. The chosen style's name
+ * shows once; each square swatch names itself on hover and to screen readers. Later cards fill the row beside the card. */
+.profile-studio .studio-item .style-count{font-size:9px;line-height:1.3;color:#d2b470}
+.profile-studio .studio-item-list{grid-auto-flow:row dense}
+.profile-studio .studio-styles{--notch:43px;position:relative;grid-column:1/-1;min-width:0;margin-top:2px;padding:8px 10px 10px;background:#27241e;border:1px solid #484237;border-radius:4px}
+.profile-studio .studio-styles:before{content:"";position:absolute;top:-6px;left:clamp(10px,calc(var(--notch) - 5px),calc(100% - 20px));width:10px;height:10px;background:#27241e;border:solid #484237;border-width:1px 0 0 1px;transform:rotate(45deg)}
+.profile-studio .studio-styles-caption{display:flex;gap:9px;min-width:0;margin:0 0 7px;font-size:12px;line-height:1.3;white-space:nowrap}
+.profile-studio .studio-styles-caption>b{font-weight:600;color:var(--text)}
+.profile-studio .studio-styles-caption>span{min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.profile-studio .studio-styles-caption>span:before{content:"·";margin-right:9px;color:var(--dim)}
+.profile-studio .style-swatches{display:grid;grid-template-columns:repeat(auto-fill,40px);gap:6px}
+.profile-studio .style-swatch{display:grid;place-items:center;width:40px;height:40px;min-height:40px;padding:0;background:#1f1d18;border:1px solid #484237;border-radius:4px;cursor:pointer}
+.profile-studio .style-swatch img{width:32px;height:32px;object-fit:contain;image-rendering:pixelated}
+.profile-studio .style-swatch:hover{border-color:#a08653}
+.profile-studio .style-swatch[aria-pressed=true]{background:#393224;border-color:var(--gold);box-shadow:inset 0 -2px var(--gold)}
+.profile-studio .style-swatch:focus-visible{outline:2px solid var(--orange);outline-offset:1px}

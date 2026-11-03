@@ -12,6 +12,12 @@ The MIT licence in [LICENSE](../LICENSE) covers this project's **source code** o
 | Collection-log catalogue and item icons | `lib/`, `public/items` | Derived from [RuneProfile](https://github.com/ReinhardtR/runeprofile) data rendered from the game cache; see [public/ASSET-SOURCES.txt](../public/ASSET-SOURCES.txt). |
 | RuneScape Bold font | `public/fonts/runescape-bold.*` | No redistribution licence is known; see [public/ASSET-SOURCES.txt](../public/ASSET-SOURCES.txt). |
 | Share-card sans font | `public/fonts/share-sans.ttf` | SIL Open Font License; see [public/fonts/share-sans-LICENSE.txt](../public/fonts/share-sans-LICENSE.txt). |
+| World map travel data: collision map, transports, teleports, banks | `public/world-map` (built by `scripts/build-world-map.mjs`; `exits.json`, the stairs, ladders and entrances on the maps, by `scripts/build-map-exits.mjs`); `lib/guide-travel.json`, guide travel hover cards (built by `scripts/build-guide-travel.mjs`) | Derived from [Shortest Path](https://github.com/Skretzo/shortest-path), BSD 2-Clause; notice in [public/world-map/NOTICE.txt](../public/world-map/NOTICE.txt). |
+| World map quest start positions | `public/world-map/places.json` | Derived from [Quest Helper](https://github.com/Zoinkwiz/quest-helper), BSD 2-Clause; notice in [public/world-map/NOTICE.txt](../public/world-map/NOTICE.txt). |
+| World map shortcut and fishing spot details (hover cards) | `public/world-map/icon-details.json` (built by `scripts/build-map-icon-details.mjs`) | Derived from [RuneLite](https://github.com/runelite/runelite) (AgilityShortcut, FishingSpot, FishingAction) and [Shortest Path](https://github.com/Skretzo/shortest-path), both BSD 2-Clause; notice in [public/world-map/NOTICE.txt](../public/world-map/NOTICE.txt). |
+| World map tiles | served through `/api/map-tile` | Rendered from the game by [Mejrs](https://github.com/mejrs/layers_osrs); the map itself © Jagex Ltd. |
 | Rocky mascot and site branding | `public/brand` | Spooned OSRS. |
+
+The player-facing summary is the [Credits page](../app/credits/page.tsx) (`/credits`); update it when this table changes.
 
 If you reuse this code for another project, replace the artwork, fonts and data, or confirm you have the rights to use them.

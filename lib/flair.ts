@@ -5,6 +5,7 @@ import type {CommunityStats} from './community';
 import type {PublicStaff} from './staff-policy';
 import wearRaw from './wearables.json' with {type: 'json'};
 import seed from './catalogue.json' with {type:'json'};
+import {wearableUnlocks} from './item-variants';
 
 /** Equipment slots a worn model can occupy. */
 export const EQUIP_SLOTS = ['head', 'cape', 'neck', 'weapon', 'body', 'shield', 'legs', 'hands', 'feet', 'ring', 'ammo'] as const;
@@ -77,7 +78,9 @@ const MAX_SKILLS = ['Attack', 'Hitpoints', 'Mining', 'Strength', 'Agility', 'Smi
 
 export type Mark = {id: string; name: string; detail: string; short: string; img: string};
 export type FlairChoice = {companionPet: string | null; displayPiece: string | null; equipped: Equipped; pinnedMark: string | null; title: string | null};
-export type StoredFlair = FlairChoice & Partial<Presentation> & {supporter?:boolean;details?:import('./profile-privacy').ProfileDetails; appearance?:Appearance; donation?:Donation; ownerShowcase?:boolean; canEdit: boolean; visibility?: 'public'|'private'; showcase?: {badge:Mark|null; pet:{id:string;name:string}|null; achievementTitle:string|null}; staff?: PublicStaff | null};
+export type StoredFlair = FlairChoice & Partial<Presentation> & {supporter?:boolean;details?:import('./profile-privacy').ProfileDetails; appearance?:Appearance; donation?:Donation; ownerShowcase?:boolean; /** Linked and proven through the RuneLite plugin by the same Discord account (lib/verified-profile.ts). */ verified?:boolean; canEdit: boolean; visibility?: 'public'|'private'; showcase?: {badge:Mark|null; pet:{id:string;name:string}|null; achievementTitle:string|null}; staff?: PublicStaff | null;
+ /** Squire before the name of someone not on staff (staff carry theirs in staff.displayPrefix). */ namePrefix?: import('./name-prefix').NamePrefix | null;
+ /** The prefix this person has earned, for the profile editor. */ earnedPrefix?: import('./name-prefix').NamePrefix | null};
 
 export function petFloats(name: string): boolean {
   return FLYING.has(name);
@@ -109,10 +112,10 @@ function collectionMarks(journal: Journal): Mark[] {
   const pets = journal.pets.filter(pet => pet.obtained).length;
   if (total >= 10 && pets >= 10) marks.push({id: 'pets-10', name: '10 pets', detail: `10/${total} pets obtained`, short: `10/${total}`, img: '/brand/rocky-mascot.webp'});
   if (total >= 50 && pets >= 50) marks.push({id: 'pets-50', name: '50 pets', detail: `50/${total} pets obtained`, short: `50/${total}`, img: '/brand/rocky-mascot.webp'});
-  if (isMaxed(journal)) marks.push({id: 'max-cape', name: 'Max cape', detail: 'Every skill is 99', short: '99', img: '/icons/ranks/max-cape.png'});
+  if (isMaxed(journal)) marks.push({id: 'max-cape', name: 'Max cape', detail: 'Every skill is 99', short: '99', img: '/items/13280.png'});
   const logged = journal.log?.obtained ?? 0;
   for (const step of clogMilestones()) {
-    if (logged >= step.count) marks.push({id: step.id, name: step.name, detail: step.detail, short: step.short, img: '/icons/navigation/collection-log-icon.png'});
+    if (logged >= step.count) marks.push({id: step.id, name: step.name, detail: step.detail, short: step.short, img: '/ui/collection-log-icon.png'});
   }
   return marks;
 }
@@ -126,15 +129,15 @@ export function badgeCatalogue(journal: Journal): Badge[] {
   const allPets = seed.pets.filter(p=>journal.pets.some(owned=>owned.id===p.id && owned.obtained)).length;
   marks.push({id: 'pets-all', name: 'All pets', detail: 'Every pet in the current journal catalogue obtained', short: 'All', img: '/brand/rocky-mascot.webp', completed: allPets, total: seed.pets.length, unlocked: allPets === seed.pets.length});
   const maxed = MAX_SKILLS.filter(name => (journal.hiscores.skills.find(s => s.name === name)?.level ?? 0) >= 99).length;
-  marks.push({id: 'max-cape', name: 'Max cape', detail: 'Every skill is 99', short: '99', img: '/icons/ranks/max-cape.png', completed: maxed, total: MAX_SKILLS.length, unlocked: isMaxed(journal)});
-  for (const step of clogMilestones()) marks.push({...step, img: '/icons/navigation/collection-log-icon.png', completed: logged, total: step.count, unlocked: earned.some(m => m.id === step.id)});
-  marks.push({id: 'clog-all', name: 'Complete collection log', detail: 'Unlock every slot in your synced collection log', short: 'All', img: '/icons/navigation/collection-log-icon.png', completed: logged, total: journal.log?.total ?? 0, unlocked: (journal.log?.total ?? 0) > 0 && logged >= journal.log!.total});
+  marks.push({id: 'max-cape', name: 'Max cape', detail: 'Every skill is 99', short: '99', img: '/items/13280.png', completed: maxed, total: MAX_SKILLS.length, unlocked: isMaxed(journal)});
+  for (const step of clogMilestones()) marks.push({...step, img: '/ui/collection-log-icon.png', completed: logged, total: step.count, unlocked: earned.some(m => m.id === step.id)});
+  marks.push({id: 'clog-all', name: 'Complete collection log', detail: 'Unlock every slot in your synced collection log', short: 'All', img: '/ui/collection-log-icon.png', completed: logged, total: journal.log?.total ?? 0, unlocked: (journal.log?.total ?? 0) > 0 && logged >= journal.log!.total});
   const quests = journal.profile?.quests ?? [];
   const finished = quests.filter(q => q.state === 'finished').length;
-  marks.push({id: 'quest-cape', name: 'Quest complete', detail: 'Finish every quest in your synced quest list', short: 'Q', img: '/icons/navigation/quest-point-icon.png', completed: finished, total: quests.length, unlocked: quests.length > 0 && finished === quests.length});
+  marks.push({id: 'quest-cape', name: 'Quest complete', detail: 'Finish every quest in your synced quest list', short: 'Q', img: '/ui/quest-point-icon.png', completed: finished, total: quests.length, unlocked: quests.length > 0 && finished === quests.length});
   const tiers = journal.profile?.diaries.flatMap(d => d.tiers) ?? [];
   const done = tiers.reduce((n, t) => n + t.completed, 0), total = tiers.reduce((n, t) => n + t.total, 0);
-  marks.push({id: 'diary-cape', name: 'Diary complete', detail: 'Complete every task in your synced diaries', short: 'D', img: '/icons/navigation/achievement-diaries-icon.png', completed: done, total, unlocked: total > 0 && done >= total});
+  marks.push({id: 'diary-cape', name: 'Diary complete', detail: 'Complete every task in your synced diaries', short: 'D', img: '/ui/achievement-diaries-icon.png', completed: done, total, unlocked: total > 0 && done >= total});
   const combat = journal.profile?.combat.reduce((n, t) => n + t.completed, 0) ?? 0;
   for (const count of [10, 25, 50, 100, 150, 250, 350, 500]) marks.push({id: `combat-${count}`, name: `${count} combat tasks`, detail: `Complete ${count} combat achievement tasks`, short: String(count), img: '/icons/navigation/combat-achievements.png', completed: combat, total: count, unlocked: combat >= count});
   return marks;
@@ -161,12 +164,13 @@ function obtainedPets(journal: Journal): Set<string> {
   return new Set(journal.pets.filter(pet => pet.obtained).map(pet => pet.id));
 }
 
-function obtainedItems(journal: Journal): Set<string> {
+/** Logged items, plus the fixed and ornamented versions they unlock (lib/item-variants.ts). */
+export function obtainedItems(journal: Journal): Set<string> {
   const ids = new Set<string>();
   for (const tab of journal.log?.tabs ?? []) for (const page of tab.pages) for (const item of page.items) {
     if (item.quantity > 0) ids.add(String(item.id));
   }
-  return ids;
+  return wearableUnlocks(ids);
 }
 
 export function parsePiece(value: string): {kind: 'pet' | 'item'; id: string} | null {
@@ -250,7 +254,7 @@ export function assertFlair(journal: Journal, input: {companionPet?: unknown; di
   return clean;
 }
 
-export type BoardRow = {supporter?:boolean;boardRank?:number|null;supporterRank?:number|null; donation?:Donation; name: string; title: string | null; pets: number; log: number; hasJournal?: boolean; stats?: CommunityStats; staff?: PublicStaff | null; achievementTitle?: string | null; featuredPet?: {id:string;name:string} | null; accountMode?: import('./account-mode').AccountMode | null};
+export type BoardRow = {supporter?:boolean;boardRank?:number|null;supporterRank?:number|null; donation?:Donation; name: string; title: string | null; pets: number; log: number; hasJournal?: boolean; stats?: CommunityStats; staff?: PublicStaff | null; namePrefix?: import('./name-prefix').NamePrefix | null; achievementTitle?: string | null; featuredPet?: {id:string;name:string} | null; accountMode?: import('./account-mode').AccountMode | null};
 
 /** Claimed accounts: pets obtained, then collection-log count, then name. */
 export function rankClaims(rows: BoardRow[]): BoardRow[] {

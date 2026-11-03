@@ -30,7 +30,7 @@ function pvm(title:string,activity:string):Guide{
   {id:'gear-divider',kind:'divider'},
   text('gear','Gear for every budget','heading'),
   text('gear-intro','Which combat style to use, and the one upgrade that matters most. Fill each budget in the gear editor.'),
-  {id:'gear-tiers',kind:'loadouts',setupIds:setups.map(s=>s.id),inventoryId:'mid'},
+  {id:'gear-tiers',kind:'loadouts',setupIds:setups.map(s=>s.id)},
   text('inventory-body','What to bring for a trip, and how many kills it lasts.'),
   text('drops','Drops worth knowing','heading'),
   text('drops-intro','The drops worth chasing, and what they are used for.'),
@@ -79,6 +79,6 @@ function diary(title:string,activity:string):Guide{
 export const GUIDE_LAYOUTS:GuideLayout[]=[
  {id:'blank',label:'Blank',text:'An empty page',icon:'/icons/navigation/collection-log-icon.png',build:(title,activity)=>({...emptyGuide(),title,activity,blocks:[text('intro','','body')]})},
  {id:'pvm',label:'Bossing',text:'Fight, gear tiers, drops',icon:'/icons/navigation/combat-achievements-icon.png',build:pvm},
- {id:'quest',label:'Quest',text:'Items, steps, rewards',icon:'/icons/navigation/quest-point-icon.png',build:quest},
- {id:'diary',label:'Diary',text:'Tasks by tier, rewards',icon:'/icons/navigation/achievement-diaries-icon.png',build:diary},
+ {id:'quest',label:'Quest',text:'Items, steps, rewards',icon:'/ui/quest-point-icon.png',build:quest},
+ {id:'diary',label:'Diary',text:'Tasks by tier, rewards',icon:'/ui/achievement-diaries-icon.png',build:diary},
 ];

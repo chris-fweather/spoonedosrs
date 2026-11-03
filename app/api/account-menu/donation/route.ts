@@ -9,9 +9,9 @@ export async function GET(request:Request){
   let name:string;
   try{name=accountName(new URL(request.url).searchParams.get('username')??'');}catch{return Response.json({error:'Choose a linked account.'},{status:400,headers});}
   await ensureAuthTables();
-  const row=await db().prepare(`SELECT p.show_donation,COALESCE(pd.amount_minor,d.amount_minor) AS amount_minor,COALESCE(pd.currency,d.currency,'USD') AS currency
+  const row=await db().prepare(`SELECT p.show_donation,pd.amount_minor,COALESCE(pd.currency,'USD') AS currency
    FROM claimed_names c LEFT JOIN profile_presentation p ON p.rsn=c.rsn
-   LEFT JOIN profile_supporter_totals pd ON pd.rsn=c.rsn LEFT JOIN supporter_totals d ON d.discord_id=c.discord_id
+   LEFT JOIN profile_supporter_totals pd ON pd.rsn=c.rsn
    WHERE c.rsn=? AND c.discord_id=?`).bind(name.toLowerCase(),session.id).first<{show_donation:number|null;amount_minor:number|null;currency:string}>();
   if(!row||row.show_donation!==0)return Response.json({error:'No hidden donation available for this linked account.'},{status:404,headers});
   return Response.json({amountMinor:row.amount_minor,currency:row.currency},{headers});

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Pull OSRS Wiki reference snapshots used by the tracker. Does not invent rates."""
-import json, re, time, urllib.parse, urllib.request
+import html, json, re, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -36,6 +36,15 @@ def strip_wiki(s):
     s = re.sub(r"[ \t]+", " ", s)
     s = re.sub(r"\n{3,}", "\n\n", s)
     return s.strip()
+
+def plain_start(s):
+    """A quest's start text as readers see it: entities decoded (the wiki's floor template leaves &#91; and &#93;),
+    ordinals joined ("1 st" from <sup>st</sup>), and one floor name, the UK one the site uses ("1st floor [UK]
+    2nd floor [US]" becomes "1st floor")."""
+    s = html.unescape(strip_wiki(s))
+    s = re.sub(r"\b(\d+) (st|nd|rd|th)\b", r"\1\2", s)
+    s = re.sub(r"\s*\[\s*UK\s*\]\s*\d+(?:st|nd|rd|th) floor\s*\[\s*US\s*\]", "", s)
+    return re.sub(r"\s+([.,;:])", r"\1", re.sub(r"[ \t]+", " ", s)).strip()
 
 def parse_skill_pets(text):
     start = text.find("local pets = {")
@@ -295,7 +304,7 @@ def main():
         quests[name] = {
             "difficulty": row.get("official_difficulty") or "",
             "length": row.get("official_length") or "",
-            "start": strip_wiki(re.sub(r"<[^>]+>", " ", row.get("start_point") or ""))[:400],
+            "start": plain_start(re.sub(r"<[^>]+>", " ", row.get("start_point") or ""))[:400],
             "description": strip_wiki(re.sub(r"<[^>]+>", " ", row.get("description") or ""))[:500],
             "items": plain_lines(row.get("items_required") or ""),
             "enemies": plain_lines(row.get("enemies_to_defeat") or ""),

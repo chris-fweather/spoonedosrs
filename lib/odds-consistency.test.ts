@@ -20,7 +20,7 @@ test('Tempoross games stay separate from reward rolls; Phoenix rolls are not dou
  const j=structuredClone(initial);const t=j.pets.find(p=>p.name==='Tiny tempor')!;
  t.methods[0]={...t.methods[0],rate:8000,unit:'games',activity:'Tempoross',kc:1132,kph:10};
  const p=j.pets.find(p=>p.name==='Phoenix')!;p.crateRolls=5000;normalizeRates(j);
- assert.equal(t.methods[0].unit,'rolls');assert.equal(t.methods[0].kc,null);assert.equal(t.methods[0].kph,null);
+ assert.equal(t.methods[0].unit,'rolls');assert.equal(t.methods[0].kc,null);assert.equal(t.methods[0].kph,80); // the games pace is dropped; permits get the example pace
  assert.ok(Math.abs(likelihood(p)!-chanceAfter(5000,1/5000))<1e-10);
 });
 test('90 percent future chance needs a fresh full budget regardless of previous kills',()=>{

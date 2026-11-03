@@ -2,9 +2,10 @@ import {db} from './storage';
 import {discordAvatarUrl} from './session';
 import {hasGildedSupporter,supporterTitle} from './staff-appearance';
 import type {StaffRole} from './staff-policy';
+import {shownPrefix,type NamePrefix} from './name-prefix';
 
 /** How a person shows on the site: their main RuneScape name with its scimitar, Sir and the Generous. */
-export type PersonDisplay={rsn:string;prefix:'Sir'|null;displayRole:StaffRole|null;generous:boolean;supporter:boolean;gilded:boolean};
+export type PersonDisplay={rsn:string;prefix:NamePrefix|null;displayRole:StaffRole|null;generous:boolean;supporter:boolean;gilded:boolean};
 /** A Discord account named in the staff portal: Discord names and avatar, staff rank, linked names and site display. */
 export type StaffPerson={id:string;name:string;username:string;avatarUrl:string|null;role:StaffRole|null;names:string[];display:PersonDisplay|null};
 type Row={discord_id:string;username:string;global_name:string|null;avatar:string|null;role:StaffRole|null;member_prefix:string|null;names:string;main_name:string|null;staff_prefix:string|null;staff_badge:string|null;show_donation:number|null;amount_minor:number|null;currency:string|null};
@@ -27,7 +28,7 @@ export async function staffPeople(ids:(string|null|undefined)[]):Promise<StaffPe
   const badge=RANKS.includes(r.staff_badge as StaffRole)?r.staff_badge as StaffRole:null;
   const donation={amountMinor:r.amount_minor,currency:r.currency??'USD',hidden:r.show_donation===0};
   return {id:r.discord_id,name:r.global_name||r.username,username:r.username,avatarUrl:r.avatar?discordAvatarUrl(r.discord_id,r.avatar):null,role,names:JSON.parse(r.names) as string[],
-   display:r.main_name?{rsn:r.main_name,prefix:role&&(r.staff_prefix??r.member_prefix)==='Sir'?'Sir':null,displayRole:role==='owner'&&badge?badge:null,
+   display:r.main_name?{rsn:r.main_name,prefix:role?shownPrefix(r.staff_prefix??r.member_prefix,role,false):null,displayRole:role==='owner'&&badge?badge:null,
     generous:!!supporterTitle(r.amount_minor,r.currency),supporter:(r.amount_minor??0)>0,gilded:r.staff_badge==='gilded'&&hasGildedSupporter(donation)}:null};
  });
 }

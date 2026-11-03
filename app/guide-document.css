@@ -1,17 +1,6 @@
 /* Guide workshop: a document editor (quiet toolbar, paper page, spaced blocks), plus the rendered guide blocks. */
 .guide-workshop{display:grid;gap:14px;min-width:0}
 .guide-workshop-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
-/* Landing: a New guide tile, then one tile per guide (official boss or activity icon, never boxed). */
-.guide-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-.guide-tile{display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0;min-height:156px;padding:16px;text-align:left;border:1px solid var(--line);border-radius:7px;background:var(--sunk);color:var(--text)}
-.guide-tile:hover{border-color:var(--line-3)}
-.guide-tile:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
-.guide-tile>img{width:34px;height:34px;object-fit:contain;flex:none}
-.guide-tile>b{font-size:14.5px;font-weight:650;line-height:1.35;text-wrap:balance;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.guide-tile-meta{display:grid;gap:4px;margin-top:auto}
-.guide-tile-meta small{font-size:11.5px;color:var(--dim)}
-.guide-tile-new{align-items:center;justify-content:center;gap:10px;color:var(--gold)}
-.guide-tile-new>b{font:18px/1.2 var(--rs);color:var(--gold)}
 .guide-back{padding-left:8px}
 .guide-workshop-bar .btn{min-height:38px}
 .guide-workshop-status{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
@@ -102,18 +91,14 @@
 .guide-add-paragraph{display:flex;align-items:center;gap:8px;width:100%;margin-top:14px;padding:12px 0 2px;color:var(--dim);font-size:13px;border-top:1px dashed #3a362d}
 .guide-add-paragraph:hover:not(:disabled){color:var(--gold)}
 
-.guide-insert-profile{display:flex;justify-content:space-between;align-items:center;gap:20px;background:#1b1a15;border:1px solid #37332a;padding:18px 20px;border-radius:8px}
-.guide-insert-profile h3{font:23px var(--rs);margin:10px 0}
-.guide-insert-profile .guide-worn{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(5,44px);gap:4px;padding:9px}
-.guide-insert-profile .guide-slot small{display:none}
-.guide-insert-profile .guide-inventory{grid-template-columns:repeat(4,42px);grid-template-rows:repeat(7,42px)}
-.guide-insert-profile .guide-slot img{width:29px;height:29px}
 .guide-insert-requirements{padding:16px 18px;border:1px solid #37332a;border-radius:8px;background:#1b1a15}
 .guide-insert-requirements h3,.guide-odds h3{font:22px var(--rs);margin:4px 0 10px}
 .guide-doc-paper hr,.guide-document-published hr{border:0;border-top:1px solid #5d5038;margin:22px 0}
 .guide-document-published>section{margin:22px 0}
-.guide-odds{padding:16px 18px;border:1px solid #37332a;border-radius:8px;background:#1b1a15}
-.guide-odds svg{width:100%;height:auto;display:block}
+.guide-odds{display:flex;flex-direction:column;padding:16px 18px;border:1px solid #37332a;border-radius:8px;background:#1b1a15}
+/* The plot keeps the chart's shape on its own and grows with a stretched card; GuideOdds redraws the curve to its height. */
+.guide-odds-plot{position:relative;flex:1 0 auto;width:100%}
+.guide-odds-plot svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 .guide-odds svg text{fill:#b2aa97;font-size:15px}
 .guide-odds-stats{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--muted);margin:18px 0 12px}
 .guide-odds-stats b{display:block;color:var(--gold);font:17px var(--rs);margin-top:7px}
@@ -161,14 +146,11 @@
  .guide-doc-block::before{left:-14px}
  .guide-insert-loadout,.guide-req-layout{grid-template-columns:1fr}
  .guide-insert-loadout>div{display:flex;justify-content:center}
- .guide-insert-profile{flex-wrap:wrap}
 }
 @media(max-width:700px){
  .guide-workshop-status{flex:1 1 auto}
  .guide-workshop-actions{flex:1 1 100%;margin-left:0}
  .guide-workshop-actions>.btn{flex:1 1 0;justify-content:center;min-height:42px}
- .guide-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
- .guide-tile{min-height:140px;padding:13px 12px}
  .guide-back{min-height:42px}
  /* Two rows with 40px targets: style and Insert, then bold, colours and emoji. */
  .guide-toolbar{gap:2px;padding:4px 5px;flex-wrap:wrap}
@@ -188,8 +170,6 @@
  .guide-doc-paper #guide-document-title{font-size:27px}
  .guide-doc-block::before{left:-11px;width:2px}
  .guide-block-actions{right:-4px}
- .guide-insert-profile{justify-content:center}
- .guide-insert-profile>div:first-child{width:100%;text-align:center}
  .guide-odds-stats{flex-wrap:wrap}
  .guide-insert-dialog>header,.guide-insert-dialog>footer,.guide-insert-body{padding:14px}
  .guide-insert-fields{grid-template-columns:1fr}
@@ -203,23 +183,16 @@
 /* Game terms: icon and name, opening the OSRS Wiki. */
 .guide-ref{display:inline-flex;align-items:baseline;gap:4px;color:#e9c97a;text-decoration:none;border-bottom:1px dotted #e9c97a66;white-space:nowrap}
 .guide-ref:hover{color:#ffd98f;border-bottom-color:#ffd98f}
-.guide-ref img{width:18px;height:18px;object-fit:contain;image-rendering:pixelated;align-self:center;flex:none}
+/* A mention's icon follows the text size. Item sprites carry their own margin, so an item's is drawn larger to read the same size. */
+.guide-ref img{width:1.25em;height:1.25em;object-fit:contain;image-rendering:pixelated;align-self:center;flex:none}
+.guide-ref.ref-item img{width:1.6em;height:1.6em;margin:-.2em 0}
+/* "3 [[Plank]]s": the quantity is part of the item's chip, "3 × Planks". */
+.guide-ref-qty{font-weight:700;font-variant-numeric:tabular-nums}
+.guide-ref-qty i{font-style:normal;font-weight:500;margin-left:3px;opacity:.75}
 .guide-ref.ref-term{color:inherit;border-bottom-color:#ffffff40}
 .guide-writing .guide-ref{cursor:default;user-select:all}
-/* Gear tiers side by side. */
-.guide-tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
-.guide-tier{display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 12px;background:#1b1a15;border:1px solid #37332a;border-radius:8px;min-width:0}
-.guide-tier h4{font:20px var(--rs);color:#e4cd98;margin:0}
-.guide-tier .guide-worn{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(5,42px);gap:4px;padding:8px}
-.guide-tier .guide-slot{padding:2px}
-.guide-tier .guide-slot small{display:none}
-.guide-tier .guide-slot img{width:28px;height:28px}
-.guide-tier p{margin:0;font-size:12px;line-height:1.6;color:#c6bca5;text-align:center}
 /* Requirements in groups, like the site's quest and diary requirements. */
 .guide-req-groups{display:grid;gap:14px;margin-bottom:6px}
-.guide-req-groups .adventure-requirement-list li>img{image-rendering:pixelated}
-.guide-req-groups .adventure-requirement-list a{color:inherit;text-decoration:none}
-.guide-req-groups .adventure-requirement-list a:hover{color:var(--orange)}
 .guide-custom-icon{opacity:.85}
 /* Editor: game term picker, tier picker and requirement extras. */
 .guide-term-menu{position:absolute;z-index:20;top:calc(100% + 6px);left:0;width:300px;padding:10px;background:#1e1c16;border:1px solid #4b4233;border-radius:6px;box-shadow:0 12px 30px #0009;display:grid;gap:8px}
@@ -228,33 +201,21 @@
 .guide-term-results button:hover,.guide-term-results button:focus-visible{border-color:#b77e25;background:#3b2e18}
 .guide-term-results img,.guide-term-blank{width:22px;height:22px;object-fit:contain;image-rendering:pixelated;flex:none}
 .guide-term-results small{display:block;font-size:10px;color:var(--muted);text-transform:capitalize}
+.guide-term-results small.is-detail,.guide-mention small.is-detail{text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.guide-term-results button>span:last-child,.guide-mention button>span:last-child{min-width:0}
 @media(max-width:650px){
- .guide-tiers{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
- .guide-tier{padding:10px 6px}
- .guide-tier .guide-worn{grid-template-columns:repeat(3,36px);grid-template-rows:repeat(5,36px);gap:3px;padding:6px}
- .guide-tier .guide-slot img{width:24px;height:24px}
- .guide-tier h4{font-size:17px}
- .guide-tier p{font-size:11px}
  .guide-term-menu{width:min(300px,calc(100vw - 40px))}
 }
-/* A single profile hugs its content instead of stretching across the page. */
-.guide-document-published .guide-insert-profile{display:inline-flex;flex-direction:column;align-items:flex-start;gap:10px;padding:14px 16px;max-width:100%}
-.guide-document-published .guide-insert-profile h3{font-size:20px;margin:4px 0 0}
 /* Requirements panel: grouped like profile quest and diary requirements, on its own panel. */
 .guide-requirements{display:grid;gap:10px}
 .guide-requirements>h3{font:22px var(--rs);margin:0}
-.guide-req-groups .adventure-requirement-list{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+/* One requirement per line in every group, like the profile's quest and diary requirements. The list stays narrow on wide
+ * pages so an amount at the right sits near its name. */
+.guide-req-groups .adventure-requirement-list{grid-template-columns:minmax(0,1fr);max-width:480px}
+/* A long requirement shortens with an ellipsis instead of widening the page on phones. */
+.guide-req-groups>.adventure-requirement-group,.guide-req-groups .adventure-requirement-list{min-width:0}
 .guide-requirements .guide-prose{font-size:13px}
 /* Gear tiers dialog: one card per tier. */
-.guide-tier-help{margin:0 0 12px}
-.guide-tier-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.guide-tier-choice{display:grid;gap:10px;padding:12px;border:1px solid var(--line-2);border-radius:6px;background:var(--sunk);opacity:.6}
-.guide-tier-choice.is-on{opacity:1;border-color:#8a6a2e}
-.guide-tier-toggle{display:flex;align-items:center;gap:9px;cursor:pointer}
-.guide-tier-toggle input{width:16px;height:16px;accent-color:var(--orange)}
-.guide-tier-toggle b{font:18px var(--rs);color:#e4cd98}
-.guide-tier-toggle small{margin-left:auto;font-size:10px;color:var(--muted)}
-.guide-tier-choice textarea{width:100%;resize:vertical;font-size:12px;line-height:1.5}
 /* Requirement search. */
 .guide-req-search input{width:100%}
 .guide-req-filters{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
@@ -280,42 +241,42 @@
 .guide-req-icon-results button[aria-pressed=true]{border-color:var(--orange)}
 .guide-req-icon-results img{width:28px;height:28px;object-fit:contain;image-rendering:pixelated}
 .guide-req-custom>.btn{justify-self:start}
-@media(max-width:650px){.guide-tier-picker{grid-template-columns:1fr}.guide-req-groups .adventure-requirement-list{grid-template-columns:1fr}}
 /* Live costs. */
-.guide-tier-cost{display:flex;align-items:center;justify-content:center;gap:5px;font-size:13px}
-.guide-tier-cost img{width:18px;height:18px;object-fit:contain;image-rendering:pixelated}
-.guide-tier-cost b{color:var(--gold)}
-.guide-tier-cost small{color:var(--muted);font-size:11px}
-.guide-costs{display:grid;gap:8px}
-.guide-costs table{width:100%;border-collapse:collapse;font-size:13px}
-.guide-costs th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:0 10px 8px;border-bottom:1px solid var(--line-2)}
-.guide-costs td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
-.guide-costs th:last-child,.guide-costs td:last-child{text-align:right;white-space:nowrap}
-.guide-costs td:last-child b{color:var(--gold)}
-.guide-cost-parts{display:flex;flex-wrap:wrap;gap:4px 12px}
-.guide-cost-parts>span{display:inline-flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums}
-.guide-cost-parts img{width:22px;height:22px;object-fit:contain;image-rendering:pixelated}
+/* Each row is one line: what it is for, the parts in columns that line up from row to row, and the cost in gold at the right.
+   A narrow table (beside an inventory, or on a phone) puts the name on its own line above the parts and cost. */
+.guide-costs{display:grid;gap:10px;container-type:inline-size;min-width:0}
+.guide-costs-head{display:flex;align-items:center;min-height:18px}
+.guide-costs-head .kicker{white-space:nowrap}
+.guide-costs table{display:grid;grid-template-columns:max-content repeat(var(--parts),max-content) minmax(max-content,1fr);font-size:13px;border-collapse:collapse}
+.guide-costs tbody,.guide-costs tr{display:contents}
+.guide-costs td{display:flex;align-items:center;min-height:44px;padding:0 14px 0 0;border-top:1px solid #ffffff0d;white-space:nowrap}
+.guide-costs tr:first-child td{border-top:0}
+.guide-costs td.guide-cost-item{padding-right:20px;font-weight:600}
+.guide-cost-part>span{display:inline-flex;align-items:center;gap:5px;color:var(--text);font-variant-numeric:tabular-nums}
+.guide-cost-part img{width:22px;height:22px;object-fit:contain;image-rendering:pixelated;flex:none}
+.guide-cost-label{display:inline-flex;align-items:center;gap:8px}
+.guide-costs td.guide-cost-total{justify-content:flex-end;gap:4px;padding-right:4px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.guide-cost-total b{font-size:14px;font-weight:700;color:var(--gold)}
 .guide-costs .fine{margin:0}
+@container (max-width:460px){
+ .guide-costs table{grid-template-columns:repeat(var(--parts),max-content) minmax(max-content,1fr)}
+ .guide-costs td{min-height:0;padding:0 12px 12px 0;border-top:0}
+ .guide-costs td.guide-cost-item{grid-column:1/-1;contain:inline-size;padding:12px 0 8px;border-top:1px solid #ffffff0d}
+ .guide-costs tr:first-child td.guide-cost-item{padding-top:2px;border-top:0}
+}
 .guide-cost-editor{display:grid;gap:10px}
 .guide-cost-title{display:grid;gap:6px;font-size:12px;color:var(--muted);max-width:320px}
 .guide-cost-row{display:grid;gap:8px;padding:10px;border:1px solid var(--line-2);border-radius:6px;background:var(--sunk)}
+.guide-cost-add{display:flex;gap:6px;flex-wrap:wrap}
+.guide-cost-add .btn[aria-pressed=true]{border-color:var(--gold)}
 .guide-cost-row-head{display:flex;align-items:center;gap:8px}
 .guide-cost-row-head img,.guide-cost-parts-edit img{width:26px;height:26px;object-fit:contain;image-rendering:pixelated}
 .guide-cost-row-head .link{margin-left:auto;font-size:12px}
 .guide-cost-parts-edit{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .guide-cost-parts-edit>label{display:flex;align-items:center;gap:4px}
 .guide-cost-parts-edit input{width:70px;height:32px;padding:4px 6px}
-@media(max-width:650px){.guide-costs td,.guide-costs th{padding:8px 6px}.guide-costs table{font-size:12px}}
-/* The trip inventory as one more card in the tiers row, scaled to the height of the worn-equipment grids. */
-.guide-tier-bag .guide-bag{padding:8px}
-.guide-tier-bag .guide-inventory{grid-template-columns:repeat(4,32px);grid-template-rows:repeat(7,30px);gap:3px}
-.guide-tier-bag .guide-slot img{width:24px;height:24px}
-.guide-tier-bag .guide-empty-dot{font-size:10px}
-@media(max-width:700px){.guide-tier-bag .guide-inventory{grid-template-columns:repeat(4,28px);grid-template-rows:repeat(7,25px);gap:2px}.guide-tier-bag .guide-bag{padding:6px}.guide-tier-bag .guide-slot img{width:20px;height:20px}}
-/* Requirement chips: one size whatever the icon or text length. */
-.guide-req-groups .adventure-requirement-list{grid-auto-rows:1fr}
-.guide-req-groups .adventure-requirement-list li{min-height:46px}
-.guide-req-groups .adventure-requirement-list li>img,.guide-requirement>img{width:24px;height:24px;object-fit:contain}
+/* Requirement chips: one size whatever the icon or text length (sizes in adventure-requirements.css). */
+.guide-requirement>img{width:24px;height:24px;object-fit:contain}
 .guide-req-plain-icons{display:flex;gap:4px}
 .guide-req-plain-icons button{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line);border-radius:4px;background:var(--sunk)}
 .guide-req-plain-icons button[aria-checked=true]{border-color:var(--orange)}
@@ -330,9 +291,11 @@
 .guide-odds-results img{width:24px;height:24px;object-fit:contain}
 .guide-odds-results small{color:var(--muted);font-size:11px}
 .guide-odds-results>p{grid-column:1/-1;margin:0}
-.drops-source{margin:0 0 8px}
+/* A guide's drop table is one box: the table, then its source line as a footer. */
+.guide-drops .drops{gap:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--sunk);overflow:hidden}
+.guide-drops .drops-scroll{border:0;border-radius:0;background:none}
+.drops-source{margin:0;padding:8px 12px;border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:650px){.guide-odds-picker .guide-insert-fields{grid-template-columns:1fr}}
-.guide-tier-bag-field{grid-template-columns:minmax(0,280px);margin-bottom:12px}
 .guide-odds-picker .guide-insert-fields label.search{display:flex;align-items:center;gap:8px;color:var(--text)}
 .guide-odds-picker .guide-insert-fields label.search input{padding:9px 0;border:0;background:none}
 /* Drop table search for the drop table and odds chart editors. */
@@ -353,27 +316,7 @@
 .drop-edit-rate{display:inline-flex;align-items:center;gap:3px;font-weight:600}
 .drop-edit-rate input{width:66px;height:28px;min-height:0;padding:3px 6px;font-size:12px}
 .droptable tr.is-editing td.rar{overflow:visible;text-overflow:clip;white-space:nowrap}
-/* Workshop tiles: topic icon, title with its boss underneath, then state and last edit on one footer line. */
-.guide-tile:not(.guide-tile-new){gap:10px}
-.guide-tile>img{width:44px;height:44px}
-.guide-tile-text{display:grid;gap:3px;min-width:0}
-.guide-tile-text>b{font-size:14.5px;font-weight:650;line-height:1.35;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.guide-tile-text>small{font-size:11.5px;color:var(--muted)}
-.guide-tile-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
-.guide-tile-meta small{white-space:nowrap}
-/* Item requirements: the amount sits on the same line, at the right. */
-.guide-req-groups .adventure-requirement-list li>span.guide-req-item{display:flex;align-items:center;gap:8px;flex:1}
-.guide-req-groups .adventure-requirement-list li>span.guide-req-item>small.guide-req-qty{display:inline;margin:0 0 0 auto;font-size:12px;color:var(--muted);white-space:nowrap}
-/* Requirement tiles size to their text, so a long requirement stays on one line instead of wrapping inside a fixed column. */
-.guide-req-groups .adventure-requirement-list{display:flex;flex-wrap:wrap;gap:6px}
-.guide-req-groups .adventure-requirement-list li{flex:0 1 auto;min-width:260px;max-width:100%}
-.guide-req-groups .adventure-requirement-list li>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media(max-width:650px){.guide-req-groups .adventure-requirement-list li{flex:1 1 100%;min-width:0}.guide-req-groups .adventure-requirement-list li>span{white-space:normal}}
-/* Workshop: a search above the tiles; titles stay on one line and the topic reads at a normal size. */
-.guide-workshop-search{margin-bottom:12px}
-.guide-tile-text{display:grid;gap:3px;min-width:0;width:100%}
-.guide-tile-text>b{font-size:14.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.guide-tile-text>small{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Workshop: a search above the guide tiles. */
 /* New guide: the layout to start from. */
 .guide-layouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .guide-layouts button{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--sunk);color:var(--text);text-align:left;min-width:0}
@@ -391,13 +334,6 @@
 .guide-block-edit{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 12px;border:1px dashed #8a6a2e;border-radius:6px;background:#e8b34a0a;color:var(--gold);font-size:12.5px;font-weight:600}
 .guide-block-edit:hover{border-style:solid;background:#e8b34a14}
 /* Gear tiers dialog: rename a tier, edit its gear or inventory, or add one. */
-.guide-tier-toggle{display:flex;align-items:center;gap:8px}
-.guide-tier-name{flex:1;min-width:0;font-weight:600}
-.guide-tier-actions{display:flex;gap:6px;flex-wrap:wrap}
-.guide-tier-add{display:grid;place-items:center;align-content:center;gap:6px;min-height:150px;border:1px dashed var(--line-3);border-radius:8px;background:none;color:var(--gold);font-weight:600}
-.guide-tier-add:hover{border-color:var(--gold);background:#e8b34a0a}
-.guide-tier-bag-field{display:flex;align-items:flex-end;gap:10px}
-.guide-tier-editor{display:grid;gap:12px}
 /* Prayers and spells: a row of icons with names, each opening the Wiki. */
 .guide-casts h3{margin:0 0 10px}
 .guide-casts ul{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
@@ -464,3 +400,176 @@
 .guide-mention span{display:grid}
 .guide-mention small{font-size:10.5px;color:var(--muted);text-transform:capitalize}
 .guide-mention .fine{margin:4px 6px}
+
+/* Two columns: two sections side by side, in the split the author chose. Phones stack them. */
+.guide-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.guide-columns.split-2-1{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.guide-columns.split-1-2{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+.guide-document-published>.guide-columns{margin:22px 0}
+.guide-document-published>.guide-columns>section,.guide-document-published>.guide-columns>.guide-column-stack{margin:0;min-width:0}
+/* A step's heading at the top of its text column (GuideDocumentBlocks), level with the map's title beside it. */
+.guide-column-stack{display:grid;gap:4px}
+.guide-column-stack>section{margin:0;min-width:0}
+.guide-column-stack>section[id]{scroll-margin-top:90px}
+/* Both sides start on one line: no leading margin on a column's first block or its first paragraph or heading, so the first
+   line of text sits level with a map's title or the top of a card beside it. */
+.guide-document-published>.guide-columns>*>:first-child,.guide-document-published>.guide-columns>*>:first-child>:first-child,.guide-document-published>.guide-columns>*>:first-child>:first-child>:first-child{margin-top:0}
+.guide-columns .gm-canvas{height:340px;min-height:0}
+.guide-columns .guide-odds{padding:14px 16px}
+.guide-columns .guide-odds-stats{flex-wrap:wrap;row-gap:10px}
+.guide-columns .guide-odds svg text{font-size:17px}
+.guide-columns .guide-image img{max-width:100%}
+.guide-columns .guide-drops .drops-scroll{max-height:460px}
+/* A drop table beside another card (often the pet's odds): both start and end on the same lines, and the shorter one stretches. */
+.guide-document-published>.guide-columns:has(>section>.guide-drops){align-items:stretch}
+.guide-document-published>.guide-columns:has(>section>.guide-drops)>section{display:flex;flex-direction:column}
+.guide-document-published>.guide-columns:has(>section>.guide-drops)>section>:only-child{flex:1 1 auto}
+.guide-columns .guide-drops{display:flex;flex-direction:column}
+.guide-columns .guide-drops .drops{flex:1 1 auto;display:flex;flex-direction:column}
+.guide-columns .guide-drops .drops-scroll{flex:1 1 auto}
+.guide-columns .guide-drops .drops-source{margin-top:auto}
+.guide-columns .guide-drops .droptable td,.guide-columns .guide-drops .droptable th{padding-left:8px;padding-right:8px}
+/* In the editor each side is a drop zone with its own small toolbar. */
+.guide-columns.is-editing{gap:12px}
+.guide-column{position:relative;min-width:0;padding:8px 10px 10px;border:1px dashed #4a4434;border-radius:8px}
+.guide-column.is-active{border-style:solid;border-color:#7a6438}
+.guide-column-bar{display:flex;align-items:center;gap:1px;margin:0 -4px 6px 0}
+.guide-column-bar small{flex:1;min-width:0;font-size:10.5px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.guide-column-bar button{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:6px;color:#d6c9a6}
+.guide-column-bar button:hover:not(:disabled){background:#ffffff12;color:#fff}
+.guide-column-bar button.is-danger:hover:not(:disabled){background:#ee6c5526;color:#ffb4a3}
+.guide-column-bar button:disabled{opacity:.35}
+.guide-column-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:150px;padding:10px 0;text-align:center}
+.guide-column-empty>small{font-size:10.5px;font-weight:600;color:var(--muted)}
+.guide-column-empty .btn{display:inline-flex;align-items:center;gap:6px}
+.guide-column-move{display:flex;flex-direction:column;align-items:center;gap:4px}
+.guide-column-move .btn{white-space:nowrap}
+.guide-column-menu{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);z-index:20;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;width:340px;max-width:calc(100vw - 32px);padding:6px;background:#2a2720;border:1px solid var(--line-2);border-radius:10px;box-shadow:0 18px 44px #000b}
+.guide-column-menu>button{display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 8px;border-radius:7px;text-align:left;font-size:12.5px;color:var(--text);white-space:nowrap}
+.guide-column-menu>button>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.guide-column-menu>button:hover,.guide-column-menu>button:focus-visible{background:#ffffff0f;outline:none}
+.guide-column-menu>button:focus-visible{box-shadow:inset 0 0 0 1px var(--gold)}
+.guide-column-menu>button>img,.guide-column-menu>button>svg{flex:none;width:20px;height:20px;object-fit:contain;color:#d6c9a6}
+.guide-column-menu>button>img.slot-silhouette{opacity:.8}
+/* Split choice in the section toolbar: two bars drawn at the chosen widths. */
+.guide-split{display:inline-flex;gap:1px;margin:0 2px;padding:0 2px;border-left:1px solid var(--line-2);border-right:1px solid var(--line-2)}
+.guide-block-actions .guide-split button{width:30px}
+.guide-split i{display:flex;gap:2px;width:18px;height:12px}
+.guide-split i b{flex:1;border-radius:2px;background:currentColor;opacity:.55}
+.guide-split i.split-2-1 b:first-child,.guide-split i.split-1-2 b:last-child{flex:2}
+.guide-split button[aria-checked=true]{color:var(--gold);background:#ffc34814}
+.guide-split button[aria-checked=true] i b{opacity:1}
+@media(max-width:760px){
+ .guide-columns,.guide-columns.split-2-1,.guide-columns.split-1-2{grid-template-columns:minmax(0,1fr)}
+ .guide-columns .gm-canvas{height:72vw}
+}
+
+/* Recommended skills and items: the same tiles as requirements. */
+.guide-requirement.is-recommended{border-style:dashed}
+.guide-req-mode{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.guide-req-groups>*{min-width:0}
+/* Half width drop tables drop the odds bar column and keep item names on one line. */
+.guide-columns .droptable col.c-ic{width:38px}
+.guide-columns .droptable col.c-qty{width:4.6rem}
+.guide-columns .droptable col.c-rar{width:5.6rem}
+.guide-columns .droptable col.c-odds{width:0}
+.guide-columns .droptable .barcol{display:none}
+.guide-columns .droptable .ic{width:38px}
+.guide-columns .droptable .ic img{max-width:26px;max-height:26px}
+.guide-columns .droptable{font-size:13px}
+.guide-columns .droptable .nm{white-space:nowrap}
+.guide-columns .droptable .nm>.link{display:inline;white-space:nowrap}
+.guide-columns .droptable .nm>.link{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+/* Gear and inventory panels (GuideParts GuideKit). The worn-equipment grid fills the same box as the 28-slot inventory, so the
+   two panels are one size wherever they sit: alone, side by side or in two columns. Tabs at the top switch setups. */
+.guide-kit{container-type:inline-size;display:grid;gap:10px;min-width:0}
+.guide-kit-pair{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.guide-kit-panel{--slot:46px;--gap:4px;--grid-w:calc(4*var(--slot) + 3*var(--gap));--grid-h:calc(7*var(--slot) + 6*var(--gap));flex:1 1 0;min-width:calc(var(--grid-w) + 56px);max-width:100%;display:flex;flex-direction:column;gap:6px;padding:14px 16px 16px;background:#1b1a15;border:1px solid #37332a;border-radius:8px}
+/* Narrow pairs shrink the slots a little before the panels stack. */
+@container (min-width:440px) and (max-width:491px){.guide-kit-panel{--slot:36px}}
+/* A panel on its own across the full page width keeps the width it has in a pair. */
+@container (min-width:700px){.guide-kit-panel:only-child{flex:0 1 calc(50% - 6px)}}
+/* The grid sits centred in its panel. */
+.guide-kit-box{justify-content:center}
+.guide-kit-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:18px}
+.guide-kit-head .kicker{white-space:nowrap}
+.guide-kit .guide-kit-name{font:20px var(--rs);color:#e4cd98;margin:0;line-height:36px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs.guide-kit-tabs{padding:0 4px;margin:0 -16px;gap:0;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+/* In a panel the tabs sit under the grid, past a divider: small pills centred on one line, the open one highlighted in
+   gold. Up to five fit (four or five take a step smaller padding, and a name that still cannot fit ends in an ellipsis;
+   its full name is the tab's title). Six or more keep their names whole and the row scrolls. */
+.guide-kit-panel .tabs.guide-kit-tabs{margin:12px -16px 0;padding:12px 12px 0;gap:6px;justify-content:safe center;border-bottom:0;border-top:1px solid var(--line)}
+.guide-kit-panel .guide-kit-tabs button{flex:0 1 auto;min-width:max-content;min-height:32px;margin:0;padding:6px 14px;font-size:13px;border:1px solid transparent;border-radius:999px;text-align:center}
+.guide-kit-panel .guide-kit-tabs button:hover{background:#ffffff0a}
+.guide-kit-panel .guide-kit-tabs button[aria-selected=true]{color:var(--gold);background:color-mix(in srgb,var(--gold) 14%,transparent);border-color:color-mix(in srgb,var(--gold) 45%,transparent)}
+.guide-kit-panel .guide-kit-tabs.is-fitted button{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.guide-kit-panel .guide-kit-tabs.is-fitted:is(.has-4,.has-5) button{padding:6px 10px;font-size:12.5px}
+.guide-kit-panel .guide-kit-tabs.is-fitted.has-5 button{padding:6px 8px}
+.guide-kit-tabs::-webkit-scrollbar{display:none}
+.guide-kit-tabs button{flex:none;min-height:36px;padding:7px 12px;font-size:13px;white-space:nowrap}
+.guide-kit-tabs button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:4px}
+.guide-kit-box{display:flex;margin-top:8px}
+.guide-kit .guide-worn,.guide-kit .guide-bag{width:calc(var(--grid-w) + 22px);height:calc(var(--grid-h) + 22px);padding:10px;border:1px solid #544937;border-radius:6px;background:radial-gradient(ellipse at center,#4a402e,#282219);box-shadow:inset 0 0 20px #0005}
+/* Worn slots are square and a little larger than inventory slots, centred in a box the same size as the inventory's. */
+.guide-kit .guide-worn{--wslot:calc(var(--slot)*1.13);grid-template-columns:repeat(3,var(--wslot));grid-template-rows:repeat(5,var(--wslot));gap:calc(var(--slot)*.35);place-content:center}
+.guide-kit .guide-inventory{grid-template-columns:repeat(4,var(--slot));grid-template-rows:repeat(7,var(--slot));gap:var(--gap)}
+.guide-kit .guide-worn .guide-slot{padding:0}
+.guide-kit .guide-slot small{display:none}
+.guide-kit .guide-worn .guide-slot img{width:calc(var(--wslot)*.74);height:calc(var(--wslot)*.74)}
+.guide-kit .guide-inventory .guide-slot img{width:calc(var(--slot)*.74);height:calc(var(--slot)*.74)}
+.guide-kit-value{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap;cursor:help}
+.guide-kit-value img{width:16px;height:16px;object-fit:contain;image-rendering:pixelated}
+.guide-kit-value small{color:var(--muted);font-weight:500}
+.guide-kit-tip{display:grid;gap:3px;max-width:220px}
+.guide-kit-tip small{color:var(--muted);font-size:11px;line-height:1.4}
+.guide-kit-note{margin:2px 0 0;font-size:13px;line-height:1.6;color:#c6bca5;max-width:760px}
+@media(max-width:700px){.guide-kit-tabs button{min-height:44px}.guide-kit-panel .guide-kit-tabs button{min-height:38px}.guide-kit-panel .tabs.guide-kit-tabs{margin:12px -14px 0}.guide-kit .guide-kit-name{line-height:40px}.guide-kit-panel{padding:12px 14px 14px}.tabs.guide-kit-tabs{margin:0 -14px;padding:0 2px}}
+/* Editor: a section's tabs (add, rename, reorder, delete) above the open tab's slots. */
+.guide-kit-editor{display:grid;gap:14px}
+.guide-kit-editor-tabs{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+.guide-kit-editor-tabs .tabs.guide-kit-tabs{margin:0;padding:0}
+.guide-kit-editor-tabs .guide-kit-tabs{border-bottom:0;flex:0 1 auto;min-width:0}
+.guide-kit-editor-tabs .guide-menu{flex:none;margin-left:auto}
+.guide-kit-add-menu{grid-template-columns:1fr;width:270px;left:auto;right:0;transform:none}
+.guide-kit-add-menu>button>span>small{display:block;font-size:10.5px;color:var(--muted)}
+.guide-column-menu>button:disabled{opacity:.45;cursor:not-allowed}
+.guide-kit-editor-bar{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.guide-kit-editor-bar label{display:grid;gap:6px;font-size:12px;color:var(--muted);flex:1 1 220px;max-width:340px}
+.guide-kit-editor-bar input{width:100%;padding:9px}
+.guide-kit-editor-actions{display:flex;gap:6px}
+.guide-kit-editor-actions .btn{min-height:38px}
+.guide-kit-editor-actions .btn.is-danger:hover:not(:disabled){color:#ffb4a3;border-color:#ee6c55}
+.guide-insert-loadout.kit-loadouts{grid-template-columns:auto minmax(0,1fr)}
+.guide-kit-editor-grids{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.guide-kit-editor-note{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.guide-kit-editor-note textarea{width:100%;resize:vertical;font-size:13px;line-height:1.5}
+@media(max-width:900px){.guide-insert-loadout.kit-loadouts{grid-template-columns:1fr}.guide-kit-editor-grids{justify-content:center}}
+@media(max-width:700px){.guide-kit-editor-actions .btn{min-height:40px}.guide-kit-editor-bar label{max-width:none}}
+/* Punctuation after a chip ("Planks, 90 Steel nails"): a small gap from the chip's underline, in the text's own colour. */
+.guide-ref-punct{margin-left:2px;color:inherit;font-weight:600}
+.guide-ref-wrap{white-space:nowrap}
+/* Drop tables in guides: collection log drops at 1/50 or rarer (pet and uniques) carry a thin gold edge and gold names; an item hovered or
+ * focused in the guide's text lights its row brighter. */
+.guide-drops .droptable tr.is-notable td:first-child{box-shadow:inset 2px 0 0 color-mix(in srgb,var(--gold) 70%,transparent)}
+.guide-drops .droptable tr.is-notable td.nm .link{color:var(--gold)}
+.guide-drops .droptable tr.is-notable td{background:color-mix(in srgb,var(--gold) 5%,transparent)}
+.guide-drops .droptable tr td{transition:background-color .18s ease,box-shadow .18s ease}
+.guide-drops .droptable tr.is-lit td{background:color-mix(in srgb,var(--gold) 18%,transparent)}
+.guide-drops .droptable tr.is-lit td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+.guide-drops .droptable tr.is-lit td.nm .link{color:#ffd98f}
+@media(prefers-reduced-motion:reduce){.guide-drops .droptable tr td{transition:none}}
+/* Inventory stacks: the stack size in the slot's top-left in the game's font and colours, and noted items on a bank note
+   with the item drawn smaller over it, as the game does. */
+.guide-inventory .guide-slot{position:relative}
+.guide-slot .guide-stack{position:absolute;left:2px;top:1px;font:12px/1 var(--rs);color:#ff0;text-shadow:1px 1px 0 #000;pointer-events:none;font-variant-numeric:normal}
+/* .guide-kit .guide-slot small hides worn slot names; stack sizes stay. */
+.guide-kit .guide-slot .guide-stack{display:block;font-size:13px}
+.guide-slot .guide-stack.is-k{color:#fff}.guide-slot .guide-stack.is-m{color:#0f8}
+.guide-note{position:relative;display:block;flex:none;width:32px;height:32px}
+.guide-kit .guide-inventory .guide-note{width:calc(var(--slot)*.74);height:calc(var(--slot)*.74)}
+.guide-inventory .guide-slot .guide-note img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+.guide-inventory .guide-slot .guide-note img+img{transform:scale(.62);transform-origin:46% 48%}
+.guide-stack-fields{display:flex;align-items:flex-end;gap:12px;margin:10px 0 2px}
+.guide-stack-fields label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+.guide-stack-fields input[type=number]{width:140px}
+.guide-stack-fields .guide-stack-noted{flex-direction:row;align-items:center;gap:7px;min-height:36px;color:inherit;font-size:13px;white-space:nowrap}

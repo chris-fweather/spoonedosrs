@@ -1,5 +1,6 @@
 import type {Journal,Pet,Method} from './model';
 import {validCollectionDate} from './collection-history';
+import {validMilestones} from './skill-milestones';
 export type Visibility = 'public' | 'private';
 export function journalForViewer(j:Journal, visibility:Visibility, owner:boolean,details:ProfileDetails=DEFAULT_DETAILS):Journal {
   if (owner) return {...j,visibility,restricted:false};
@@ -12,8 +13,8 @@ export function journalForViewer(j:Journal, visibility:Visibility, owner:boolean
   j=publicProgress(j);
   // A public collection does not publish personal notes, planning preferences or time logs.
   const profile=j.profile?{...j.profile,quests:details.quests?j.profile.quests:[],diaries:details.diaries?j.profile.diaries:[],combat:details.combat?j.profile.combat:[]}:undefined;
-  return {...j,visibility,restricted:false,details,profile,log:details.log?j.log:null,collectionDates:details.log?j.collectionDates:undefined,
-   hiscores:{skills:details.skills?j.hiscores.skills:[],activities:details.petRecords?j.hiscores.activities:[]},
+  return {...j,visibility,restricted:false,details,profile,log:details.log?j.log:null,collectionDates:details.log?j.collectionDates:undefined,unconfirmedDates:details.log?j.unconfirmedDates:undefined,
+   hiscores:{skills:details.skills?j.hiscores.skills:[],activities:details.petRecords?j.hiscores.activities:[]},skillMilestones:details.skills?j.skillMilestones:undefined,
    pets:details.pets?j.pets.map(p=>({...p,notes:'',priority:false,recordedHours:null,historicalXph:null,plannedMethod:undefined,...(!details.petRecords?{huntHistory:undefined,obtainedStartCount:null,obtainedCount:null,obtainedMethod:'',date:'',crateRolls:null,methods:p.methods.map(m=>({...m,kc:null}))}:{})})):[]};
 }
 export function validVisibility(value:unknown): value is Visibility {return value==='public'||value==='private';}
@@ -30,14 +31,14 @@ export function parseDetails(value:unknown):ProfileDetails {
 
 function publicMethod(m:Method):Method {
  return {name:m.name,kc:m.kc,rate:m.rate,kph:m.kph,activity:m.activity,unit:m.unit,source:m.source,
-  farmingRunsPerDay:m.farmingRunsPerDay,observedAverageXp:m.observedAverageXp,
+  farmingRun:m.farmingRun?.map(({crop,count})=>({crop,count})),farmingRunsPerDay:m.farmingRunsPerDay,observedAverageXp:m.observedAverageXp,
   rateOverride:m.rateOverride,rateConfirmed:m.rateConfirmed,paceConfirmed:m.paceConfirmed};
 }
 function publicPet(p:Pet):Pet {
  return {id:p.id,name:p.name,category:p.category,obtained:p.obtained,date:p.date,
   source:p.source,sourceRow:p.sourceRow,referenceHours:p.referenceHours,
   obtainedCount:p.obtainedCount,obtainedUnit:p.obtainedUnit,obtainedMethod:p.obtainedMethod,
-  obtainedApproximate:p.obtainedApproximate,obtainedStartCount:p.obtainedStartCount,crateRolls:p.crateRolls,
+  obtainedApproximate:p.obtainedApproximate,obtainedStartCount:p.obtainedStartCount,crateRolls:p.crateRolls,unconfirmed:p.unconfirmed,
   methods:p.methods.map(publicMethod),
   huntHistory:p.huntHistory?.map(({method,unit,count,pace,rate})=>({method,unit,count,pace,rate})),
   notes:'',priority:false,recordedHours:null,historicalXph:null};
@@ -48,6 +49,8 @@ function publicProgress(j:Journal):Journal {
   hiscores:{skills:j.hiscores.skills.map(({name,level,xp,rank})=>({name,level,xp,rank})),
    activities:j.hiscores.activities.map(({name,score,rank})=>({name,score,rank}))},
   collectionDates:j.collectionDates?Object.fromEntries(Object.entries(j.collectionDates).filter(([id,date])=>/^\d+$/.test(id)&&validCollectionDate(date))):undefined,
+  unconfirmedDates:j.unconfirmedDates?.filter(id=>/^\d+$/.test(id)&&!!j.collectionDates?.[id]),
+  skillMilestones:validMilestones(j.skillMilestones)?{...j.skillMilestones}:undefined,
   log:j.log?{obtained:j.log.obtained,total:j.log.total,tabs:j.log.tabs.map(t=>({name:t.name,pages:t.pages.map(p=>({
    name:p.name,obtained:p.obtained,total:p.total,items:p.items.map(({id,name,quantity})=>({id,name,quantity}))
   }))}))}:null,

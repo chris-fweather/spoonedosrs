@@ -1,5 +1,8 @@
-import {acquisitionEffort,receivedMethod} from './hunt-history';
+import {acquisitionEffort,migrateHuntHistory,receivedMethod} from './hunt-history';
 import {atLevel, wikiMethod} from './skill-rates';
+import {FARMING_RUNS,LEGACY_MIXED_RUN,TREE_RUNS,defaultFarmingRun,isTreeRun,presetTreeRunRate,refreshFarmingRun,refreshTreeRun,treeRunsMethod} from './farming-runs';
+import {lapUpgrade} from './agility-laps';
+import {upgradeTreeMethods} from './tangleroot-trees';
 import type {Journal,Method,Pet} from './model';
 import original from './catalogue.json' with {type: 'json'};
 import audited from './audited-rates.json' with {type: 'json'};
@@ -132,7 +135,8 @@ export function countedMethods(p:Pet):Method[]{
  });
 }
 export function effortTime(p:Pet,_j?:Journal):number|null{
- if(p.obtained||p.huntHistory?.length||p.recordedHours!=null)return acquisitionEffort(p).hours;
+ // Hours already spent, when entered, are the time spent; otherwise count ÷ pace.
+ if(p.obtained||p.recordedHours!=null)return acquisitionEffort(p).hours;
  // Lifetime skill XP includes lamps, quests and unrelated methods. Never treat it as hunt time.
  const counted=countedMethods(p);
  if(!counted.length||counted.some(m=>!m.kph))return null;
@@ -140,14 +144,69 @@ export function effortTime(p:Pet,_j?:Journal):number|null{
 }
 export function totalEffort(j:Journal){return j.pets.reduce((hours,p)=>hours+(effortTime(p,j)??0),0);}
 
+/** Tangleroot's default is one standard tree run (6 magic + 6 palm) counted in Farming XP, named Tree runs.
+ * - The old XP preset ("Farming runs", later "Tree runs: 6 magic + 6 palm (XP)") is that run: it is renamed with its
+ *   acquisition record and hunt history, and an unedited preset rate follows the level again.
+ * - The briefly default "Farming runs" counted in runs is dropped while untouched; anything a player used stays.
+ * - Tree runs is added once and becomes the selected method over an untouched catalogue or dropped method. */
+function upgradeFarming(p:Pet,level:number|undefined){
+ const key=(s?:string|null)=>s?.trim().toLowerCase()??'';
+ const has=(name:string)=>p.methods.some(m=>key(m.name)===key(name));
+ const used=(m:Method)=>key(p.obtainedMethod)===key(m.name)||!!p.huntHistory?.some(s=>key(s.method)===key(m.name));
+ const legacy=p.methods.find(m=>isTreeRun(m)&&[FARMING_RUNS,LEGACY_MIXED_RUN].map(key).includes(key(m.name)));
+ if(legacy&&!has(TREE_RUNS)){
+  const old=key(legacy.name);
+  legacy.name=TREE_RUNS;
+  if(legacy.rateOverride&&presetTreeRunRate(legacy.rate)){legacy.rateOverride=false;legacy.rateConfirmed=true;}
+  if(key(p.obtainedMethod)===old)p.obtainedMethod=TREE_RUNS;
+  if(p.huntHistory)p.huntHistory=p.huntHistory.map(s=>key(s.method)===old&&s.unit==='XP'?{...s,method:TREE_RUNS}:s);
+ }
+ let planned=p.plannedMethod??0,reselect=false;
+ const runs=p.methods.findIndex(m=>m.unit==='runs'&&!!m.farmingRun&&key(m.name)===key(FARMING_RUNS));
+ if(runs>=0){
+  const m=p.methods[runs],trees=JSON.stringify(m.farmingRun);
+  const untouched=m.kc==null&&!m.rateOverride&&!m.paceConfirmed&&m.farmingRunsPerDay==null&&!used(m)&&Array.from({length:99},(_,i)=>JSON.stringify(defaultFarmingRun(i+1))).includes(trees);
+  if(untouched){
+   p.methods=p.methods.filter((_,i)=>i!==runs);
+   if(planned===runs)reselect=true;else if(planned>runs)planned--;
+   p.plannedMethod=Math.min(planned,Math.max(0,p.methods.length-1));
+  }
+ }
+ if(has(TREE_RUNS)||p.methods.length>=100)return;
+ const current=reselect?undefined:p.methods[p.plannedMethod??0];
+ p.methods=[...p.methods,treeRunsMethod(level)];
+ if(!current||(current.kc==null&&!current.rateOverride&&!current.paceConfirmed&&current.source.startsWith('Spreadsheet')))p.plannedMethod=p.methods.length-1;
+}
+function skillLevel(j:Journal,p:Pet){return j.hiscores.skills.find(s=>s.name===petSkill[p.name])?.level;}
+
 /** Keep all views on the current-level method denominator; never turn game KC into reward rolls. */
+/** Penance Queen comes from high-level gambles, not kills; a gamble costs Honour points from every role. */
+/** PetCord's planning pace for Tiny tempor: reward permits spent per hour. */
+export const TEMPOROSS_PERMITS_PER_HOUR=80;
+export const PENANCE_GAMBLES='High-level gambles', HONOUR_PER_GAMBLE=2000;
+const PENANCE_SOURCE='OSRS Wiki: 1/1,000 per high-level gamble; each costs 500 Honour points in each of the four roles (2,000 in all). Example pace 4 gambles/hour (PetCord sheet) = 8,000 points/hour; enter your own points per hour.';
 export function normalizeRates(j:Journal):Journal {
  for(const p of j.pets) {
+  if(p.name==='Tangleroot'){upgradeFarming(p,skillLevel(j,p));upgradeTreeMethods(p,skillLevel(j,p));}
+  if(p.name==='Giant Squirrel'){
+   const used=new Set([p.obtained?p.obtainedMethod:null,...(p.huntHistory??[]).map(s=>s.method)].filter(Boolean).map(s=>s!.trim().toLowerCase()));
+   p.methods=p.methods.map(m=>lapUpgrade(m,skillLevel(j,p)??99,used.has(m.name.trim().toLowerCase())));
+  }
+  p.methods=p.methods.map(m=>m.farmingRun?refreshFarmingRun(m,skillLevel(j,p)):p.name==='Tangleroot'&&m.name===TREE_RUNS?refreshTreeRun(m,skillLevel(j,p)):m);
   for(const m of p.methods) {
-   if(p.name==='Tangleroot'&&m.name==='Farming runs'&&m.unit==='XP'&&m.kph==null&&!m.paceConfirmed&&m.source.startsWith('Mixed tree-run estimate:')){m.kph=mixedFarmingMethod(99).kph;m.source+=' Example active pace: 6 magic and 6 palm trees in 15 minutes, excluding growth time; edit to your route.';}
+   if(p.name==='Tangleroot'&&m.unit==='XP'&&m.kph==null&&!m.paceConfirmed&&m.source.startsWith('Mixed tree-run estimate:')){m.kph=mixedFarmingMethod(99).kph;m.source+=' Example active pace: 6 magic and 6 palm trees in 15 minutes, excluding growth time; edit to your route.';}
    if(p.name==='Tiny tempor' && m.name==='Tempoross' && m.rate===8000 && (m.unit==='games'||m.activity==='Tempoross')) {
     m.unit='rolls'; m.kc=null; m.kph=null; m.activity=null;
     m.source='OSRS Wiki: 1/8,000 per reward-pool roll. Hiscores games do not count as reward rolls. https://oldschool.runescape.wiki/w/Tiny_tempor';
+   }
+   if(p.name==='Tiny tempor' && m.unit==='rolls' && m.kph==null && !m.paceConfirmed) {
+    m.kph=TEMPOROSS_PERMITS_PER_HOUR;
+    m.source+=` Example pace ${TEMPOROSS_PERMITS_PER_HOUR} permits/hour (PetCord sheet); enter your own permits per hour.`;
+   }
+   if(p.name==='Pet Penance Queen' && m.name==='Penance' && m.unit==='kills') {
+    m.name=PENANCE_GAMBLES; m.unit='gambles'; m.kc=null; m.activity=null; m.rate=1000; m.rateConfirmed=true;
+    if(!m.paceConfirmed) m.kph=4;
+    m.source=PENANCE_SOURCE;
    }
    if(p.name==='Phoenix' && m.unit==='rolls') {
     const xp=j.hiscores.skills.find(s=>s.name==='Firemaking')?.xp;
@@ -161,13 +220,15 @@ export function normalizeRates(j:Journal):Journal {
    const rate=m.unit==='XP'?calc.expectedXp:calc.actions;
    if(rate!=null && rate>0) {m.rate=rate;m.rateConfirmed=true;}
   }
+  // After the renames and rate refreshes above, so segments meet each method as it now stands.
+  migrateHuntHistory(p);
  }
  return j;
 }
 
 /** Acquisition is a separate observation, never copied into live KC or another unit. */
 export function usesAcquisition(p:Pet):boolean {
- const m=receivedMethod(p);return !!(p.obtained&&!p.huntHistory?.length&&p.obtainedCount!=null&&(p.obtainedStartCount??0)<=p.obtainedCount&&m?.rate&&(p.name==='Tiny tempor'&&p.obtainedUnit==='permits'?'rolls':p.obtainedUnit??(petSkill[p.name]?'XP':m.unit))===m.unit);
+ const m=receivedMethod(p);return !!(p.obtained&&p.obtainedCount!=null&&(p.obtainedStartCount??0)<=p.obtainedCount&&m?.rate&&(p.name==='Tiny tempor'&&p.obtainedUnit==='permits'?'rolls':p.obtainedUnit??(petSkill[p.name]?'XP':m.unit))===m.unit);
 }
 export function oddsMethod(p:Pet):Method|undefined {
  const received=receivedMethod(p),m=p.obtained?(received??selectedMethod(p)):selectedMethod(p);

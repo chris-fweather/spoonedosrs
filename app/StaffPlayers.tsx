@@ -20,7 +20,7 @@ export function StaffPlayers({players,total,owner,corrections,onSearch,onAccess,
  const [query,setQuery]=useState(''),[open,setOpen]=useState<string|null>(()=>typeof window==='undefined'?null:new URLSearchParams(window.location.search).get('player')),[fixing,setFixing]=useState<string|null>(null);
  const people=useContext(StaffPeople);
  return <div className="staff-players">
-  <section className="community-panel"><PanelHead icon="/icons/community/friends-list.png" title="Players" badge={total.toLocaleString()} text="Search a RuneScape name or a Discord username. Open a player for their profile, ownership and access."/>
+  <section className="community-panel"><PanelHead icon="/ui/friends-list.png" title="Players" badge={total.toLocaleString()} text="Search a RuneScape name or a Discord username. Open a player for their profile, ownership and access."/>
    <form className="staff-player-search" onSubmit={e=>{e.preventDefault();onSearch(query);}}><label className="search ws-search"><Search size={16} aria-hidden="true"/><input aria-label="Search players or Discord names" value={query} maxLength={80} onChange={e=>setQuery(e.target.value)} placeholder="RuneScape name or Discord username…"/></label><button className="btn">Search</button></form>
    {players.length?<ol className="ws-list player-list">{players.map(p=>{const person=people.find(x=>x.id===p.discordId),names=(JSON.parse(p.linked_names) as string[]).filter(n=>n!==p.name),isOpen=open===p.name;
     // The name as this profile shows it: the main account's scimitar, Sir and title, on this RuneScape name.
@@ -29,7 +29,7 @@ export function StaffPlayers({players,total,owner,corrections,onSearch,onAccess,
      <button type="button" className="ws-row-head player-row" aria-expanded={isOpen} onClick={()=>{setOpen(isOpen?null:p.name);setFixing(null);}}>
       {person?.avatarUrl?<img className="player-avatar" src={person.avatarUrl} alt=""/>:<span className="player-avatar">{p.name.charAt(0).toUpperCase()}</span>}
       <span className="ws-row-main"><span className="ws-row-title"><PersonName person={shown} fallback={p.name} role={p.role}/></span><span className="ws-row-meta"><span className="player-discord"><DiscordMark/>@{p.discordName}</span>{names.length>0&&<span>also {names.join(', ')}</span>}</span></span>
-      <span className="player-stats" aria-label="Progress"><span title="Pets"><img src="/brand/rocky-mascot.webp" alt=""/>{p.pets??'—'}</span><span title="Collection log slots"><img src="/icons/navigation/collection-log-icon.png" alt=""/>{p.log??'—'}</span><span title="Quest points"><img src="/icons/navigation/quest-point-icon.png" alt=""/>{p.quests??'—'}</span>{donated(p)&&<span className={'player-donation'+(p.donationShown?'':' is-hidden')} title={p.donationShown?'Donated':'Donated (hidden on their profile)'}><img src="/icons/community/sponsor-coin.png" alt=""/>{donated(p)}{!p.donationShown&&<EyeOff size={12} aria-label="Hidden"/>}</span>}</span>
+      <span className="player-stats" aria-label="Progress"><span title="Pets"><img src="/brand/rocky-mascot.webp" alt=""/>{p.pets??'—'}</span><span title="Collection log slots"><img src="/ui/collection-log-icon.png" alt=""/>{p.log??'—'}</span><span title="Quest points"><img src="/ui/quest-point-icon.png" alt=""/>{p.quests??'—'}</span>{donated(p)&&<span className={'player-donation'+(p.donationShown?'':' is-hidden')} title={p.donationShown?'Donated':'Donated (hidden on their profile)'}><img src="/icons/community/sponsor-coin.png" alt=""/>{donated(p)}{!p.donationShown&&<EyeOff size={12} aria-label="Hidden"/>}</span>}</span>
       <span className={'staff-visibility is-'+p.visibility}>{p.visibility==='private'?'Private':'Public'}</span>
       <ChevronDown className="ws-row-chevron" size={16} aria-hidden="true"/>
      </button>
@@ -45,7 +45,7 @@ export function StaffPlayers({players,total,owner,corrections,onSearch,onAccess,
       {fixing===p.name&&<div className="player-fix"><StaffProgress key={p.name} player={p.name}/></div>}
      </div>}
     </li>;})}</ol>
-   :<Empty icon="/icons/community/friends-list.png" title="No players match" text="Try a RuneScape name or a Discord username."/>}
+   :<Empty icon="/ui/friends-list.png" title="No players match" text="Try a RuneScape name or a Discord username."/>}
   </section>
  </div>;
 }

@@ -13,5 +13,6 @@
 .overview-pet-tip>strong{color:var(--gold);font-size:12px}
 .overview-pet-tip>small{color:var(--muted);font-size:10px}
 .overview-pet-tip>b{font-weight:500;font-size:11px}
-.overview-pet-record{display:grid;gap:5px;margin-top:5px;padding-top:7px;border-top:1px solid var(--line);line-height:1.5}
+.overview-pet-record{display:grid;gap:3px;margin-top:5px;padding-top:6px;border-top:1px solid var(--line);line-height:1.4}
+.overview-pet-record>*{text-wrap:balance}
 @media(prefers-reduced-motion:reduce){.ov .ov-pets .petlog-grid button img{transition:none}}

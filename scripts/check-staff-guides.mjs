@@ -39,9 +39,14 @@ try{
  await post({action:'save',id,revision:row.revision,guide:rich},h);
  row=(await dashboard(h)).guides.find(r=>r.id===id);assert.equal(row.guide.blocks[0].style,'numbered');assert.equal(row.guide.blocks[0].text,'Enter the arena\n{gold}Pray **melee**{/gold} :quests:');assert.equal(row.guide.setups[0].equipment.head,'26382');
  await post({action:'save',id,revision:row.revision,guide:{...rich,blocks:[{...rich.blocks[0],style:'ordered'}]}},h,400);
+ // Two columns and recommended skills round-trip; a column cannot hold more columns.
+ const columns={...rich,recommendedSkills:[{skill:'Attack',level:70}],blocks:[...rich.blocks,{id:'pair',kind:'columns',split:'2:1',columns:[{id:'drops',kind:'drops',page:'Kraken'},null]}]};
+ await post({action:'save',id,revision:row.revision,guide:{...columns,blocks:[{id:'pair',kind:'columns',split:'1:1',columns:[{id:'inner',kind:'columns',split:'1:1',columns:[null,null]},null]}]}},h,400);
+ await post({action:'save',id,revision:row.revision,guide:columns},h);
+ row=(await dashboard(h)).guides.find(r=>r.id===id);assert.deepEqual(row.guide.blocks.at(-1),{id:'pair',kind:'columns',split:'2:1',columns:[{id:'drops',kind:'drops',page:'Kraken'},null]});assert.deepEqual(row.guide.recommendedSkills,[{skill:'Attack',level:70}]);
  await post({action:'unpublish',id,revision:row.revision},m);
  assert.ok(!(await publicRows()).some(r=>r.id===id));
- console.log('PASS: anonymous/nonstaff/cross-origin writes blocked; helper draft hidden; moderator cannot edit another draft; helpers cannot publish; stale publication blocked; published snapshot survives draft edits; numbered lists, colours, emojis and catalogued items save; unpublish removes public guide.');
+ console.log('PASS: anonymous/nonstaff/cross-origin writes blocked; helper draft hidden; moderator cannot edit another draft; helpers cannot publish; stale publication blocked; published snapshot survives draft edits; numbered lists, colours, emojis, catalogued items, two columns and recommended skills save; unpublish removes public guide.');
 }finally{
  if(id){await sql('DELETE FROM community_guides WHERE id=?',[id]);await sql('DELETE FROM staff_audit WHERE target_id=?',[id]);}
  for(const user of [helper,moderator]){await sql('DELETE FROM staff_members WHERE discord_id=?',[user]);await sql('DELETE FROM users WHERE discord_id=?',[user]);}

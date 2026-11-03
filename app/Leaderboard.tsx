@@ -5,7 +5,7 @@ import {Check, ChevronDown, Search} from 'lucide-react';
 import './leaderboard-controls.css';
 import {Select} from 'radix-ui';
 import {BOARD_METRICS, BOARD_SKILLS, type BoardMetric} from '@/lib/community';
-import {CollectorList, CommunityChat, CommunityStatus, HeroTotals, PublicHeader, SupporterList, useCommunity} from './Community';
+import {BoardSkeleton, CollectorList, CommunityChat, CommunityStatus, HeroTotals, PublicHeader, SupporterList, useCommunity} from './Community';
 
 const CATEGORIES=[...BOARD_METRICS,{id:'supporters' as const,label:'Supporters',icon:'/icons/community/supporters-heart.png'}];
 const XP_OPTIONS=[{name:'Overall',icon:'/icons/navigation/stats-icon.png'},...BOARD_SKILLS];
@@ -39,7 +39,7 @@ export function Leaderboard() {
           </Select.Root>}</div>
         </div>
         <div className="board-column-head" aria-hidden="true"><span>#</span><span>Player</span><span>{supporters?'Amount':category==='xp'?'XP':'Total'}</span></div>
-        {!rows&&!error&&<ol className="collector-list board-loading" aria-label="Loading leaderboard" aria-busy="true">{Array.from({length:10},(_,i)=><li className="board-loading-row" key={i} aria-hidden="true"><span className="bl-rank"/><span className="bl-identity"><i className="bl-badge"/><span><i/><i/></span></span><span className="bl-score"><i/><i/></span></li>)}</ol>}
+        {!rows&&!error&&<BoardSkeleton count={10}/>}
         {rows&&(supporters?<SupporterList rows={rows} pageSize={10} serverPaging={serverPaging}/>:<CollectorList expandable rows={rows} metric={metric} skill={category==='xp'&&skill!=='Overall'?skill:undefined} pageSize={10} serverPaging={serverPaging}/>)}
       </section>
     </div><CommunityChat/>

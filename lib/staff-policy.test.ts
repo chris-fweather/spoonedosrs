@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mayGrant, mayManageProfile, evidenceUrl} from './staff-policy.ts';
+import {mayGrant, mayManageProfile, evidenceUrl, staffTitle} from './staff-policy.ts';
 import {rateCatalogue, applyTableRates, applyPetRates, type RateOverride} from './rate-catalogue.ts';
 import {achievementTitle, assertFlair, badgeCatalogue} from './flair.ts';
 import {initial} from './model.ts';
@@ -17,6 +17,14 @@ test('staff grants cannot escalate to owner, change self, or let admins manage a
   assert.equal(mayGrant({id:'a',role:'admin'},{id:'b',role:'helper'},'moderator'),true);
   assert.equal(mayGrant({id:'a',role:'helper'},{id:'b',role:null},'helper'),false);
   assert.equal(mayGrant({id:'a',role:'owner'},{id:'b',role:null},'admin'),true);
+});
+
+test('staff hover titles: trimmed plain text of 2-32 characters, empty clears', () => {
+  assert.equal(staffTitle('  Head   Admin '),'Head Admin');
+  assert.equal(staffTitle("Guides & Q'n-A 2"),"Guides & Q'n-A 2");
+  assert.equal(staffTitle(''),null);assert.equal(staffTitle('   '),null);assert.equal(staffTitle(null),null);
+  assert.equal(staffTitle('x'.repeat(32)),'x'.repeat(32));
+  for(const bad of ['A','x'.repeat(33),'<b>Admin</b>','Head Admin!','Admin\u200b','Ädmin','123',42,{}])assert.throws(()=>staffTitle(bad),String(bad));
 });
 
 test('profile staff controls: admins and the owner, never their own account, the owner or (for admins) another admin', () => {

@@ -41,7 +41,8 @@ export async function discoverPlayer(username:string, original:Journal, fetcher:
   const statuses=new Map<string,number>();
   const tracked:typeof fetch=async(input,init)=>{
    const response=await fetcher(input,init);
-   statuses.set(new URL(input instanceof Request?input.url:String(input)).hostname,response.status);
+   // WOM achievements are extra: only the snapshot request says whether WOM tracks the name.
+   const url=new URL(input instanceof Request?input.url:String(input));if(!url.pathname.endsWith('/achievements'))statuses.set(url.hostname,response.status);
    return response;
   };
   let journal:SyncedJournal|null=null;

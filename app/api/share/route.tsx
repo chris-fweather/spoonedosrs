@@ -8,7 +8,7 @@ import {accountName,db} from '@/lib/storage';
 import {profileJournal,publicProfile} from '@/lib/profile-store';
 import {renderShareCharacter,renderSharePet} from '@/lib/share-character';
 import {OWNER_LAVA_MASK,RANK_STYLE,hasGildedSupporter} from '@/lib/staff-appearance';
-import {DEFAULT_APPEARANCE} from '@/lib/appearance';
+import {DEFAULT_APPEARANCE,shownBackground} from '@/lib/appearance';
 // Character renderer is shared with the model catalogue rather than a screenshot service.
 export async function GET(request:Request){
  const value=new URL(request.url).searchParams.get('username');
@@ -22,7 +22,7 @@ export async function GET(request:Request){
  const origin=import.meta.env.DEV?new URL(request.url).origin:'https://spoonedosrs.com';
  const [mascot,font,sans]=await Promise.all([shareDataUrl('/brand/rocky-mascot.png',origin),shareAsset('/fonts/runescape-bold.ttf',origin),shareAsset('/fonts/share-sans.ttf',origin)]);
  let profile:ReturnType<typeof shareProfileDetails>|undefined,character:string|undefined,pet:string|undefined,badge:string|undefined,backdrop:ShareBackdrop|undefined;const ranks:Record<string,number>={};let mode:string|undefined,nameColor:string|undefined,prefix:string|null=null;
- const icons:Record<string,string>=Object.fromEntries(await Promise.all(Object.entries({'Pets collected':'/brand/rocky-icon.png','Collection log':'/icons/navigation/collection-log-icon.png','Total level':'/icons/navigation/stats-icon.png'}).map(async([label,path])=>[label,await shareDataUrl(path,origin)])));
+ const icons:Record<string,string>=Object.fromEntries(await Promise.all(Object.entries({'Pets collected':'/brand/rocky-icon.png','Collection log':'/ui/collection-log-icon.png','Total level':'/icons/navigation/stats-icon.png'}).map(async([label,path])=>[label,await shareDataUrl(path,origin)])));
  if(name){
   const exists=await db().prepare('SELECT 1 FROM journals WHERE id=? UNION SELECT 1 FROM claimed_names WHERE rsn=? LIMIT 1').bind(name.toLowerCase(),name.toLowerCase()).first();
   if(exists){
@@ -32,8 +32,8 @@ export async function GET(request:Request){
    const role=flair.staff?.displayRole??flair.staff?.role;
    // The scimitar or coin, the account-type badge and the rank colour, as on the profile.
    if(role)nameColor=RANK_INK[role];
-   prefix=flair.staff?.displayPrefix??null;
-   if(j.accountMode&&j.accountMode!=='normal'&&!j.restricted)mode=await shareDataUrl(`/icons/account-modes/${j.accountMode.replaceAll('_','-')}.png`,origin).catch(()=>undefined);
+   prefix=flair.staff?.displayPrefix??flair.namePrefix??null;
+   if(j.accountMode&&j.accountMode!=='normal'&&!j.restricted)mode=await shareDataUrl(`/ui/account-modes/${j.accountMode}.png`,origin).catch(()=>undefined);
    const badgePath=flair.donation?.badge==='gilded'&&hasGildedSupporter(flair.donation)?'/icons/ranks/gilded-scimitar.png':role?RANK_STYLE[role].src:flair.donation?.supporter?'/icons/community/sponsor-coin.png':null;
    if(badgePath)badge=await shareDataUrl(badgePath,origin).catch(()=>undefined);
    if(role==='owner'&&badge&&badgePath!=='/icons/ranks/gilded-scimitar.png'){
@@ -43,7 +43,7 @@ export async function GET(request:Request){
    }
    if(profile.pet&&/^\d+$/.test(profile.pet.id))pet=await renderSharePet(profile.pet.id,loadAsset).then(p=>p.dataUrl).catch(()=>shareDataUrl('/pets/'+profile!.pet!.id+'.png',origin).catch(()=>undefined));
    // The scene they chose for their profile and their place on the public boards. Worn items show on the character.
-   const kind=flair.appearance?.background;
+   const kind=shownBackground(flair.appearance);
    if(kind==='castle'||kind==='riverside')backdrop={image:await shareDataUrl(`/brand/share-scene-${kind}.jpg`,origin).catch(()=>undefined)};
    else if(kind==='mine'||kind==='woodland')backdrop={sky:kind==='mine'?'#2f2b27':'#7f9a84',ground:kind==='mine'?'#5a5046':'#4f6a3e'};
    if(!j.restricted){

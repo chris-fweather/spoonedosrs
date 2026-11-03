@@ -1,5 +1,5 @@
 'use client';
-import {diaryRequirementGroups,requirementCompletion,type AdventureRequirements} from '@/lib/adventure-requirements';
+import {diaryRequirementGroups,itemName,KUDOS_ICON,noteLines,questItemQuantity,requirementCompletion,type AdventureRequirements,type DiaryItemTile} from '@/lib/adventure-requirements';
 import {BOARD_SKILLS} from '@/lib/community';
 import './adventure-requirements.css';
 import {useMemo, useState} from 'react';
@@ -21,6 +21,8 @@ import {ProfileEmpty} from './ProfileEmpty';
 import {TileProgress} from './TileProgress';
 import {Meter, Count} from './Meter';
 import {PopHead, Stats, type PopApi} from './Pop';
+import {ItemRequirementTile} from './RequirementTiles';
+import {OurGuideButton, usePublishedGuide} from './GuideLink';
 
 type QuestInfo = {mem: boolean; mini: boolean; d?: string; l?: string; s?: string; r?: string; qp?: number};
 type CaTask = [monster: string, name: string, desc: string, type: string, tier: string, pts: number, comp: string];
@@ -35,7 +37,7 @@ const TASKS = (data as unknown as {ca: CaTask[]}).ca;
 const QREF = qraw as {lengthNote: string; quests: Record<string, QRef>};
 const QITEMS = qitems as Record<string, {name: string; id: number}[]>;
 const QBY = new Map(Object.entries(QREF.quests).map(([k, v]) => [k.toLowerCase(), v]));
-const DIARY_ITEMS=diaryItems as Record<string,{id:number;name:string}[]>;
+const DIARY_ITEMS=diaryItems as Record<string,DiaryItemTile[]>;
 const DREF = (draw as {areas: Record<string, DArea>}).areas;
 const COMBOS = (craw as {combos: Record<string, string[]>}).combos;
 const DIFFS = ['Novice', 'Intermediate', 'Experienced', 'Master', 'Grandmaster', 'Special'];
@@ -49,22 +51,39 @@ const STATE: Record<string, [string, string]> = {finished: ['Completed', 'good']
 function questRef(name: string) { return QREF.quests[name] ?? QBY.get(name.toLowerCase()); }
 function diaryRef(area: string) { return DREF[area] ?? Object.entries(DREF).find(([k]) => k.toLowerCase() === area.toLowerCase())?.[1]; }
 function firstLine(s: string) { return s.split('\n')[0].trim(); }
+/** Kudos is not a hiscore skill: it takes the Varrock Museum's icon. Combat level takes Attack's. */
+function requirementIcon(row:{skill?:string;label:string},group:string){
+  if(row.skill==='Kudos'||/\bKudos\b/.test(row.label))return KUDOS_ICON;
+  if(row.skill==='Combat')return bossArtwork('Attack');
+  return row.skill?bossArtwork(row.skill):group==='quests'?'/ui/quest-point-icon.png':undefined;
+}
+/** Skills, quests and items as tiles, then notes as short muted lines: the same in quest and diary panels. */
 function RequirementGroups({groups,journal}:{groups:AdventureRequirements;journal:Journal}){
-  const hasRequirements=Object.values(groups).some(rows=>rows.length);
+  const hasRequirements=(['skills','quests','items'] as const).some(group=>groups[group].length)||groups.notes.length>0;
   return <section className="pop-block adventure-requirements"><span className="kicker">Requirements</span>
-    {(['skills','quests','items','other'] as const).map(group=>{
+    {(['skills','quests','items'] as const).map(group=>{
       const rows=groups[group];if(!rows.length)return null;
-      return <div className="adventure-requirement-group" key={group}><h3>{{skills:'Skills',quests:'Quests',items:'Items',other:'Other conditions'}[group]}</h3>
-        {group==='items'?<ul className="adventure-requirement-list">{groups.items.map((row,index)=><li key={index}><span className="adventure-item-icons" aria-hidden="true">{row.items.map(item=><img key={item.id} src={`/items/${item.id}.png`} alt=""/>)}</span><span>{decodeWiki(row.label)}</span></li>)}</ul>
+      return <div className="adventure-requirement-group" key={group}><h3>{{skills:'Skills',quests:'Quests',items:'Items'}[group]}</h3>
+        {group==='items'?<ul className="adventure-requirement-list">{groups.items.map((row,index)=><ItemRequirementTile key={index} items={row.items.map(item=>({id:String(item.id),name:itemName(decodeWiki(item.name))}))} quantity={row.quantity} note={row.note&&decodeWiki(row.note)} label={row.items.length>1||row.label!==row.items[0]?.name?decodeWiki(row.label):undefined}/>)}</ul>
         :<ul className="adventure-requirement-list">{groups[group].map((row,index)=>{
-          const met=requirementCompletion(row,journal.hiscores.skills,journal.profile?.quests);
-          const icon=row.skill?bossArtwork(row.skill):group==='quests'?'/icons/navigation/quest-point-icon.png':undefined;
-          return <li key={index} className={met===null?'':met?'req-met':'req-miss'}>{icon&&<img src={icon} alt=""/>}<span>{row.quest?<a href={wiki(row.quest)} target="_blank" rel="noreferrer">{decodeWiki(row.label)}</a>:decodeWiki(row.label)}{row.note&&<small>{row.note}</small>}</span>{met===true&&<b className="requirement-check" aria-label="Requirement met">✓</b>}</li>;
+          const met=requirementCompletion(row,journal.hiscores.skills,journal.profile?.quests),icon=requirementIcon(row,group);
+          return <li key={index} className={met===null?undefined:met?'req-met':'req-miss'}>{icon&&<img src={icon} alt=""/>}<span className="req-name">{row.quest?<a href={wiki(row.quest)} target="_blank" rel="noreferrer">{decodeWiki(row.label)}</a>:<b>{decodeWiki(row.label)}</b>}{row.note&&<small className="req-note" title={row.note}>{row.note}</small>}</span>{met===true&&<b className="requirement-check" aria-label="Requirement met">✓</b>}</li>;
         })}</ul>}
       </div>;
     })}
+    {groups.notes.length>0&&<div className="adventure-requirement-group"><h3>Notes</h3><ul className="adventure-requirement-notes">{groups.notes.map((line,index)=><li key={index}>{line}</li>)}</ul></div>}
     {!hasRequirements&&<p className="muted">None listed.</p>}
   </section>;
+}
+
+/** Our published guide first (gold) with the Wiki's guide beside it in grey, on one row; without one, the Wiki links as before. */
+function GuideButtons({activities,wikiLinks}:{activities:string[];wikiLinks:{label:string;href:string}[]}){
+  const guide=usePublishedGuide(...activities);
+  const links=guide?wikiLinks.slice(0,1):wikiLinks;
+  return <div className="pop-links">
+    {guide&&<OurGuideButton guide={guide} primary/>}
+    {links.map((link,i)=><a key={link.href} className={`btn sm ${guide||i>0?'ghost':'primary'}`} href={link.href} target="_blank" rel="noreferrer">{link.label} <ExternalLink size={13}/></a>)}
+  </div>;
 }
 
 type Props = {journal: Journal; pop: PopApi; onSync: () => void; busy: boolean; canEdit?: boolean};
@@ -79,7 +98,7 @@ export function Quests({journal: j, pop, onSync, busy, canEdit=false}: Props) {
   const [q, setQ] = useState(''), [status, setStatus] = useState('all'), [sort, setSort] = useState('name'), [diff, setDiff] = useState('all');
   const all = j.profile?.quests;
   const rows: Quest[] = useMemo(() => (all ?? []).map(x => ({...x, info: QUESTS[x.name] ?? {mem: x.type !== 'free', mini: x.type === 'mini'}})), [all]);
-  if (!all?.length) return <ProfileEmpty section="Quests" icon="/icons/navigation/quest-point-icon.png" onSync={onSync} busy={busy} canEdit={canEdit}/>;
+  if (!all?.length) return <ProfileEmpty section="Quests" icon="/ui/quest-point-icon.png" onSync={onSync} busy={busy} canEdit={canEdit}/>;
   const isMini = (r: Quest) => r.info.mini || r.type === 'mini';
   const qp = rows.filter(r => r.state === 'finished').reduce((s, r) => s + r.points, 0);
   const totalQp = rows.reduce((s, r) => s + r.points, 0);
@@ -91,7 +110,7 @@ export function Quests({journal: j, pop, onSync, busy, canEdit=false}: Props) {
     ['Miniquests', shown.filter(isMini)],
   ];
   return <div className="list-panel">
-    <ScoreHead icon="/icons/navigation/quest-point-icon.png" kicker="Quest points" done={qp} total={totalQp} remaining={false} extra={<small className="remaining-count">{rows.filter(r=>!isMini(r)&&r.state!=='finished').length} quests left</small>}/>
+    <ScoreHead icon="/ui/quest-point-icon.png" kicker="Quest points" done={qp} total={totalQp} remaining={false} extra={<small className="remaining-count">{rows.filter(r=>!isMini(r)&&r.state!=='finished').length} quests left</small>}/>
     <FilterBar>
       <SearchBox label="Search quests" placeholder="Search quests…" value={q} onChange={setQ}/>
       <SortMenu label="Quest status" value={status} onChange={setStatus} options={[{value:"all",label:"All quests"},{value:"todo",label:"To do"},{value:"done",label:"Done"}]}/>
@@ -104,7 +123,7 @@ export function Quests({journal: j, pop, onSync, busy, canEdit=false}: Props) {
       <summary>{label}<span>{list.filter(r => r.state === 'finished').length} / {list.length} complete</span></summary>
       {list.map(r => {const key = 'quest:' + r.id, done = r.state === 'finished';
         return <button type="button" key={r.id} className={`q-row ${pop.key === key ? 'sel' : ''}`} onClick={() => pop.key === key ? pop.close() : pop.show(key, jj => <QuestDetail journal={jj} q={r}/>)}>
-          <IconBox src={diffIcon(questDifficulty(r)) || '/icons/navigation/quest-point-icon.png'} alt={questDifficulty(r) || 'Quest'}/>
+          <IconBox src={diffIcon(questDifficulty(r)) || '/ui/quest-point-icon.png'} alt={questDifficulty(r) || 'Quest'}/>
           <span className={done ? 'done' : ''}>{r.name}</span>
           <small>{r.points || ''}</small>
         </button>;})}
@@ -118,19 +137,16 @@ function QuestDetail({q, journal}: {q: Quest; journal: Journal}) {
   const skills = (ref?.skills ?? []).filter(s => s.skill !== 'Quest point');
   const points = (ref?.skills ?? []).find(s => s.skill === 'Quest point');
   const items = QITEMS[q.name] ?? QITEMS[Object.keys(QITEMS).find(key => key.toLowerCase() === q.name.toLowerCase()) ?? ''] ?? [];
-  const groups:AdventureRequirements={skills:skills.map(skill=>({label:`${skill.level} ${skill.skill}`,skill:skill.skill,level:skill.level,note:[skill.ironman?'Ironman requirement':null,skill.boostable?'Boostable':null].filter(Boolean).join(' · ')})),quests:[...(points?[{label:`${points.level} Quest points`,points:points.level}]:[]),...(ref?.quests??[]).map(name=>({label:name,quest:name}))],items:items.map(item=>({label:item.name,items:[item]})),other:[]};
+  const groups:AdventureRequirements={skills:skills.map(skill=>({label:`${skill.level} ${skill.skill}`,skill:skill.skill,level:skill.level,note:[skill.ironman?'Ironman only':null,skill.boostable?'Boostable':null].filter(Boolean).join(' · ')})),quests:[...(points?[{label:`${points.level} Quest points`,points:points.level}]:[]),...(ref?.quests??[]).map(name=>({label:name,quest:name}))],items:items.map(item=>({label:item.name,items:[item],quantity:questItemQuantity(ref?.items,item.name)})),notes:[]};
   return <>
-    <PopHead img={diffIcon(q.info.d || ref?.difficulty) || '/icons/navigation/quest-point-icon.png'} kicker={q.info.mini || q.type === 'mini' ? 'Miniquest' : 'Quest'} title={decodeWiki(q.name)} sub={<span className={tone}>{label}</span>}/>
+    <PopHead img={diffIcon(q.info.d || ref?.difficulty) || '/ui/quest-point-icon.png'} kicker={q.info.mini || q.type === 'mini' ? 'Miniquest' : 'Quest'} title={decodeWiki(q.name)} sub={<span className={tone}>{label}</span>}/>
     <Stats rows={[
       ['Difficulty', ref?.difficulty || q.info.d || '—'],
       ['Length', ref?.length || q.info.l || '—'],
       ['Quest points', q.points ? String(q.points) : '—', 'y'],
     ]}/>
     <RequirementGroups groups={groups} journal={journal}/>
-    <div className="pop-links">
-      <a className="btn primary sm" href={wiki(q.name) + '/Quick_guide'} target="_blank" rel="noreferrer">Quick guide <ExternalLink size={13}/></a>
-      <a className="btn ghost sm" href={ref?.wiki || wiki(q.name)} target="_blank" rel="noreferrer">Wiki <ExternalLink size={13}/></a>
-    </div>
+    <GuideButtons activities={[q.name]} wikiLinks={[{label:'Quick guide',href:wiki(q.name)+'/Quick_guide'},{label:'Wiki',href:ref?.wiki||wiki(q.name)}]}/>
   </>;
 }
 
@@ -142,7 +158,7 @@ export function Diaries({journal: j, pop, onSync, busy, canEdit=false}: Props) {
   const [sort, setSort] = useState('name');
   const [taskSort, setTaskSort] = useState('order');
   const [tier, setTier] = useState('All');
-  if (!ds?.length) return <ProfileEmpty section="Achievement diaries" icon="/icons/navigation/achievement-diaries-icon.png" onSync={onSync} busy={busy} canEdit={canEdit}/>;
+  if (!ds?.length) return <ProfileEmpty section="Achievement diaries" icon="/ui/achievement-diaries-icon.png" onSync={onSync} busy={busy} canEdit={canEdit}/>;
   const all = ds.flatMap(d => d.tiers), done = all.reduce((s, t) => s + t.completed, 0), total = all.reduce((s, t) => s + t.total, 0);
   const selected = ds.find(d => d.areaId === areaId);
   const tiersFor = (d:Diary) => d.tiers.filter(t=>tier==='All'||t.tier===tier);
@@ -154,7 +170,7 @@ export function Diaries({journal: j, pop, onSync, busy, canEdit=false}: Props) {
   const needle=q.trim().toLowerCase();
   const shown=areas.filter(d=>!needle||d.area.toLowerCase().includes(needle)||diaryRef(d.area)?.tiers.some(t=>(tier==='All'||t.tier===tier)&&t.tasks.some(task=>task.task.toLowerCase().includes(needle))));
   return <div className={`clog3 diary-board ${selected?'is-open':''}`}>
-    <ScoreHead icon="/icons/navigation/achievement-diaries-icon.png" kicker="Achievement diaries" done={done} total={total}/>
+    <ScoreHead icon="/ui/achievement-diaries-icon.png" kicker="Achievement diaries" done={done} total={total}/>
     <FilterBar>
       <SearchBox label={selected?'Search diary tasks':'Search diaries'} placeholder={selected?'Search tasks…':'Search areas or tasks…'} value={q} onChange={setQ}/>
       <SortMenu label={selected?'Sort diary tasks':'Sort diaries'} value={selected?taskSort:sort} onChange={selected?setTaskSort:setSort} options={selected?[{value:'order',label:'Task order'},{value:'name',label:'Name A–Z'}]:[{value:'name',label:'Name A–Z'},{value:'progress',label:'Least complete'}]}/>
@@ -164,7 +180,7 @@ export function Diaries({journal: j, pop, onSync, busy, canEdit=false}: Props) {
       {selected ? <DiaryTasks d={selected} tier={tier} query={q} sort={taskSort} pop={pop} onBack={()=>{setAreaId(null);setQ('');pop.close();}}/> : <div className="diary-areas adv-scroll">{shown.map(d=>{
         const ts=tiersFor(d),got=ts.reduce((s,t)=>s+t.completed,0),total=ts.reduce((s,t)=>s+t.total,0);
         return <button type="button" key={d.areaId} className={`diary-area ${got>=total?'complete':''}`} onClick={()=>{setAreaId(d.areaId);setQ('');pop.close();}}>
-          <img src="/icons/navigation/achievement-diaries-icon.png" alt=""/><b>{d.area}</b><Count done={got} total={total}>{got}/{total}</Count>
+          <img src="/ui/achievement-diaries-icon.png" alt=""/><b>{d.area}</b><Count done={got} total={total}>{got}/{total}</Count>
           <span className="diary-segments">{ts.map(t=><span key={t.tier}><small>{t.tier}</small><Meter done={t.completed} total={t.total}/><small className={t.completed>=t.total?'good':''}>{t.completed}/{t.total}</small></span>)}</span><small className="tile-remaining">{got>=total?'Complete':`${total-got} tasks left`}</small>
         </button>;
       })}{!shown.length&&<p className="muted pad">No matching diary areas or tasks.</p>}</div>}
@@ -187,7 +203,7 @@ function DiaryTasks({d,tier,query,sort,pop,onBack}:{d:Diary;tier:string;query:st
     <div className="adv-scroll diary-task-list">
       {tasks.map(({task,i,tier:taskTier})=>{const key=`diary:${d.areaId}:${taskTier}:${i}`,current=d.tiers.find(t=>t.tier===taskTier),complete=!!current&&current.completed>=current.total;
         return <button type="button" key={key} className={`task-row ${pop.key===key?'sel':''}`} onClick={()=>pop.key===key?pop.close():pop.show(key,jj=><DiaryTask d={d} tier={taskTier} task={task} journal={jj}/>)}>
-          <span className={complete?'task-state good':'task-state muted'} aria-label={complete?'Completed task':'Individual completion unavailable'}><img src="/icons/navigation/achievement-diaries-icon.png" alt=""/></span>
+          <span className={complete?'task-state good':'task-state muted'} aria-label={complete?'Completed task':'Individual completion unavailable'}><img src="/ui/achievement-diaries-icon.png" alt=""/></span>
           <span>{decodeWiki(firstLine(task.task))}{tier==='All'&&<small className="diary-task-tier">{taskTier}</small>}</span><span className={complete?'task-check':'muted'} aria-hidden="true">{complete?'Done':'›'}</span>
         </button>;
       })}
@@ -197,17 +213,15 @@ function DiaryTasks({d,tier,query,sort,pop,onBack}:{d:Diary;tier:string;query:st
   </div>;
 }
 
+/** A diary task: its requirements and notes, nothing else; the Wiki's task notes join the requirement notes. */
 function DiaryTask({d, tier, task, journal}: {d: Diary; tier: string; task: DTask; journal:Journal}) {
   const groups=diaryRequirementGroups(task.requirements.split('\n').map(decodeWiki),Object.keys(QREF.quests),BOARD_SKILLS.map(s=>s.name),DIARY_ITEMS);
-  const notes=task.task.split('\n').slice(1).join('\n').replace(/^Note:\s*/,'').trim();
+  for(const line of noteLines(decodeWiki(task.task.split('\n').slice(1).join('\n'))))if(!groups.notes.includes(line))groups.notes.push(line);
+  const current=d.tiers.find(t=>t.tier===tier),complete=!!current&&current.completed>=current.total;
   return <>
-    <PopHead img="/icons/navigation/achievement-diaries-icon.png" kicker={`${d.area} · ${tier}`} title={firstLine(task.task)}/>
+    <PopHead img="/ui/achievement-diaries-icon.png" kicker={`${d.area} · ${tier}`} title={firstLine(task.task)} sub={complete?<span className="good">Tier complete</span>:undefined}/>
     <RequirementGroups groups={groups} journal={journal}/>
-    {notes&&<div className="pop-block"><span className="kicker">Notes</span><p>{decodeWiki(notes)}</p></div>}
-    <div className="pop-links">
-      <a className="btn primary sm" href={wiki(`${d.area} Diary`) + '#' + tier} target="_blank" rel="noreferrer">Diary guide <ExternalLink size={13}/></a>
-    </div>
-    <p className="fine">{d.tiers.find(t => t.tier === tier)?.completed === d.tiers.find(t => t.tier === tier)?.total ? 'Completed: this entire tier is finished.' : 'Individual completion is unavailable; RuneProfile supplies the tier total.'}</p>
+    <GuideButtons activities={[`${d.area} Diary`]} wikiLinks={[{label:'Diary guide',href:wiki(`${d.area} Diary`)+'#'+tier}]}/>
   </>;
 }
 

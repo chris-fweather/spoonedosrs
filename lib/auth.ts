@@ -149,7 +149,7 @@ export async function sessionVersion(discordId: string): Promise<number> {
   return row?.session_version ?? 0;
 }
 
-/** Ends every session for the signed-in account, on every device including this one, and notes it in each linked name's history. */
+/** Ends every session for the signed-in account, on every device including this one, revokes its RuneLite plugin tokens, and notes it in each linked name's history. */
 export async function logoutEverywhere(request: Request): Promise<Response> {
   // Only the site's own Account page may end every session: the request must name this origin.
   if (request.headers.get('origin') !== new URL(request.url).origin) throw new HttpError(403, 'Use the Account page to log out everywhere.');
@@ -158,6 +158,8 @@ export async function logoutEverywhere(request: Request): Promise<Response> {
   const at = new Date().toISOString(), database = db();
   await database.batch([
     database.prepare('UPDATE users SET session_version = session_version + 1 WHERE discord_id = ?').bind(session.discordId),
+    // Plugin tokens are sessions too: logging out everywhere disconnects every RuneLite client.
+    database.prepare('UPDATE plugin_tokens SET revoked_at = ? WHERE discord_id = ? AND revoked_at IS NULL').bind(Date.now(), session.discordId),
     database.prepare("INSERT INTO account_actions(rsn,actor_id,actor_name,action,detail,created_at) SELECT rsn,?,?,'signed out everywhere','All sessions ended by the account owner.',? FROM claimed_names WHERE discord_id = ?").bind(session.id, session.globalName || session.username, at, session.id),
   ]);
   return logoutResponse(request);
@@ -194,19 +196,25 @@ export async function claimRuneScapeName(request: Request, username: unknown) {
   const name = accountName(username);
   const rsn = name.toLowerCase();
   if (!devAllowsProfile(rsn)) throw new HttpError(403, 'The dev environment only holds Obifloat.');
+  return linkName(name, session.id);
+}
+
+/** Links a name to a Discord account, or re-links one it reserved before. Shared by the Account page and the RuneLite plugin. */
+export async function linkName(name: string, discordId: string) {
+  const rsn = name.toLowerCase();
   await ensureAuthTables();
   // A removed link is not a transfer of the previous owner's private journal.
   await db().batch([
     db().prepare('INSERT OR IGNORE INTO profile_link_owners(rsn,discord_id,linked_at) SELECT ?,?,? WHERE (SELECT COUNT(*) FROM profile_link_owners WHERE discord_id=?)<?')
-      .bind(rsn,session.id,Date.now(),session.id,MAX_RESERVED_NAMES),
+      .bind(rsn,discordId,Date.now(),discordId,MAX_RESERVED_NAMES),
     db().prepare(`INSERT OR IGNORE INTO claimed_names(rsn,display_name,discord_id,claimed_at,companion_pet,display_piece,equipped,pinned_mark)
       SELECT rsn,?,discord_id,?,json_extract(saved_flair,'$.companion_pet'),json_extract(saved_flair,'$.display_piece'),json_extract(saved_flair,'$.equipped'),json_extract(saved_flair,'$.pinned_mark')
-      FROM profile_link_owners WHERE rsn=? AND discord_id=?`).bind(name,Date.now(),rsn,session.id),
+      FROM profile_link_owners WHERE rsn=? AND discord_id=?`).bind(name,Date.now(),rsn,discordId),
   ]);
   const row=await db().prepare('SELECT discord_id FROM claimed_names WHERE rsn=?').bind(rsn).first<{discord_id:string}>();
   if(!row&&!await db().prepare('SELECT 1 FROM profile_link_owners WHERE rsn=?').bind(rsn).first())
     throw new HttpError(409,`Each Discord account can hold up to ${MAX_RESERVED_NAMES} RuneScape names, including names you unlinked. Ask staff to release one you no longer use.`);
-  if(!row||row.discord_id!==session.id)throw new HttpError(409,`${name} is already linked or reserved. Sign in with the Discord account that linked it. A different owner needs a reviewed transfer.`);
+  if(!row||row.discord_id!==discordId)throw new HttpError(409,`${name} is already linked or reserved. Sign in with the Discord account that linked it. A different owner needs a reviewed transfer.`);
   return addAccount(name);
 }
 

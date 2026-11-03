@@ -114,3 +114,12 @@ test('Retry-After parsing honors dates, long waits and fallback without immediat
  assert.equal(providerPolicy(new URL(rp)).ttl,60_000);
  assert.equal(providerPolicy(new URL(temple)).ttl,300_000);
 });
+test('Wise Old Man achievements use their own slower lane and a long cache beside the snapshot',async()=>{
+ const x=setup();try{
+  assert.equal(providerPolicy(new URL(wom+'/achievements')).provider,'womAchievements');
+  await x.client(wom);await x.client(wom+'/achievements');assert.equal(x.calls(),2);
+  await assert.rejects(x.client(wom.replace('Tester','Other')+'/achievements'),limited(12));
+  x.advance(3_600_000);await x.client(wom+'/achievements');assert.equal(x.calls(),2,'cached for hours');
+  await assert.rejects(x.client(wom+'/achievements/progress'),{status:400});
+ }finally{x.sql.close();}
+});

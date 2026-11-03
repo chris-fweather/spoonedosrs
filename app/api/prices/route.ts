@@ -1,24 +1,11 @@
-/** Grand Exchange prices for guide costs, from the OSRS Wiki real-time prices API (https://prices.runescape.wiki).
- * The full price list is cached for ten minutes per location, and callers get only the item IDs they ask for. */
-const SOURCE = 'https://prices.runescape.wiki/api/v1/osrs/latest';
-const AGENT = 'spoonedosrs.com guide prices (discord.gg/spoonedosrs)';
-type Latest = {data: Record<string, {high: number | null; low: number | null}>};
-let memory: {at: number; data: Latest['data']} | null = null;
+import {latestTrades} from '@/lib/ge-prices';
 
-async function latest() {
-  if (memory && Date.now() - memory.at < 600_000) return memory.data;
-  const response = await fetch(SOURCE, {headers: {'User-Agent': AGENT}, signal: AbortSignal.timeout(10_000), cf: {cacheTtl: 600, cacheEverything: true}} as RequestInit);
-  if (!response.ok) throw Error('Prices are unavailable right now.');
-  const body = await response.json() as Latest;
-  memory = {at: Date.now(), data: body.data ?? {}};
-  return memory.data;
-}
-
+/** Grand Exchange prices for guide costs (lib/ge-prices.ts): callers get only the item IDs they ask for. */
 export async function GET(request: Request) {
   const ids = [...new Set((new URL(request.url).searchParams.get('ids') ?? '').split(',').filter(id => /^\d{1,6}$/.test(id)))].slice(0, 200);
   if (!ids.length) return Response.json({error: 'Ask for at least one item ID.'}, {status: 400});
   try {
-    const data = await latest(), prices: Record<string, number> = {};
+    const data = await latestTrades(), prices: Record<string, number> = {};
     // Coins are always worth 1; otherwise use the average of the latest instant buy and sell, or whichever exists.
     for (const id of ids) {
       if (id === '995') { prices[id] = 1; continue; }

@@ -41,7 +41,7 @@ test('marks follow pets, max cape, and collection log count', () => {
   assert.equal(earnedMarks(full).some(mark => mark.id === 'max-cape'), true);
   assert.equal(earnedMarks(full).some(mark => mark.id === 'clog-1717'), true);
   assert.equal(earnedMarks(full).some(mark => mark.name === DONATOR_TITLE), false);
-  assert.equal(badgeCatalogue(full).find(mark => mark.id === 'max-cape')?.img, '/icons/ranks/max-cape.png');
+  assert.equal(badgeCatalogue(full).find(mark => mark.id === 'max-cape')?.img, '/items/13280.png');
   assert.equal(badgeTier('pets-5'), 'bronze');
   assert.equal(badgeTier('pets-10'), 'silver');
   assert.equal(badgeTier('pets-30'), 'platinum');

@@ -10,6 +10,11 @@
 .collection-timeline .timeline-items{overflow:visible;max-height:none;padding:8px 0 0;grid-template-columns:repeat(auto-fill,minmax(52px,1fr))}
 .collection-timeline .timeline-items>.cl-item{height:auto;min-height:52px;cursor:help}
 .timeline-tip{display:grid;gap:2px}.timeline-tip small{color:var(--muted)}
+/* Skill milestones of the chosen day: icon and name in a row, never boxed. */
+.timeline-skills{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;padding:10px 0 0;list-style:none}
+.timeline-skills li{display:flex;align-items:center;gap:6px;min-height:28px;font-size:13px;font-weight:600;white-space:nowrap;cursor:help}
+.timeline-skills img{width:20px;height:20px;object-fit:contain;image-rendering:pixelated}
+.timeline-skills small{font-size:11px;font-weight:400;color:var(--muted)}
 .timeline-empty{padding:24px 0;text-align:center}
 .timeline-undated{margin-top:10px;text-align:right}
 /* Lollipops: a stem from the collection's day up to a head showing what was collected. */
@@ -19,6 +24,7 @@
 .lollipop-stage svg{display:block}.lollipop-axis{stroke:#4a453c}
 .lollipop{cursor:pointer;outline:none}.lollipop-stem{stroke:#81b8c5;stroke-width:1.5;opacity:.7}.lollipop-foot{fill:#81b8c5}.lollipop-head{fill:#1b1a15;stroke:#81b8c5;stroke-width:1.5}
 .lollipop-stalk.is-pet .lollipop-stem,.lollipop.is-pet .lollipop-head{stroke:#e0a343}.lollipop-stalk.is-pet .lollipop-foot{fill:#e0a343}
+.lollipop-stalk.is-skill .lollipop-stem,.lollipop.is-skill .lollipop-head{stroke:#a99be0}.lollipop-stalk.is-skill .lollipop-foot{fill:#a99be0}
 .lollipop:hover .lollipop-head,.lollipop:focus-visible .lollipop-head,.lollipop.is-on .lollipop-head{stroke:#ffd34d;stroke-width:2.5}
 .lollipop image{image-rendering:pixelated;pointer-events:none}.lollipop-count{fill:#d5ad61}.lollipop-count-text{fill:#17150f;font-size:9.5px;font-weight:700}
 @media(max-width:520px){

@@ -1,6 +1,7 @@
 // Local fixture only. Validate persistence and writer boundaries without changing a real account.
 import assert from 'node:assert/strict';
 import {mixedFarmingMethod} from '../lib/estimates.ts';
+import {farmingRunsMethod} from '../lib/farming-runs.ts';
 import {initial,likelihood} from '../lib/model.ts';
 import {seal,SESSION_COOKIE} from '../lib/session.ts';
 import {startWorker} from './worker-harness.mjs';
@@ -20,7 +21,7 @@ try{
  pet={...pet,obtained:true,obtainedStartCount:2000000,huntHistory:[{method:'Teak (1.5t)',unit:'XP',count:10345678,pace:190000,rate:18000000}],obtainedApproximate:true,obtainedCount:12345678,obtainedUnit:'XP',obtainedMethod:'Teak (1.5t)',plannedMethod:0,methods:[{name:'Teak (1.5t)',unit:'XP',rate:18000000,rateOverride:true,rateConfirmed:false,kph:190000,kc:4000000,activity:null,source:'Personal estimate'}]};
  await save(pet,other,403);await save(pet,{'Content-Type':'application/json',Origin:base},401);
  await save(pet);await read();pet=journal.pets.find(p=>p.name==='Beaver');
- assert.equal(pet.obtainedStartCount,2000000);assert.equal(pet.huntHistory[0].count,10345678);assert.equal(pet.huntHistory[0].pace,190000);assert.equal(pet.obtainedCount,12345678);assert.equal(pet.obtainedApproximate,true);assert.equal(pet.obtainedUnit,'XP');assert.equal(pet.obtainedMethod,'Teak (1.5t)');assert.equal(pet.methods[0].rate,18000000);
+ assert.equal(pet.obtainedStartCount,2000000);assert.equal(pet.huntHistory,undefined,'old history moves into methods on load');assert.equal(pet.obtainedCount,12345678);assert.equal(pet.obtainedApproximate,true);assert.equal(pet.obtainedUnit,'XP');assert.equal(pet.obtainedMethod,'Teak (1.5t)');assert.equal(pet.methods[0].rate,18000000);
  await save({...pet,obtainedCount:200000001},h,400);
  const boss=journal.pets.find(p=>p.name==='Baby Mole');
  await save({...boss,obtained:true,obtainedCount:100.5,obtainedUnit:'kills'},h,400);
@@ -32,8 +33,15 @@ try{
  await save({...farming,obtained:true,obtainedUnit:'level',obtainedCount:95,obtainedMethod:'Regular farming runs'});await read();assert.equal(journal.pets.find(p=>p.name==='Tangleroot').obtainedCount,95);assert.equal(journal.pets.find(p=>p.name==='Tangleroot').obtainedUnit,'level');
  await save({...farming,obtainedUnit:'level',obtainedCount:100},h,400);
  await save({...farming,obtained:true,obtainedUnit:'XP',obtainedCount:7942614,obtainedMethod:'Farming runs',plannedMethod:0,methods:[{...mixedFarmingMethod(99),farmingRunsPerDay:.5}]});await read();const savedFarming=journal.pets.find(p=>p.name==='Tangleroot');assert.equal(savedFarming.methods[0].kc,null);assert.equal(savedFarming.methods[0].farmingRunsPerDay,.5);
- await save({...savedFarming,methods:[{...savedFarming.methods[0],farmingRunsPerDay:2}]},h,400);assert.ok(likelihood(savedFarming)>0);
+ await save({...savedFarming,methods:[{...savedFarming.methods[0],farmingRunsPerDay:4}]},h,400);assert.ok(likelihood(savedFarming)>0);
  await save({...savedFarming,obtainedCount:9000000});await read();assert.ok(likelihood(journal.pets.find(p=>p.name==='Tangleroot'))>likelihood(savedFarming));
+ const legacy=journal.pets.find(p=>p.name==='Tangleroot');
+ assert.equal(legacy.obtainedMethod,'Tree runs');assert.ok(legacy.methods.some(m=>m.name==='Tree runs'&&m.unit==='XP'&&!m.rateOverride));assert.ok(!legacy.methods.some(m=>m.name==='Farming runs'));
+ const runs={...farmingRunsMethod(99,[{crop:'Palm',count:6},{crop:'Yew',count:5}]),kc:120};
+ await save({...legacy,obtained:false,plannedMethod:0,methods:[runs]});await read();
+ const savedRuns=journal.pets.find(p=>p.name==='Tangleroot').methods.find(m=>m.name==='Farming runs');
+ assert.deepEqual(savedRuns.farmingRun,[{crop:'Palm',count:6},{crop:'Yew',count:5}]);assert.equal(savedRuns.kc,120);
+ await save({...legacy,obtained:false,plannedMethod:0,methods:[{...runs,farmingRun:[{crop:'Redwood',count:1}]}]},h,400);
  await save({...boss,name:'Tangleroot',obtainedUnit:'level',obtainedCount:95},h,400);
  console.log('PASS: XP, KC and reward records persist; custom estimates survive reload; invalid values and unrelated/anonymous writers rejected.');
 }finally{await sql('DELETE FROM profile_link_owners WHERE rsn=? AND discord_id=?',[rsn,id]);await sql('DELETE FROM journals WHERE id=?',[rsn]);await sql('DELETE FROM claimed_names WHERE rsn=? AND discord_id=?',[rsn,id]);await sql('DELETE FROM users WHERE discord_id=?',[id]);}

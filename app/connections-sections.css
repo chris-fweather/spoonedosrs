@@ -22,3 +22,4 @@
 .connections-bottom-sections .connection-guide>p{font-size:11px;line-height:1.5;margin:6px 0 0}
 .connections-bottom-sections>details.connection-guide[open]>summary{margin-bottom:8px}
 .connections-content>.connections-bottom-sections{gap:10px}
+.conn-plugin-icon{width:16px;height:16px;object-fit:contain}

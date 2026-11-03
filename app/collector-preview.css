@@ -6,14 +6,13 @@
 .collector-list button.collector-identity{background:none;border:0;padding:0;text-align:left;color:inherit;width:100%}
 .collector-list button.collector-identity:after{display:none}.collector-list button.collector-identity:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
 .collector-identity .preview-chevron{flex:none;color:var(--muted);margin-left:6px}
-/* Loading rows take the tallest loaded shape (badge, name and title on two lines, value and label) so nothing jumps. */
-.leaderboard-page .collector-list>li.board-loading-row,.board-loading-row{min-height:62px}.board-loading-row i{display:block;border-radius:3px;background:var(--line);animation:board-pulse 1.6s ease-in-out infinite}
-.board-loading-row .bl-rank{width:14px;height:16px;border-radius:3px;background:var(--line);align-self:center}
-.board-loading-row .bl-identity{display:flex;align-items:center;gap:8px;min-width:0}.board-loading-row .bl-badge{flex:none;width:24px;height:24px;border-radius:50%}
-.board-loading-row .bl-identity>span{display:grid;gap:7px;flex:1;min-width:0}.board-loading-row .bl-identity>span>i:first-child{height:12px;width:min(160px,70%)}.board-loading-row .bl-identity>span>i:last-child{height:9px;width:min(90px,45%)}
-.board-loading-row .bl-score{display:grid;justify-items:end;gap:7px;align-self:center}.board-loading-row .bl-score>i:first-child{height:14px;width:64px}.board-loading-row .bl-score>i:last-child{height:8px;width:36px}
-/* Phones can wrap a twelve-character name and its title onto a third line. */
-@media(max-width:520px){.leaderboard-page .collector-list>li.board-loading-row,.board-loading-row{min-height:76px}}
+/* Loading rows: the loaded row's columns at the shared board row height (community-rows.css), so nothing jumps. */
+.board-loading-row i{display:block;border-radius:3px;background:var(--line);animation:board-pulse 1.6s ease-in-out infinite}
+.board-loading-row .bl-rank{display:flex;align-items:center}.board-loading-row .bl-rank>i{width:14px;height:16px}
+.board-loading-row .bl-identity{display:flex;align-items:center;gap:7px;min-width:0}.board-loading-row .bl-badge{flex:none;width:18px;height:18px}
+.board-loading-row .bl-identity>span{display:grid;gap:6px;flex:1;min-width:0}.board-loading-row .bl-identity>span>i:first-child{height:12px;width:min(150px,70%)}.board-loading-row .bl-identity>span>i:last-child{height:9px;width:min(96px,45%)}
+.board-loading-row .bl-score{display:grid;justify-items:end;gap:6px;align-self:center}.board-loading-row .bl-score>i:first-child{height:16px;width:48px}.board-loading-row .bl-score>i:last-child{height:8px;width:30px}
+.board-loading-pager{display:contents}
 @keyframes board-pulse{50%{opacity:.45}}@media(prefers-reduced-motion:reduce){.board-loading-row i{animation:none}}
 @media(max-width:540px){.collector-preview header{align-items:flex-start}.collector-preview header>b{font-size:18px}.collector-preview header .btn{font-size:11px;white-space:nowrap}.collector-preview dl{gap:14px}}
 .collector-preview header{justify-content:flex-end}
@@ -30,7 +29,7 @@
 
 
 /* Compact preview navigation uses the same landmarks as a full profile. */
-.preview-skills{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}.preview-skill{padding:5px;gap:5px;font-size:10px}.preview-skill>img{width:19px;height:19px}.preview-skill>b{font-size:16px}.leaderboard-page .collector-list>li{min-height:52px;padding:9px 10px}.leaderboard-page .collector-list .collector-score b{font-size:20px}.leaderboard-page .collector-list .collector-score small{font-size:9px}.leaderboard-page .collector-placeholder{min-height:45px}.leaderboard-page .collector-list .collector-identity{font-size:12px}.leaderboard-page .collector-list .achievement-title{font-size:11px}.collector-list .collector-preview{padding-top:10px}@media(max-width:750px){.preview-skills{grid-template-columns:repeat(4,minmax(0,1fr))}.preview-skill>span{display:block}}@media(max-width:480px){.preview-progress-list>div{grid-template-columns:minmax(100px,1fr) 45px}.preview-progress-list .meter{display:none}.preview-skills{grid-template-columns:repeat(4,minmax(0,1fr))}.preview-skill>span{display:none}}
+.preview-skills{grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}.preview-skill{padding:5px;gap:5px;font-size:10px}.preview-skill>img{width:19px;height:19px}.preview-skill>b{font-size:16px}.leaderboard-page .collector-list>li{padding-inline:10px}.leaderboard-page .collector-list .collector-score b{font-size:20px}.leaderboard-page .collector-list .collector-score small{font-size:9px}.leaderboard-page .collector-list .collector-identity{font-size:12px}.leaderboard-page .collector-list .achievement-title{font-size:11px}.collector-list .collector-preview{padding-top:10px}@media(max-width:750px){.preview-skills{grid-template-columns:repeat(4,minmax(0,1fr))}.preview-skill>span{display:block}}@media(max-width:480px){.preview-progress-list>div{grid-template-columns:minmax(100px,1fr) 45px}.preview-progress-list .meter{display:none}.preview-skills{grid-template-columns:repeat(4,minmax(0,1fr))}.preview-skill>span{display:none}}
 
 /* Read-only summary on every board; the current board's card is highlighted. */
 .collector-preview .preview-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0 14px}

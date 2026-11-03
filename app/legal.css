@@ -1,6 +1,12 @@
 .legal-page{max-width:800px;margin:3rem auto;padding:0 24px 40px;line-height:1.75;color:var(--text,#dedbcc)}
 .legal-page h1{font-size:2.3rem}.legal-page h2{font-size:1.3rem;margin-top:2rem;color:#ffab42}
 .legal-page .kicker{margin-top:2rem}.legal-page a{text-decoration:underline;text-underline-offset:3px}
-.legal-footer{display:flex;justify-content:center;gap:24px;padding:12px 20px 24px;font-size:12px;color:#a59e8b}
+.legal-footer{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 0;padding:10px 16px 14px;font-size:12px;line-height:1.6;color:#a59e8b}
+.legal-footer nav{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline}
+.legal-footer i{font-style:normal;padding:0 8px;color:var(--dim,#7a7465)}
+.legal-footer-note::before{content:'·';padding:0 8px;color:var(--dim,#7a7465)}
+@media (max-width:640px){.legal-footer-note{flex-basis:100%;text-align:center}.legal-footer-note::before{content:none}}
 
 .dev-banner{position:sticky;top:0;z-index:100;padding:6px 12px;text-align:center;font-size:12px;font-weight:600;color:#1d1a2e;background:#ffcf3f}
+.legal-page .credits-list{padding-left:1.2rem}.legal-page .credits-list li{margin:.45rem 0}
+.legal-page h2[id]{scroll-margin-top:16px}

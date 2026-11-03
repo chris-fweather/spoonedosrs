@@ -21,13 +21,13 @@ type Props={viewer:Viewer;changes:Change[];planningTargets:PlanningTarget[];over
 const petId=(key:string)=>{try{return (JSON.parse(key.slice('planning:'.length)) as [string,string])[0];}catch{return null;}};
 
 const SECTIONS:{id:CorrectionSection;label:string;icon:string;text:string}[]=[
- {id:'queue',label:'Awaiting review',icon:'/icons/navigation/quest-list-icon.png',text:'Proposals to decide'},
- {id:'drops',label:'Drop rates',icon:'/icons/navigation/collection-log-icon.png',text:'Fixed drop-table rates'},
+ {id:'queue',label:'Awaiting review',icon:'/ui/quest-list-icon.png',text:'Proposals to decide'},
+ {id:'drops',label:'Drop rates',icon:'/ui/collection-log-icon.png',text:'Fixed drop-table rates'},
  {id:'paces',label:'Kill rates & XP',icon:'/icons/navigation/combat-achievements-icon.png',text:'Where new plans start'},
  {id:'records',label:'Dry-streak records',icon:'/icons/skills/firemaking.png',text:'Longest pet droughts'},
- {id:'history',label:'History',icon:'/icons/navigation/quest-point-icon.png',text:'Every submission'},
+ {id:'history',label:'History',icon:'/ui/quest-point-icon.png',text:'Every submission'},
 ];
-const KIND_ICON={rate:'/icons/navigation/collection-log-icon.png',planning:'/icons/navigation/combat-achievements-icon.png',record:'/icons/skills/firemaking.png'};
+const KIND_ICON={rate:'/ui/collection-log-icon.png',planning:'/icons/navigation/combat-achievements-icon.png',record:'/icons/skills/firemaking.png'};
 
 /** One place for every shared-data change: what waits for review, the three proposal forms, and the history. */
 export function StaffCorrections(p:Props){
@@ -36,8 +36,8 @@ export function StaffCorrections(p:Props){
  const shown=SECTIONS.filter(s=>allowed[s.id]),active=shown.some(s=>s.id===section)?section:shown[0]?.id;
  return <div className="staff-corrections">
   <WorkspaceTabs label="Corrections" active={active} onSelect={p.onSection} tabs={shown.map(s=>({...s,count:s.id==='queue'?pending.length:s.id==='history'?changes.length:undefined,urgent:s.id==='queue'}))}/>
-  {active==='queue'&&<section className="community-panel"><PanelHead icon="/icons/navigation/quest-list-icon.png" title="Awaiting review" badge={String(pending.length)} text={viewer.permissions.review?'A different reviewer approves each proposal. One approval updates everywhere the value is used.':'Staff with approval access decide these. Follow your proposals here.'}/>
-   <ChangeList changes={pending} viewer={viewer} busy={p.busy} onAction={p.onAction} empty={<Empty icon="/icons/navigation/quest-point-icon.png" title="All caught up" text="No proposals are waiting for review."/>}/></section>}
+  {active==='queue'&&<section className="community-panel"><PanelHead icon="/ui/quest-list-icon.png" title="Awaiting review" badge={String(pending.length)} text={viewer.permissions.review?'A different reviewer approves each proposal. One approval updates everywhere the value is used.':'Staff with approval access decide these. Follow your proposals here.'}/>
+   <ChangeList changes={pending} viewer={viewer} busy={p.busy} onAction={p.onAction} empty={<Empty icon="/ui/quest-point-icon.png" title="All caught up" text="No proposals are waiting for review."/>}/></section>}
   {active==='drops'&&<DropRateForm busy={p.busy} onAction={p.onAction}/>}
   {active==='paces'&&<PaceForm targets={p.planningTargets} overrides={p.overrides} observations={p.observations} busy={p.busy} onAction={p.onAction}/>}
   {active==='records'&&<RecordForm pets={p.pets} busy={p.busy} onAction={p.onAction}/>}
@@ -101,11 +101,11 @@ function DropRateForm({busy,onAction}:{busy:boolean;onAction:Props['onAction']})
  const [denominator,setDenominator]=useState(''),[source,setSource]=useState(''),[reason,setReason]=useState('');
  useEffect(()=>{const q=query.trim();if(q.length<2){setResults([]);return;}let live=true;setLoading(true);const t=setTimeout(()=>fetch('/api/staff/targets?q='+encodeURIComponent(q)).then(r=>r.ok?r.json() as Promise<{targets:RateTarget[]}>:{targets:[]}).then(d=>{if(live)setResults(d.targets);}).catch(()=>{if(live)setResults([]);}).finally(()=>{if(live)setLoading(false);}),200);return()=>{live=false;clearTimeout(t);};},[query]);
  async function submit(e:FormEvent){e.preventDefault();if(!target)return;if(await onAction({action:'propose',kind:'rate',target:target.key,source,reason,denominator:Number(denominator)},'Submitted for another staff member to review.')){setDenominator('');setReason('');setTarget(null);}}
- return <section className="community-panel"><PanelHead icon="/icons/navigation/collection-log-icon.png" title="Change a drop rate" text="Pick the drop, set its new rate and link the source."/><form className="staff-form corr-form" onSubmit={submit}>
-  <Step n={1} title="Choose the drop">{target?<><Picked icon={target.img?`/drops/${target.img}`:'/icons/navigation/collection-log-icon.png'} title={target.item} detail={<>{target.source} · {target.table} · now <b>{target.rarity}</b></>} onClear={()=>setTarget(null)}/>
+ return <section className="community-panel"><PanelHead icon="/ui/collection-log-icon.png" title="Change a drop rate" text="Pick the drop, set its new rate and link the source."/><form className="staff-form corr-form" onSubmit={submit}>
+  <Step n={1} title="Choose the drop">{target?<><Picked icon={target.img?`/drops/${target.img}`:'/ui/collection-log-icon.png'} title={target.item} detail={<>{target.source} · {target.table} · now <b>{target.rarity}</b></>} onClear={()=>setTarget(null)}/>
    {others.length>0&&<div className="corr-others"><small>Also drops from</small>{others.map(t=><button type="button" key={t.key} onClick={()=>{setTarget(t);setSource(t.url);}}>{t.source}<em>{t.rarity}</em></button>)}</div>}</>
   :<><label className="search"><Search size={16} aria-hidden="true"/><input aria-label="Search a boss, activity or drop" placeholder="Search a boss, activity or drop…" value={query} onChange={e=>setQuery(e.target.value)}/></label>
-   {query.trim().length>=2&&<div className="staff-results corr-groups" role="listbox" aria-label="Drops">{groups.map(([item,list])=><div key={item} className="corr-group"><div className="corr-group-head"><img src={list[0].img?`/drops/${list[0].img}`:'/icons/navigation/collection-log-icon.png'} alt=""/><b>{item}</b><small>{list.length===1?'1 source':`${list.length} sources`}</small></div>
+   {query.trim().length>=2&&<div className="staff-results corr-groups" role="listbox" aria-label="Drops">{groups.map(([item,list])=><div key={item} className="corr-group"><div className="corr-group-head"><img src={list[0].img?`/drops/${list[0].img}`:'/ui/collection-log-icon.png'} alt=""/><b>{item}</b><small>{list.length===1?'1 source':`${list.length} sources`}</small></div>
      {list.map(t=><button type="button" role="option" aria-selected={false} key={t.key} onClick={()=>{setTarget(t);setSource(t.url);setPool(list);setQuery('');}}><span>{t.source}<small>{t.table}</small></span><em>{t.rarity}</em><Pencil size={13} aria-hidden="true"/></button>)}</div>)}
     {!results.length&&<p className="fine">{loading?'Searching…':<>Not on any drop table the site shows. The site keeps rates for its collection-log bosses and activities. <a className="link" href={'https://oldschool.runescape.wiki/w/Special:Search?search='+encodeURIComponent(query.trim())} target="_blank" rel="noreferrer">Search the Wiki ↗</a></>}</p>}</div>}</>}</Step>
   <Step n={2} title="New rate"><label className="corr-rate"><span>1 in</span><input type="number" min={1} max={1e12} step="any" required value={denominator} onChange={e=>setDenominator(e.target.value)} aria-label="New rate, 1 in"/></label><p className="fine">Fixed per-roll rates only. Raid, skilling and conditional pet formulas need a code change.</p></Step>
@@ -153,7 +153,7 @@ function RecordForm({pets,busy,onAction}:{pets:string[];busy:boolean;onAction:Pr
 /** Every past submission as compact rows, filtered by outcome and searchable. */
 function CorrectionHistory({changes,historyQuery,setHistoryQuery,historyState,setHistoryState}:Props){
  const list=changes.filter(c=>(historyState==='all'||c.state===historyState)&&`${c.actor_name} ${c.reviewer_name??''} ${c.target} ${c.payload} ${c.reason}`.toLowerCase().includes(historyQuery.toLowerCase()));
- return <section className="community-panel"><PanelHead icon="/icons/navigation/quest-point-icon.png" title="History" text="The latest 100 submissions and every open proposal, with evidence, author and review."/>
+ return <section className="community-panel"><PanelHead icon="/ui/quest-point-icon.png" title="History" text="The latest 100 submissions and every open proposal, with evidence, author and review."/>
   <ListTools states={[{id:'all',label:'All',count:changes.length},...REVIEW_STATES.map(({state,label})=>({id:state,label,count:changes.filter(c=>c.state===state).length}))]} state={historyState} onState={s=>setHistoryState(s as ReviewState|'all')} query={historyQuery} onQuery={setHistoryQuery} placeholder="Search players, staff, activities or reasons…"/>
-  <ChangeList changes={list} empty={<Empty icon="/icons/navigation/quest-point-icon.png" title="No submissions match" text="Try another filter or search."/>}/></section>;
+  <ChangeList changes={list} empty={<Empty icon="/ui/quest-point-icon.png" title="No submissions match" text="Try another filter or search."/>}/></section>;
 }

@@ -14,9 +14,9 @@ export async function GET(req:Request){
   if(!ids.length)return Response.json({members:[],next:null},{headers});
   // Bind the explicit owner alias; never infer ownership from names or Discord roles.
   const rows=await db().prepare(`WITH targets(id,identity) AS (VALUES ${ids.map(()=>'(?,?)').join(',')}) SELECT t.id,s.role,
-   CASE WHEN COALESCE(p.supporter_role,1)=1 AND (u.title='the Generous' OR COALESCE(d.amount_minor,0)>0 OR EXISTS(SELECT 1 FROM claimed_names c JOIN profile_supporter_totals ps ON ps.rsn=c.rsn WHERE c.discord_id=t.identity AND ps.amount_minor>0)) THEN 1 ELSE 0 END AS supporter,
+   CASE WHEN COALESCE(p.supporter_role,1)=1 AND EXISTS(SELECT 1 FROM claimed_names c JOIN profile_support ps ON ps.rsn=c.rsn WHERE c.discord_id=t.identity AND ps.supporter=1) THEN 1 ELSE 0 END AS supporter,
    (SELECT c.display_name FROM claimed_names c WHERE c.discord_id=t.identity AND c.rsn=p.nickname_rsn) AS nickname
-   FROM targets t LEFT JOIN users u ON u.discord_id=t.identity LEFT JOIN staff_members s ON s.discord_id=t.identity LEFT JOIN supporter_totals d ON d.discord_id=t.identity LEFT JOIN discord_sync_preferences p ON p.discord_id=t.identity`).bind(...ids.flatMap(value=>[value,accountIdentity(value)])).all<{id:string;role:string|null;supporter:number;nickname:string|null}>();
+   FROM targets t LEFT JOIN users u ON u.discord_id=t.identity LEFT JOIN staff_members s ON s.discord_id=t.identity LEFT JOIN discord_sync_preferences p ON p.discord_id=t.identity`).bind(...ids.flatMap(value=>[value,accountIdentity(value)])).all<{id:string;role:string|null;supporter:number;nickname:string|null}>();
   const members=rows.results.map(discordEntitlement);
   // Every explicitly linked owner login shares authority, even if only one has a users row.
   const [owner,...aliases]=OWNER_DISCORD_IDS,primary=!id&&owner?members.find(m=>m.id===owner):undefined;

@@ -86,7 +86,9 @@ export type DropRow = [name: string, qty: string, rarity: string, p: number | nu
 export type DropSource = {t: string; u: string; tabs: {h: string; r: DropRow[]}[]};
 export type SourceRateDetail={source:string;rate:string;quantity?:string;conditions?:string};
 export type ItemRate = {sourceDetails?:SourceRateDetail[];r?: string; p?: number | null; s?: string; all?: [string, string][]; kcSource?:string; status?:string; url?:string; revision?:number; checkedAt?:string; acquisition?:string[]; note?:string};
-export type PageDrops = {error?:string;sources: DropSource[]; items: Record<string, ItemRate>};
+export type PageDrops = {error?:string;sources: DropSource[]; items: Record<string, ItemRate>;
+  /** Lower-case names of the drops worth noting: collection log items at 1/50 or rarer. */
+  notable?: string[]};
 
 const pageCache = new Map<string, Promise<PageDrops>>();
 const pageCachedAt = new Map<string, number>();

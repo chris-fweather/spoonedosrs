@@ -28,4 +28,13 @@ Reference snapshots added 4 October 2026
 - Quest requirements: Bucket:Quest and Module:Questreq/data, stored in lib/quest-reference.json. official_length is a category (Very Short through Very Long). The wiki pages do not publish one clock time.
 - Achievement diary tasks: the twelve diary pages linked from https://oldschool.runescape.wiki/w/Achievement_Diary , stored in lib/diary-tasks.json. Area completion totals still come from the RuneProfile sync. The task text is the wiki list, not per-account ticks.
 - Combat achievement combos: Bucket:Combat_achievement descriptions that name other catalogue tasks, stored in lib/ca-combos.json. Points shown on the combat tab are tier totals × points per task, because individual ticks are not in the sync.
+- Quest start text keeps one floor name, the UK one the site uses, with the wiki's entities decoded (plain_start in scripts/fetch-reference.py).
 Wiki content is CC BY-NC-SA 3.0. Refresh with scripts/fetch-reference.py.
+
+World map icon details (public/world-map/icon-details.json, built by scripts/build-map-icon-details.mjs)
+- Agility shortcuts: RuneLite AgilityShortcut (https://github.com/runelite/runelite/blob/9fad2c588ca957ae47d883b09544725a796ed9fe/runelite-client/src/main/java/net/runelite/client/game/AgilityShortcut.java) gives the name, Agility level and world map point; an icon within 2 tiles of a point takes it. Otherwise Shortest Path's agility_shortcuts.tsv and Agility-gated transports.tsv rows (commit c48960159a738066a230f76899821da9d5369439) within 3 tiles, when they agree on the level. Grapple shortcuts add Shortest Path's other skills. Unmatched or ambiguous icons keep the plain name.
+- Fishing spots: RuneLite FishingSpot lists each kind of spot's fish and NPC ids; the NPC ids name the 64-tile map square the spots stand in. An icon lists every kind named for its square. The level is the lowest of the spot's fish in RuneLite's FishingAction (skill calculator); a spot with a fish it does not list shows no level. Spots named without a square (boats, Piscatoris, Tempoross, Camdozaal and others) are not matched.
+BSD 2-Clause; notice in public/world-map/NOTICE.txt.
+
+Grand Exchange prices (guide cost tables, gear values and item price cards)
+- OSRS Wiki real-time prices API: https://prices.runescape.wiki/api/v1/osrs (lib/ge-prices.ts). Latest trades are cached for ten minutes. Credited on the credits page with the other OSRS Wiki data.

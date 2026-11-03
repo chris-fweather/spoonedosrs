@@ -399,8 +399,8 @@ export function GuideWritingField({
         style={{ minHeight: rows * 22 }}
       />
       {mention && <div className="guide-mention" role="listbox" aria-label="Insert a game term" style={{ left: mention.x, top: mention.y }} onMouseDown={(e) => e.preventDefault()}>
-        {mentionResults.length ? mentionResults.map((r, i) => <button type="button" role="option" aria-selected={i === mention.pick} key={r.kind + r.name} onClick={() => chooseMention(r.name)}>{r.icon ? <img src={r.icon} alt="" /> : <span className="guide-term-blank" />}<span>{r.name}<small>{r.kind}</small></span></button>)
-          : <p className="fine">{mention.query ? "No matches." : "Type an item, prayer, spell, skill or quest."}</p>}
+        {mentionResults.length ? mentionResults.map((r, i) => <button type="button" role="option" aria-selected={i === mention.pick} key={r.kind + r.name} onClick={() => chooseMention(r.name)}>{r.icon ? <img src={r.icon} alt="" /> : <span className="guide-term-blank" />}<span>{r.name}<small className={r.detail ? "is-detail" : undefined}>{r.detail ?? r.kind}</small></span></button>)
+          : <p className="fine">{mention.query ? "No matches." : "Type an item, prayer, spell, skill, quest or teleport."}</p>}
       </div>}
       <small data-near={value.length > maxLength * 0.9 || undefined}>
         {value.length.toLocaleString()} / {maxLength.toLocaleString()}{value.length > maxLength ? " · Shorten this section before saving." : ""}

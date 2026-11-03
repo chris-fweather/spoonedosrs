@@ -1,4 +1,5 @@
 import questReference from './quest-reference.json' with {type:'json'};
+import {parseGuideMap,type GuideMap} from './guide-map';
 import diaryReference from './diary-tasks.json' with {type:'json'};
 import names from './guide-item-catalogue.json' with {type:'json'};
 import {isUploadUrl} from './guide-upload-rules';
@@ -6,23 +7,52 @@ import itemImages from './guide-item-images.json' with {type:'json'};
 import {GUIDE_EMOJIS} from './guide-emojis';
 import {EQUIP_SLOTS,emptyEquipped,wearables,type EquipSlot,type Equipped} from './flair';
 import type {StaffRole} from './staff-policy';
-export type GuideSetupProfile={id:string;name:string;equipment:Equipped;inventory:(string|null)[];note?:string};
+import magicData from './guide-magic.json' with {type:'json'};
+/** A stack in an inventory slot: how many, and whether they are bank notes. Slots without one hold a single, unnoted item. */
+export type GuideStack={quantity:number;noted?:boolean};
+/** `stacks` is keyed by inventory slot index ("0" to "27"); only slots with an item can have one. */
+export type GuideSetupProfile={id:string;name:string;equipment:Equipped;inventory:(string|null)[];stacks?:Record<string,GuideStack>;note?:string};
 export const GUIDE_SKILLS=['Attack','Strength','Defence','Ranged','Prayer','Magic','Runecraft','Construction','Hitpoints','Agility','Herblore','Thieving','Crafting','Fletching','Slayer','Hunter','Mining','Smithing','Fishing','Cooking','Firemaking','Woodcutting','Farming','Sailing'];
 export type GuideSkill={skill:string;level:number};
 /** A requirement the catalogues don't cover, such as a Slayer unlock or fairy ring access; it can borrow any item's icon. */
 export type GuideOtherRequirement={label:string;itemId:string|null;icon?:GuideIconKey};
 /** Plain icons for a custom requirement that no item fits; a task icon is the default. */
-export const GUIDE_OTHER_ICONS={task:['Task','/icons/navigation/combat-achievements-icon.png'],slayer:['Slayer','/icons/skills/slayer.png'],list:['List','/icons/navigation/quest-list-icon.png'],settings:['Settings','/icons/community/settings-icon.png']} as const;
+export const GUIDE_OTHER_ICONS={task:['Task','/icons/navigation/combat-achievements-icon.png'],slayer:['Slayer','/icons/skills/slayer.png'],list:['List','/ui/quest-list-icon.png'],settings:['Settings','/icons/community/settings-icon.png']} as const;
 export type GuideIconKey=keyof typeof GUIDE_OTHER_ICONS;
 export type GuideDiary={area:string;tier:string};
 export const GUIDE_TONES=['default','gold','orange','green'] as const;
 export type GuideTone=(typeof GUIDE_TONES)[number];
 export const GUIDE_TEXT_STYLES=['body','heading','subheading','list','numbered'] as const;
 export type GuideTextStyle=(typeof GUIDE_TEXT_STYLES)[number];
-export type GuideBlock={id:string;kind:'text';text:string;style:GuideTextStyle;tone:GuideTone}|{id:string;kind:'gear'|'inventory';setupId:string}|{id:string;kind:'requirements'|'divider'}|{id:string;kind:'odds';name:string;rate:number;count:number;unit:string}|{id:string;kind:'loadouts';setupIds:string[];inventoryId?:string}|{id:string;kind:'costs';title:string;rows:GuideCostRow[]}|{id:string;kind:'drops';page:string}|{id:string;kind:'prayers'|'spells';names:string[]}|{id:string;kind:'image';url:string;caption:string};
+export type GuideLeafBlock={id:string;kind:'text';text:string;style:GuideTextStyle;tone:GuideTone}|{id:string;kind:'gear'|'inventory';setupId:string;setupIds?:string[]}|{id:string;kind:'requirements'|'divider'}|{id:string;kind:'odds';name:string;rate:number;count:number;unit:string}|{id:string;kind:'loadouts';setupIds:string[];inventoryId?:string}|{id:string;kind:'costs';title:string;rows:GuideCostRow[];per?:string}|{id:string;kind:'drops';page:string}|{id:string;kind:'prayers'|'spells';names:string[]}|{id:string;kind:'image';url:string;caption:string}|({id:string;kind:'map'}&GuideMap)|GuideRewardsBlock;
+/** Rewards in the game's own style: a quest's completion scroll, a boss or raid chest's loot, a clue casket or an
+ * achievement diary's rewards. `itemId` is the scroll's picture (quests); XP can be in a skill or, for lamps, any skill. */
+export const GUIDE_REWARD_VARIANTS=['quest','chest','casket','diary'] as const;
+export type GuideRewardVariant=(typeof GUIDE_REWARD_VARIANTS)[number];
+export const GUIDE_REWARD_ANY_SKILL='Any';
+export type GuideRewardXp={skill:string;amount:number};
+/** A clue casket's tier: its casket picture and the default title follow it. */
+export const GUIDE_REWARD_TIERS=['beginner','easy','medium','hard','elite','master'] as const;
+export type GuideRewardTier=(typeof GUIDE_REWARD_TIERS)[number];
+/** Where a chest's loot comes from. Barrows, the three raids and the Lunar Chest have their own reward window in the game
+ * (the same stone frame, each with its own title and chest); the Gauntlet's chest and other loot ('loot', such as a boss
+ * chest or the Wintertodt reward cart) have none, so they share one loot window. */
+export const GUIDE_REWARD_SOURCES=['loot','barrows','cox','tob','toa','lunar','gauntlet'] as const;
+export type GuideRewardSource=(typeof GUIDE_REWARD_SOURCES)[number];
+export type GuideRewardsBlock={id:string;kind:'rewards';variant:GuideRewardVariant;title:string;tier?:GuideRewardTier;source?:GuideRewardSource;itemId?:string;questPoints?:number;xp?:GuideRewardXp[];items?:{id:string;quantity:number}[];lines?:string[]};
+export const GUIDE_REWARD_LIMITS={title:80,questPoints:10,xp:8,xpAmount:10_000_000,items:28,quantity:1_000_000_000,lines:12,line:140};
+/** Two sections side by side: the split is the width of the left column to the right. Phones stack them. */
+export const GUIDE_COLUMN_SPLITS=['1:1','2:1','1:2'] as const;
+export type GuideColumnSplit=(typeof GUIDE_COLUMN_SPLITS)[number];
+export type GuideColumnsBlock={id:string;kind:'columns';split:GuideColumnSplit;columns:[GuideLeafBlock|null,GuideLeafBlock|null]};
+export type GuideBlock=GuideLeafBlock|GuideColumnsBlock;
 /** One row of a cost table: an item and what one use of it consumes (for example a staff and its runes per charge). */
-export type GuideCostRow={itemId:string;parts:{itemId:string;quantity:number}[]};
-export type Guide={blocks?:GuideBlock[];title:string;activity:string;summary:string;requirements:string;strategy:string;equipment:Equipped;inventory:(string|null)[];setups?:GuideSetupProfile[];requiredItems?:{id:string;quantity:number}[];requiredQuests?:string[];requiredDiaries?:GuideDiary[];requiredSkills?:GuideSkill[];requiredOther?:GuideOtherRequirement[]};
+/** A cost table row: the item it prices (its name, or `label` when set, such as "Early level") and what one use takes. */
+/** A cost table row: an item ("Trident of the swamp") or a spell ("Ice Barrage", its runes filled in), and what one use consumes. */
+export type GuideCostRow=({itemId:string;spell?:undefined}|{spell:string;itemId?:undefined})&{label?:string;parts:{itemId:string;quantity:number}[]};
+/** A spell a cost row can price: one with runes per cast. */
+export const isCostSpell=(name:unknown):name is string=>typeof name==='string'&&Object.hasOwn(magicData.spells,name)&&!!(magicData.spells as Record<string,{runes?:unknown[]}>)[name].runes?.length;
+export type Guide={blocks?:GuideBlock[];title:string;activity:string;summary:string;requirements:string;strategy:string;equipment:Equipped;inventory:(string|null)[];setups?:GuideSetupProfile[];requiredItems?:{id:string;quantity:number}[];requiredQuests?:string[];requiredDiaries?:GuideDiary[];requiredSkills?:GuideSkill[];requiredOther?:GuideOtherRequirement[];recommendedSkills?:GuideSkill[];recommendedItems?:{id:string;quantity:number}[]};
 export const guideItems:Record<string,string>={...names,...Object.fromEntries(Object.entries(wearables.items).map(([id,item])=>[id,item.name]))};
 const images=itemImages as Record<string,string|null>;
 /** Official inventory icon for a guide item: /items/{id}.png unless the image map points elsewhere (null when the game has no icon we can use). */
@@ -43,6 +73,28 @@ export function newGuideSetup(name='Recommended',id='recommended'):GuideSetupPro
 export function guideSetups(g:Guide):GuideSetupProfile[]{return g.setups?.length?g.setups:[{id:'recommended',name:'Recommended',equipment:g.equipment,inventory:g.inventory}];}
 export function emptyGuide():Guide{return {title:'',activity:'',summary:'',requirements:'',strategy:'',equipment:emptyEquipped(),inventory:Array(28).fill(null),requiredQuests:[],requiredDiaries:[]};}
 export function mayEditGuide(role:StaffRole,actor:string,author:string){return actor===author||role==='owner'||role==='admin';}
+/** The game's largest stack (a 32-bit signed integer). */
+export const GUIDE_MAX_STACK=2147483647;
+/** Stacks for a setup's filled inventory slots: whole quantities from 1 to the game's maximum, optionally noted. A single,
+ * unnoted item needs no entry, so those are dropped; nothing left means no stacks at all. */
+function parseStacks(value:unknown,inventory:(string|null)[]):Record<string,GuideStack>|undefined{
+ if(value===undefined||value===null)return undefined;
+ if(typeof value!=='object'||Array.isArray(value))throw Error('Inventory stacks must list slots with a quantity.');
+ const out:Record<string,GuideStack>={};
+ for(const [slot,raw] of Object.entries(value)){
+  if(!/^(?:[0-9]|1[0-9]|2[0-7])$/.test(slot)||!inventory[Number(slot)])throw Error('Give stacks only to inventory slots that hold an item.');
+  const r=raw as Record<string,unknown>;
+  if(!r||typeof r!=='object'||Array.isArray(r)||!Number.isSafeInteger(r.quantity)||Number(r.quantity)<1||Number(r.quantity)>GUIDE_MAX_STACK)throw Error(`Use a whole stack size from 1 to ${GUIDE_MAX_STACK.toLocaleString('en-US')}.`);
+  if(r.noted!==undefined&&typeof r.noted!=='boolean')throw Error('Mark a stack as noted or not.');
+  if(r.quantity===1&&!r.noted)continue;
+  out[slot]={quantity:Number(r.quantity),...(r.noted?{noted:true}:{})};
+ }
+ return Object.keys(out).length?out:undefined;
+}
+/** The stack in an inventory slot: one unnoted item unless the setup says otherwise. */
+export function guideSlotStack(setup:Pick<GuideSetupProfile,'stacks'>,slot:number):Required<GuideStack>{const s=setup.stacks?.[slot];return {quantity:s?.quantity??1,noted:!!s?.noted};}
+/** A setup's inventory as items with their stack sizes, for its value. */
+export function guideInventoryItems(setup:Pick<GuideSetupProfile,'inventory'|'stacks'>):{id:string;quantity:number}[]{return setup.inventory.flatMap((id,i)=>id?[{id,quantity:guideSlotStack(setup,i).quantity}]:[]);}
 function parseSetup(v:Record<string,unknown>):GuideSetupProfile{
  if(typeof v.id!=='string'||!/^[a-zA-Z0-9_-]{1,64}$/.test(v.id)||typeof v.name!=='string'||!v.name.trim()||v.name.length>60)throw Error('Name every setup using 1 to 60 characters.');
  const g=newGuideSetup(v.name.trim(),v.id);
@@ -52,8 +104,35 @@ function parseSetup(v:Record<string,unknown>):GuideSetupProfile{
  for(const slot of EQUIP_SLOTS){const id=g.equipment[slot];if(id&&wearables.items[id].blocks.some(block=>g.equipment[block]))throw Error('Equipment slots conflict.');}
  if(!Array.isArray(v.inventory)||v.inventory.length!==28||v.inventory.some(id=>id!==null&&(typeof id!=='string'||!Object.hasOwn(guideItems,id))))throw Error('Use 28 inventory slots with recognised items.');
  g.inventory=[...v.inventory] as (string|null)[];
+ const stacks=parseStacks(v.stacks,g.inventory);if(stacks)g.stacks=stacks;
  if(v.note!==undefined&&v.note!==''){if(typeof v.note!=='string'||v.note.length>400)throw Error('Keep each setup note to 400 characters.');g.note=v.note.trim();}
  return g;
+}
+function parseItems(value:unknown,what:string):{id:string;quantity:number}[]{
+ const items=value??[];if(!Array.isArray(items)||items.length>40||items.some(i=>!i||typeof i!=='object'||typeof i.id!=='string'||!Object.hasOwn(guideItems,i.id)||!Number.isSafeInteger(i.quantity)||i.quantity<1||i.quantity>1000000)||new Set(items.map(i=>i.id)).size!==items.length)throw Error(`Choose up to 40 known ${what} items with valid quantities.`);
+ return items.map(i=>({id:i.id,quantity:i.quantity}));
+}
+function parseSkills(value:unknown):GuideSkill[]{
+ const skills=value??[];if(!Array.isArray(skills)||skills.length>GUIDE_SKILLS.length||skills.some(r=>!r||typeof r!=='object'||!GUIDE_SKILLS.includes(r.skill)||!Number.isSafeInteger(r.level)||r.level<1||r.level>99)||new Set(skills.map(r=>r.skill)).size!==skills.length)throw Error('Choose each skill once, with a level from 1 to 99.');
+ return skills.map(r=>({skill:r.skill,level:r.level}));
+}
+/** A rewards section: a known variant, a title, and at least one reward (quest points, XP, items or lines of text such as
+ * unlocks and perks). Empty lists and blank lines are left out. */
+function parseRewards(id:string,b:Record<string,unknown>):GuideRewardsBlock{
+ const L=GUIDE_REWARD_LIMITS;
+ if(!(GUIDE_REWARD_VARIANTS as readonly string[]).includes(String(b.variant)))throw Error('Choose quest, chest, casket or diary rewards.');
+ if(typeof b.title!=='string'||!b.title.trim()||b.title.length>L.title)throw Error(`Name the rewards in 1 to ${L.title} characters.`);
+ const out:GuideRewardsBlock={id,kind:'rewards',variant:b.variant as GuideRewardVariant,title:b.title.trim()};
+ // A casket's tier and a chest's source; older sections have neither. Each only belongs to its own kind of rewards.
+ if(b.tier!==undefined&&b.tier!==null){if(!(GUIDE_REWARD_TIERS as readonly string[]).includes(String(b.tier)))throw Error('Choose a beginner, easy, medium, hard, elite or master casket.');if(out.variant==='casket')out.tier=b.tier as GuideRewardTier;}
+ if(b.source!==undefined&&b.source!==null){if(!(GUIDE_REWARD_SOURCES as readonly string[]).includes(String(b.source)))throw Error('Choose where the chest\'s loot comes from.');if(out.variant==='chest')out.source=b.source as GuideRewardSource;}
+ if(b.itemId!==undefined&&b.itemId!==null){if(typeof b.itemId!=='string'||!Object.hasOwn(guideItems,b.itemId))throw Error('Choose a known item for the rewards picture.');out.itemId=b.itemId;}
+ if(b.questPoints!==undefined&&b.questPoints!==0){if(!Number.isSafeInteger(b.questPoints)||Number(b.questPoints)<0||Number(b.questPoints)>L.questPoints)throw Error(`Use 0 to ${L.questPoints} quest points.`);out.questPoints=Number(b.questPoints);}
+ if(b.xp!==undefined){const xp=b.xp;if(!Array.isArray(xp)||xp.length>L.xp||xp.some(r=>!r||typeof r!=='object'||(r.skill!==GUIDE_REWARD_ANY_SKILL&&!GUIDE_SKILLS.includes(r.skill))||!Number.isSafeInteger(r.amount)||r.amount<1||r.amount>L.xpAmount))throw Error(`Use up to ${L.xp} XP rewards, each a skill (or any skill) and 1 to 10,000,000 XP.`);if(xp.length)out.xp=xp.map(r=>({skill:r.skill,amount:r.amount}));}
+ if(b.items!==undefined){const items=b.items;if(!Array.isArray(items)||items.length>L.items||items.some(i=>!i||typeof i!=='object'||typeof i.id!=='string'||!Object.hasOwn(guideItems,i.id)||!Number.isSafeInteger(i.quantity)||i.quantity<1||i.quantity>L.quantity))throw Error(`Use up to ${L.items} known reward items with whole quantities.`);if(items.length)out.items=items.map(i=>({id:i.id,quantity:i.quantity}));}
+ if(b.lines!==undefined){const lines=b.lines;if(!Array.isArray(lines)||lines.some(l=>typeof l!=='string'||l.length>L.line))throw Error(`Keep each reward line to ${L.line} characters.`);const kept=(lines as string[]).map(l=>l.trim()).filter(Boolean);if(kept.length>L.lines)throw Error(`Use up to ${L.lines} reward lines.`);if(kept.length)out.lines=kept;}
+ if(!out.questPoints&&!out.xp&&!out.items&&!out.lines)throw Error('Add at least one reward.');
+ return out;
 }
 export function parseGuide(value:unknown):Guide {
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Enter a guide.');
@@ -63,35 +142,70 @@ export function parseGuide(value:unknown):Guide {
  if(v.setups!==undefined){if(!Array.isArray(v.setups)||!v.setups.length||v.setups.length>8)throw Error('Use 1 to 8 equipment setups.');g.setups=v.setups.map(s=>{if(!s||typeof s!=='object'||Array.isArray(s))throw Error('Invalid setup.');return parseSetup(s);});if(new Set(g.setups.map(s=>s.id)).size!==g.setups.length)throw Error('Setup IDs must be unique.');if(new Set(g.setups.map(s=>s.name.toLowerCase())).size!==g.setups.length)throw Error('Give every setup a different name.');}
  else g.setups=[legacy];
  g.equipment=g.setups[0].equipment;g.inventory=g.setups[0].inventory;
- const items=v.requiredItems??[];if(!Array.isArray(items)||items.length>40||items.some(i=>!i||typeof i!=='object'||typeof i.id!=='string'||!Object.hasOwn(guideItems,i.id)||!Number.isSafeInteger(i.quantity)||i.quantity<1||i.quantity>1000000)||new Set(items.map(i=>i.id)).size!==items.length)throw Error('Choose up to 40 known required items with valid quantities.');g.requiredItems=items.map(i=>({id:i.id,quantity:i.quantity}));
+ g.requiredItems=parseItems(v.requiredItems,'required');
  const quests=v.requiredQuests??[];if(!Array.isArray(quests)||quests.length>40||quests.some(q=>typeof q!=='string'||!guideQuests.includes(q))||new Set(quests).size!==quests.length)throw Error('Choose up to 40 distinct quests from the catalogue.');g.requiredQuests=quests;
  const diaries=v.requiredDiaries??[];if(!Array.isArray(diaries)||diaries.length>48||diaries.some(d=>!d||typeof d!=='object'||!guideDiaryAreas.includes(d.area)||!guideDiaryTiers.includes(d.tier))||new Set(diaries.map(d=>d.area+'|'+d.tier)).size!==diaries.length)throw Error('Choose distinct diary areas and tiers from the catalogue.');g.requiredDiaries=diaries.map(d=>({area:d.area,tier:d.tier}));
- const skills=v.requiredSkills??[];if(!Array.isArray(skills)||skills.length>GUIDE_SKILLS.length||skills.some(r=>!r||typeof r!=='object'||!GUIDE_SKILLS.includes(r.skill)||!Number.isSafeInteger(r.level)||r.level<1||r.level>99)||new Set(skills.map(r=>r.skill)).size!==skills.length)throw Error('Choose each skill once, with a level from 1 to 99.');g.requiredSkills=skills.map(r=>({skill:r.skill,level:r.level}));
+ g.requiredSkills=parseSkills(v.requiredSkills);
+ // Recommended levels and items sit apart from the requirements; older guides have none.
+ if(v.recommendedSkills!==undefined)g.recommendedSkills=parseSkills(v.recommendedSkills);
+ if(v.recommendedItems!==undefined)g.recommendedItems=parseItems(v.recommendedItems,'recommended');
  const other=v.requiredOther??[];if(!Array.isArray(other)||other.length>20||other.some(r=>!r||typeof r!=='object'||typeof r.label!=='string'||r.label.trim().length<2||r.label.length>100||(r.itemId!==null&&(typeof r.itemId!=='string'||!Object.hasOwn(guideItems,r.itemId)))))throw Error('Use up to 20 other requirements of 2 to 100 characters.');if(other.some(r=>r.icon!==undefined&&!Object.hasOwn(GUIDE_OTHER_ICONS,r.icon)))throw Error('Choose a supported requirement icon.');g.requiredOther=other.map(r=>({label:r.label.trim(),itemId:r.itemId,...(!r.itemId&&r.icon&&r.icon!=='task'?{icon:r.icon as GuideIconKey}:{})}));
  if(v.blocks!==undefined){
   if(!Array.isArray(v.blocks)||!v.blocks.length||v.blocks.length>100)throw Error('Use 1 to 100 document sections.');
   const ids=new Set<string>();let length=0;
-  g.blocks=v.blocks.map((b:Record<string,unknown>):GuideBlock=>{
+  const setupList=(list:unknown,message:string):string[]=>{if(!Array.isArray(list)||!list.length||list.length>8||list.some(x=>typeof x!=='string'||!g.setups?.some(s=>s.id===x))||new Set(list).size!==list.length)throw Error(message);return [...list] as string[];};
+  const leaf=(b:Record<string,unknown>):GuideLeafBlock=>{
    if(!b||typeof b!=='object'||typeof b.id!=='string'||!/^[a-zA-Z0-9_-]{1,64}$/.test(b.id)||ids.has(b.id))throw Error('Invalid document section.');ids.add(b.id);
    const id=b.id;
    if(b.kind==='text'){if(typeof b.text!=='string'||(length+=b.text.length)>16000||!(GUIDE_TEXT_STYLES as readonly string[]).includes(String(b.style))||!(GUIDE_TONES as readonly string[]).includes(String(b.tone)))throw Error('Use the supported document styles and up to 16,000 text characters.');return {id,kind:'text',text:b.text,style:b.style as GuideTextStyle,tone:b.tone as GuideTone};}
-   if(b.kind==='gear'||b.kind==='inventory'){if(typeof b.setupId!=='string'||!g.setups?.some(s=>s.id===b.setupId))throw Error('Choose a saved loadout for this section.');return {id,kind:b.kind,setupId:b.setupId};}
+   // One setup, or several shown as tabs (setupIds, first tab = setupId). Older sections have setupId only.
+   if(b.kind==='gear'||b.kind==='inventory'){if(typeof b.setupId!=='string'||!g.setups?.some(s=>s.id===b.setupId))throw Error('Choose a saved loadout for this section.');if(b.setupIds===undefined)return {id,kind:b.kind,setupId:b.setupId};const tabs=setupList(b.setupIds,'Choose the saved loadouts to show as tabs.');return tabs.length>1?{id,kind:b.kind,setupId:tabs[0],setupIds:tabs}:{id,kind:b.kind,setupId:tabs[0]};}
    if(b.kind==='requirements'||b.kind==='divider')return {id,kind:b.kind};
    // Older drafts carried a highlight list; the table now shows on its own, so it is dropped.
    if(b.kind==='drops'){if(typeof b.page!=='string'||!b.page.trim()||b.page.length>100)throw Error('Choose the boss or activity whose drop table to show.');return {id,kind:'drops',page:b.page.trim()};}
-   if(b.kind==='costs'){const rows=b.rows;if(typeof b.title!=='string'||b.title.length>80||!Array.isArray(rows)||!rows.length||rows.length>12||rows.some(r=>!r||typeof r!=='object'||typeof r.itemId!=='string'||!Object.hasOwn(guideItems,r.itemId)||!Array.isArray(r.parts)||!r.parts.length||r.parts.length>8||r.parts.some((x:{itemId:unknown;quantity:unknown})=>!x||typeof x.itemId!=='string'||!Object.hasOwn(guideItems,x.itemId)||typeof x.quantity!=='number'||!Number.isFinite(x.quantity)||x.quantity<=0||x.quantity>100000)))throw Error('Use 1 to 12 cost rows, each with known items and positive quantities.');return {id,kind:'costs',title:b.title.trim(),rows:rows.map((r:GuideCostRow)=>({itemId:r.itemId,parts:r.parts.map(x=>({itemId:x.itemId,quantity:x.quantity}))}))};}
-   if(b.kind==='loadouts'){const list=b.setupIds;if(!Array.isArray(list)||!list.length||list.length>8||list.some(x=>typeof x!=='string'||!g.setups?.some(s=>s.id===x))||new Set(list).size!==list.length)throw Error('Choose the saved loadouts to show side by side.');if(b.inventoryId!==undefined&&(typeof b.inventoryId!=='string'||!g.setups?.some(s=>s.id===b.inventoryId)))throw Error('Choose a saved loadout for the inventory.');return {id,kind:'loadouts',setupIds:[...list] as string[],...(b.inventoryId?{inventoryId:b.inventoryId as string}:{})};}
+   if(b.kind==='costs'){const rows=b.rows;if(typeof b.title!=='string'||b.title.length>80||!Array.isArray(rows)||!rows.length||rows.length>12||rows.some(r=>!r||typeof r!=='object'||(r.spell!==undefined?!isCostSpell(r.spell)||r.itemId!==undefined:typeof r.itemId!=='string'||!Object.hasOwn(guideItems,r.itemId))||(r.label!==undefined&&(typeof r.label!=='string'||!r.label.trim()||r.label.length>40))||!Array.isArray(r.parts)||!r.parts.length||r.parts.length>8||r.parts.some((x:{itemId:unknown;quantity:unknown})=>!x||typeof x.itemId!=='string'||!Object.hasOwn(guideItems,x.itemId)||typeof x.quantity!=='number'||!Number.isFinite(x.quantity)||x.quantity<=0||x.quantity>100000)))throw Error('Use 1 to 12 cost rows, each with known items and positive quantities.');if(b.per!==undefined&&(typeof b.per!=='string'||!/^[a-z][a-z ]{0,19}$/i.test(b.per.trim())))throw Error('Say what one use is in a word or two, like cast or run.');return {id,kind:'costs',title:b.title.trim(),rows:rows.map((r:GuideCostRow)=>({...(r.spell!==undefined?{spell:r.spell}:{itemId:r.itemId}),...(r.label?{label:r.label.trim()}:{}),parts:r.parts.map(x=>({itemId:x.itemId,quantity:x.quantity}))})),...(b.per?{per:b.per.trim()}:{})};}
+   // Gear and inventory with a tab per setup. inventoryId (older guides) is the inventory shown for a tab whose own is empty.
+   if(b.kind==='loadouts'){const list=setupList(b.setupIds,'Choose the saved loadouts to show as tabs.');if(b.inventoryId!==undefined&&(typeof b.inventoryId!=='string'||!g.setups?.some(s=>s.id===b.inventoryId)))throw Error('Choose a saved loadout for the inventory.');return {id,kind:'loadouts',setupIds:list,...(b.inventoryId?{inventoryId:b.inventoryId as string}:{})};}
    if(b.kind==='odds'){if(typeof b.name!=='string'||b.name.length<1||b.name.length>100||typeof b.rate!=='number'||!Number.isFinite(b.rate)||b.rate<1||b.rate>1e12||!Number.isSafeInteger(b.count)||Number(b.count)<0||Number(b.count)>1e12||!['kills','searches','rolls','runs','catches','actions'].includes(String(b.unit)))throw Error('Use a valid per-action rate and whole attempt count.');return {id,kind:'odds',name:b.name,rate:b.rate,count:Number(b.count),unit:String(b.unit)};}
    // Prayers and spells to use, shown as a row with their icons.
    if(b.kind==='prayers'||b.kind==='spells'){const names=b.names;if(!Array.isArray(names)||!names.length||names.length>16||names.some(n=>typeof n!=='string'||!n.trim()||n.length>60)||new Set(names).size!==names.length)throw Error(`Choose up to 16 ${b.kind}.`);return {id,kind:b.kind,names:names.map(n=>n.trim())};}
    // An uploaded image (served by this site from R2) or one by link: https only, shown lazily with a caption.
    if(b.kind==='image'){if(typeof b.caption!=='string'||b.caption.length>200)throw Error('Keep the caption to 200 characters.');if(typeof b.url==='string'&&isUploadUrl(b.url))return {id,kind:'image',url:b.url,caption:b.caption.trim()};let url:URL;try{url=new URL(String(b.url));}catch{throw Error('Paste an image link that starts with https://.');}if(url.protocol!=='https:'||String(b.url).length>500)throw Error('Paste an image link that starts with https://.');if(typeof b.caption!=='string'||b.caption.length>200)throw Error('Keep the caption to 200 characters.');return {id,kind:'image',url:url.href,caption:b.caption.trim()};}
+   if(b.kind==='rewards')return parseRewards(id,b);
+   // A world map with numbered stops (lib/guide-map.ts).
+   if(b.kind==='map')return {id,kind:'map',...parseGuideMap(b,itemId=>Object.hasOwn(guideItems,itemId))};
    throw Error('Unsupported document section.');
-  });
+  };
+  // Two columns hold one section each (or nothing yet); a column never holds another pair of columns or a divider.
+  const block=(b:Record<string,unknown>):GuideBlock=>{
+   if(!b||typeof b!=='object'||b.kind!=='columns')return leaf(b);
+   if(typeof b.id!=='string'||!/^[a-zA-Z0-9_-]{1,64}$/.test(b.id)||ids.has(b.id))throw Error('Invalid document section.');ids.add(b.id);
+   if(!(GUIDE_COLUMN_SPLITS as readonly string[]).includes(String(b.split))||!Array.isArray(b.columns)||b.columns.length!==2)throw Error('Use two columns with a supported split.');
+   const side=(c:unknown):GuideLeafBlock|null=>{if(c===null)return null;if(!c||typeof c!=='object'||Array.isArray(c))throw Error('Invalid column section.');const k=(c as Record<string,unknown>).kind;if(k==='columns'||k==='divider')throw Error('A column holds one section: not columns or a divider.');return leaf(c as Record<string,unknown>);};
+   return {id:b.id,kind:'columns',split:b.split as GuideColumnSplit,columns:[side(b.columns[0]),side(b.columns[1])]};
+  };
+  g.blocks=v.blocks.map(block);
  }
  return g;
 }
-export function guideHasRequirements(g:Guide){return !!(g.requirements||g.requiredItems?.length||g.requiredQuests?.length||g.requiredDiaries?.length||g.requiredSkills?.length||g.requiredOther?.length);}
+/** The setups a gear, inventory or gear-and-inventory section shows, in tab order. */
+export function guideSectionSetups(b:GuideLeafBlock):string[]{return b.kind==='loadouts'?b.setupIds:b.kind==='gear'||b.kind==='inventory'?b.setupIds??[b.setupId]:[];}
+export function guideHasRequirements(g:Guide){return !!(g.requirements||g.requiredItems?.length||g.requiredQuests?.length||g.requiredDiaries?.length||g.requiredSkills?.length||g.requiredOther?.length||g.recommendedSkills?.length||g.recommendedItems?.length);}
+/** Every section in reading order, with the two sides of a columns section in place of it. */
+export function guideLeafBlocks(blocks:GuideBlock[]):GuideLeafBlock[]{return blocks.flatMap(b=>b.kind==='columns'?b.columns.filter((c):c is GuideLeafBlock=>!!c):[b]);}
+export type GuideHeading={blockId:string;anchor:string;text:string;level:2|3};
+/** Headings and subheadings for the guide's contents, each with a readable anchor (#the-fight) that is unique in the guide. */
+export function guideHeadings(blocks:GuideBlock[]):GuideHeading[]{
+ const used=new Set<string>(),out:GuideHeading[]=[];
+ for(const b of guideLeafBlocks(blocks)){
+  if(b.kind!=='text'||(b.style!=='heading'&&b.style!=='subheading'))continue;
+  const text=guidePlainText(b.text.split(/\r?\n/)[0]).trim();if(!text)continue;
+  const base=text.toLowerCase().normalize('NFKD').replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)||'section';
+  let anchor=base;for(let n=2;used.has(anchor);n++)anchor=`${base}-${n}`;used.add(anchor);
+  out.push({blockId:b.id,anchor,text,level:b.style==='heading'?2:3});
+ }
+ return out;
+}
 export function guideBlocks(g:Guide):GuideBlock[]{return g.blocks??[
  ...(guideHasRequirements(g)?[{id:'requirements',kind:'requirements' as const}]:[]),
  ...guideSetups(g).flatMap(s=>s.inventory.some(Boolean)||Object.values(s.equipment).some(Boolean)?[{id:'gear-'+s.id,kind:'gear' as const,setupId:s.id},{id:'bag-'+s.id,kind:'inventory' as const,setupId:s.id}]:[]),
@@ -103,7 +217,7 @@ export function guideTextBlocks(text:string):GuideTextBlock[]{
  const blocks:GuideTextBlock[]=[];
  for(const line of text.split(/\r?\n/)){if(!line.trim())continue;const heading=line.match(/^#{1,3}\s+(.+)/),bullet=line.match(/^[-*]\s+(.+)/);if(heading)blocks.push({kind:'heading',text:heading[1]});else if(bullet){const last=blocks.at(-1);if(last?.kind==='list')last.items!.push(bullet[1]);else blocks.push({kind:'list',text:'',items:[bullet[1]]});}else blocks.push({kind:'paragraph',text:line});}return blocks;
 }
-export type GuideInline=string|{kind:'bold';children:GuideInline[]}|{kind:'tone';tone:GuideTone;children:GuideInline[]}|{kind:'emoji';name:string}|{kind:'ref';name:string;suffix?:string};
+export type GuideInline=string|{kind:'bold';children:GuideInline[]}|{kind:'tone';tone:GuideTone;children:GuideInline[]}|{kind:'emoji';name:string}|{kind:'ref';name:string;suffix?:string;quantity?:number};
 const INLINE=/\*\*([^*]+)\*\*|\{(default|gold|orange|green)\}|:([a-z_]+):|\[\[([^[\]\n]{1,60})\]\]([a-z']{0,3})/;
 /** Inline formatting inside one line: **bold**, {gold}coloured{/gold}, :emoji: names from the site set and [[game terms]]. Anything else stays text. */
 export function guideInline(text:string):GuideInline[]{
@@ -120,6 +234,27 @@ export function guideInline(text:string):GuideInline[]{
   push(text.slice(at,m.index));out.push({kind:'tone',tone,children:guideInline(text.slice(re.lastIndex,i-close.length))});at=re.lastIndex=i;
  }
  push(text.slice(at));return out;
+}
+/** How many of an item a mention means, from the text just before it: "3 [[Plank]]s", "2,000 [[Coins]]", "10x [[Shark]]",
+ * "x3 [[Shark]]". Only a standalone number followed by one space counts: "a [[Hammer]]", "level 8 [[...]]", "(8 [[Crafting]])",
+ * "1/3 [[...]]" and "8% [[...]]" are not quantities. Returns the text without the number, or null. */
+export function guideLeadingQuantity(before:string):{text:string;quantity:number}|null{
+ const m=before.match(/(^|\s)(?:(\d{1,3}(?:,\d{3})+|\d+) ?[x\u00d7]?|[x\u00d7](\d{1,3}(?:,\d{3})+|\d+)) $/i);if(!m)return null;
+ const quantity=Number((m[2]??m[3]).replaceAll(',','')),text=before.slice(0,m.index!+m[1].length);
+ if(!Number.isSafeInteger(quantity)||quantity<1||/(?:^|[^a-z])(?:level|lvl|lv)\.? ?$/i.test(text))return null;
+ return {text,quantity};
+}
+/** Folds a number just before an item mention into the mention ("3 [[Plank]]s" → Plank × 3), so it shows with the item and
+ * its price card values the stack. Mentions that are not items (isItem false), such as skills, keep their number as text. */
+export function guideMentionQuantities(nodes:GuideInline[],isItem:(name:string)=>boolean):GuideInline[]{
+ const out:GuideInline[]=[];
+ for(const n of nodes){
+  if(typeof n!=='string'&&(n.kind==='bold'||n.kind==='tone')){out.push({...n,children:guideMentionQuantities(n.children,isItem)});continue;}
+  const prev=out.at(-1);
+  if(typeof n!=='string'&&n.kind==='ref'&&typeof prev==='string'&&isItem(n.name)){const q=guideLeadingQuantity(prev);if(q){if(q.text)out[out.length-1]=q.text;else out.pop();out.push({...n,quantity:q.quantity});continue;}}
+  out.push(n);
+ }
+ return out;
 }
 /** Plain words of a line, without formatting marks (for outlines and labels). */
 export function guidePlainText(text:string):string{const walk=(n:GuideInline[]):string=>n.map(x=>typeof x==='string'?x:x.kind==='emoji'?'':x.kind==='ref'?x.name+(x.suffix??''):walk(x.children)).join('');return walk(guideInline(text));}

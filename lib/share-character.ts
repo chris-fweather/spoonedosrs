@@ -1,6 +1,6 @@
 import {appearanceModels,DEFAULT_APPEARANCE,equipmentModel,headModel,parseAppearance,type Appearance} from './appearance';
 import {EQUIP_SLOTS,emptyEquipped,equipItem,wearables,type Equipped} from './flair';
-import {skinColor} from './skin-palette';
+import {skinColor,skinPixel} from './skin-palette';
 
 type Vec=[number,number,number];
 type Face={points:Vec[];color:number[];normal:Vec;uv:number[][]|null;texture:string|null;opacity:number};
@@ -41,7 +41,7 @@ async function modelFaces(raw:unknown,appearance:Appearance):Promise<Face[]>{
  for(let i=0;i+2<indices.length;i+=3){if(faces.length>=MAX_FACES)throw Error('Model exceeds face budget.');const ids=indices.slice(i,i+3);if(ids.some(id=>!Number.isSafeInteger(id)||id<0||id>=positions.length))throw Error('Invalid face indices.');const points=ids.map(id=>positions[id] as Vec);const normal=normals?normalize([0,1,2].map(axis=>ids.reduce((s,id)=>s+(normals[id]?.[axis]??0),0)/3) as Vec):normalize(cross(minus(points[1],points[0]),minus(points[2],points[0])));const color=[0,0,0];let opacity=factor[3]??1;
  for(const id of ids){const original=colors?.[id]?.slice(0,3)??[1,1,1],recolored=skinColor(original,appearance.skin??'default')??original;for(let k=0;k<3;k++)color[k]+=recolored[k]*(factor[k]??1)/3;}
  let texture=image,coords=uv?ids.map(id=>uv[id]):null;
- if(image&&coords){const area=(coords[1][0]-coords[0][0])*(coords[2][1]-coords[0][1])-(coords[2][0]-coords[0][0])*(coords[1][1]-coords[0][1]);if(Math.abs(area)<1e-8){const decoded=images.get(image);if(decoded){const u=coords.reduce((s,v)=>s+v[0],0)/3,v=coords.reduce((s,t)=>s+t[1],0)/3,x=Math.min(decoded.width-1,Math.floor((u-Math.floor(u))*decoded.width)),y=Math.min(decoded.height-1,Math.floor((v-Math.floor(v))*decoded.height)),at=(y*decoded.width+x)*4;for(let k=0;k<3;k++)color[k]*=linear(decoded.rgba[at+k]/255);opacity*=decoded.rgba[at+3]/255;}texture=null;coords=null;}}
+ if(image&&coords){const area=(coords[1][0]-coords[0][0])*(coords[2][1]-coords[0][1])-(coords[2][0]-coords[0][0])*(coords[1][1]-coords[0][1]);if(Math.abs(area)<1e-8){const decoded=images.get(image);if(decoded){const u=coords.reduce((s,v)=>s+v[0],0)/3,v=coords.reduce((s,t)=>s+t[1],0)/3,x=Math.min(decoded.width-1,Math.floor((u-Math.floor(u))*decoded.width)),y=Math.min(decoded.height-1,Math.floor((v-Math.floor(v))*decoded.height)),at=(y*decoded.width+x)*4,pixel=skinPixel(decoded.rgba.subarray(at,at+3),appearance.skin??'default')??decoded.rgba.subarray(at,at+3);for(let k=0;k<3;k++)color[k]*=linear(pixel[k]/255);opacity*=decoded.rgba[at+3]/255;}texture=null;coords=null;}}
  if(opacity>0)faces.push({points,color,normal,uv:coords,texture,opacity});
  }}return faces;
 }
@@ -50,7 +50,7 @@ async function modelFaces(raw:unknown,appearance:Appearance):Promise<Face[]>{
 export async function renderShareCharacter({appearance:input=DEFAULT_APPEARANCE,equipped:inputGear=emptyEquipped(),loadAsset,width=300,height=470}:ShareCharacterOptions):Promise<ShareCharacterResult>{
  const appearance=parseAppearance(input);if(!Number.isFinite(width)||!Number.isFinite(height)||width<40||height<40||width>1200||height>1200)throw Error('Unsupported portrait dimensions.');
  let equipped=emptyEquipped();for(const slot of EQUIP_SLOTS){const id=inputGear[slot];if(id&&wearables.items[id]?.slot===slot)equipped=equipItem(equipped,slot,id);}
- const items=EQUIP_SLOTS.flatMap(slot=>{const id=equipped[slot];if(!id)return [];const entry=wearables.items[id],file=equipmentModel(id,entry.file,appearance);return file?[{file,entry}]:[];}),covered=new Set(items.flatMap(x=>x.entry.wear).filter(n=>n>=0)),kits=appearance.body==='female'?appearanceModels.femaleKits:wearables.kits,files=[...kits.filter(k=>k.hide<0||!covered.has(k.hide)).map(k=>k.part===0?headModel(appearance,covered.has(8)):k.file),...items.map(i=>i.file)];
+ const items=EQUIP_SLOTS.flatMap(slot=>{const id=equipped[slot];if(!id)return [];const entry=wearables.items[id],file=equipmentModel(id,entry.file,appearance);return file?[{file,entry}]:[];}),covered=new Set(items.flatMap(x=>x.entry.wear).filter(n=>n>=0)),kits=appearance.body==='female'?appearanceModels.femaleKits:wearables.kits,files=[...kits.filter(k=>k.hide<0||!covered.has(k.hide)).flatMap(k=>(k.part===0?headModel(appearance,covered.has(8)):k.file)??[]),...items.map(i=>i.file)];
  const missing:string[]=[],results=await Promise.all([...new Set(files)].map(async file=>{if(!/^[A-Za-z0-9_./-]+\.gltf$/.test(file)||file.includes('..'))return [];try{return await modelFaces(await loadAsset('/models/look/'+file),appearance);}catch{missing.push(file);return [];}})),faces=results.flat();if(!faces.length)throw Error('Character assets are unavailable.');if(faces.length>MAX_FACES)throw Error('Character exceeds face budget.');
  return projectFaces(faces,width,height,missing);
 }

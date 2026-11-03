@@ -22,7 +22,7 @@ Track your pets and collection log, see how dry you really are, and compare with
 </tr>
 <tr>
 <td align="center" width="50%" valign="top"><img src="public/icons/navigation/stats-icon.png" height="40"><br><b>Leaderboards</b><br><sub>Pets, collection log, combat achievements, quest points and total&nbsp;XP.</sub></td>
-<td align="center" width="50%" valign="top"><img src="public/icons/community/friends-list.png" height="40"><br><b>Profiles</b><br><sub>Your 3D character in its own scene, with titles, account badges and privacy&nbsp;controls.</sub></td>
+<td align="center" width="50%" valign="top"><img src="public/icons/community/friends-list.png" height="40"><br><b>Profiles</b><br><sub>Your 3D character in the gear you have collected, with titles, account badges and privacy&nbsp;controls.</sub></td>
 </tr>
 <tr>
 <td align="center" width="50%" valign="top"><img src="public/icons/navigation/quest-list-icon.png" height="40"><br><b>Guides</b><br><sub>Boss and activity guides with gear setups for every&nbsp;budget.</sub></td>

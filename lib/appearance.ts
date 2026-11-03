@@ -3,6 +3,13 @@ import {SKIN_COLORS,cacheHex} from './game-colors';
 export const SKIN_TONES=Object.fromEntries(Object.entries(SKIN_COLORS).map(([name,color])=>[name,cacheHex(color)])) as Record<keyof typeof SKIN_COLORS,string>;
 export type SkinTone=keyof typeof SKIN_TONES;
 export const BACKGROUNDS={none:'Plain',castle:'Castle courtyard',riverside:'Riverbank',mine:'Mine',woodland:'Woodland'} as const;
+/** Character scenes are off until they are redone. Saved choices stay stored and validated, but the profile, the settings
+ * preview and share images show the plain background, and the scene picker is hidden. Set true to bring them back. */
+export const CHARACTER_SCENES:boolean=false;
+/** The background a character is shown on: the saved scene while scenes are on, otherwise plain. */
+export function shownBackground(appearance:{background?:keyof typeof BACKGROUNDS}|undefined,enabled=CHARACTER_SCENES):keyof typeof BACKGROUNDS {
+ return enabled?appearance?.background??'none':'none';
+}
 export type Appearance = {background?:keyof typeof BACKGROUNDS;skin?:SkinTone;body:'male'|'female';hair:'brown'|'blonde'|'black'|'red'|'grey'};
 export const DEFAULT_APPEARANCE:Appearance={body:'male',hair:'brown'};
 export const HAIR_COLORS=['brown','blonde','black','red','grey'] as const;
@@ -26,8 +33,10 @@ export function featuredEmblem(id:string):boolean {
  return true;
 }
 
-/** Hide hair only when equipment covers identity slot 8. Open hats retain the chosen colour. */
-export function headModel(appearance:Appearance,wearingHat:boolean):string {
+/** The head kit (hair, skull and face) in the chosen hair colour, or null under a head item that covers identity slot 8.
+ * As in the game, such an item replaces the whole head: helmets, masks and hoods carry their own face, so a kit face
+ * underneath would show through visors and eye holes (slayer helmets, Torva, faceguards). Open hats keep the hair. */
+export function headModel(appearance:Appearance,wearingHat:boolean):string|null {
  const body=appearance.body==='female'?'female':'male';
- return wearingHat?`appearance/${body}-hat-head.gltf`:appearanceModels.hair[body][appearance.hair];
+ return wearingHat?null:appearanceModels.hair[body][appearance.hair];
 }

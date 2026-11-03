@@ -3,6 +3,8 @@ import {bossArtwork} from './artwork';
 import {DONATOR_TITLE, type BoardRow} from './flair';
 
 export const COMMUNITY_NAME = 'SpoonedOSRS';
+/** Home boards: the API sends each board's top HOME_BOARD_ROWS, shown HOME_BOARD_PAGE at a time. */
+export const HOME_BOARD_PAGE = 10, HOME_BOARD_ROWS = 30;
 export type CommunityStats = {skillXp?:Record<string,number>;hidden?:string[];petsKnown?:boolean;petTotal: number; logTotal: number | null; questPoints: number | null; questTotal: number | null; combat: number | null; combatTotal: number | null; diaries: number | null; diaryTotal: number | null; xp: number | null; syncedAt: string | null};
 export function journalStats(j: Journal): CommunityStats {
   const quests = j.details?.quests===false?undefined:j.profile?.quests;
@@ -26,9 +28,9 @@ export function journalStats(j: Journal): CommunityStats {
 export type BoardMetric = 'pets' | 'log' | 'combat' | 'questPoints' | 'xp';
 export const BOARD_METRICS: {id: BoardMetric; label: string; icon: string}[] = [
   {id: 'pets', label: 'Pets', icon: '/brand/rocky-mascot.webp'},
-  {id: 'log', label: 'Collection log', icon: '/icons/navigation/collection-log-icon.png'},
+  {id: 'log', label: 'Collection log', icon: '/ui/collection-log-icon.png'},
   {id: 'combat', label: 'Combat achievements', icon: '/icons/navigation/combat-achievements.png'},
-  {id: 'questPoints', label: 'Quest points', icon: '/icons/navigation/quest-point-icon.png'},
+  {id: 'questPoints', label: 'Quest points', icon: '/ui/quest-point-icon.png'},
   {id: 'xp', label: 'Total XP', icon: '/icons/navigation/stats-icon.png'},
 ];
 export function metricValue(row: BoardRow, metric: BoardMetric, skill?:string): number | null {

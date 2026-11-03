@@ -1,0 +1,308 @@
+/* World map page (WorldMap.tsx, WorldMapView.tsx, TravelOptions.tsx). */
+/* The map page fits the window: nothing below the map (the site footer's links are on every other page), no page scroll. */
+html.wm-fit,html.wm-fit body{height:100%;overflow:hidden;overscroll-behavior:none}
+html.wm-fit .legal-footer{display:none}
+html.wm-fit .site{min-height:0}
+.wm-page{display:grid;grid-template-columns:380px minmax(0,1fr);margin:0;height:calc(100dvh - var(--wm-top,61px))}
+.wm-panel{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
+.wm-head{--wm-tab-h:40px;display:flex;align-items:flex-end;gap:3px;padding:10px 8px 0 12px;border-bottom:1px solid #0b0a08;flex:none}
+.site .wm-tabs.wtabs{display:flex;flex:1;min-width:0;padding:0;position:static;overflow:visible}
+.site .wm-tabs.wtabs button{flex:1 1 0;flex-direction:row;gap:8px;min-height:var(--wm-tab-h);padding:6px 10px;font-size:15px;white-space:nowrap}
+.wm-tabs button svg{flex:none}
+/* The tab icons are painted art (public/icons/map/interface): smooth scaling, dimmed until the tab is chosen. */
+.wm-tab-icon{width:20px;height:20px;object-fit:contain;flex:none;opacity:.75}
+.wm-tabs button[aria-selected=true] .wm-tab-icon{opacity:1}
+/* Teleports & travel: a square the height of the tabs beside them, in the same tab style. */
+.wm-options-btn{width:var(--wm-tab-h);height:var(--wm-tab-h);flex:none;color:var(--muted);background:linear-gradient(180deg,#2c2822,#211e19);border:1px solid #0b0a08;border-bottom:0;box-shadow:0 0 0 1px #3d382f inset;border-radius:5px 5px 0 0}
+.wm-options-btn:hover{color:var(--gold);background:linear-gradient(180deg,#34302a,#26231d);border-color:#0b0a08}
+.wm-options-btn img{width:26px;height:26px;object-fit:contain;image-rendering:pixelated;opacity:.85;filter:drop-shadow(1px 1px 0 #000)}
+.wm-options-btn:hover img{opacity:1}
+.wm-options-btn:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+.wm-panel-body{display:flex;flex-direction:column;gap:12px;padding:14px;overflow:auto;flex:1;min-height:0}
+.wm-panel-body .fine{margin-top:0}
+.wm-credit{margin-top:auto!important;padding-top:8px;font-size:11px}
+.wm-credit a{color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+.wm-hint{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.wm-hint.is-picking{color:var(--gold)}
+.wm-error{color:#ffb4a5;font-size:13px;background:var(--bad-bg);border:1px solid #6b2d22;border-radius:var(--radius);padding:8px 10px}
+
+/* Search fields */
+.wm-field{position:relative}
+.wm-search{width:100%;min-height:42px;padding:0 6px 0 10px}
+.wm-search input{flex:1;min-width:0;width:auto;border:0;background:none;outline:none;padding:11px 0;font-size:14px}
+.wm-search input.has-value::placeholder{color:var(--text);opacity:1}
+.wm-search:focus-within{border-color:var(--line-3)}
+.wm-search input,.wm-search input:focus,.wm-search input:focus-visible{outline:none;box-shadow:none}
+.wm-search:has(input:focus-visible){outline:2px solid var(--orange);outline-offset:1px}
+.wm-field-btn{display:grid;place-items:center;width:32px;height:32px;flex:none;border-radius:5px;color:var(--muted)}
+.wm-field-btn:hover{color:var(--text);background:var(--panel-2)}
+.wm-field-btn[aria-pressed=true]{color:var(--gold);background:var(--warn-bg)}
+.wm-field-dot{display:grid;place-items:center;width:20px;height:20px;flex:none;border-radius:50%;font-size:11px;font-weight:800;color:#1a1206}
+.wm-field-dot.is-from,.wm-pin.is-from{background:linear-gradient(135deg,#9be38e,#3c9a3a)}
+.wm-field-dot.is-to,.wm-pin.is-to{background:linear-gradient(135deg,#ff8a7a,#b92e22)}
+.wm-field-dot.is-stop,.wm-pin.is-stop{background:linear-gradient(135deg,#ffd36b,#c98a1c)}
+.wm-results{position:absolute;z-index:1200;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px;list-style:none;background:var(--panel-2);border:1px solid var(--line-3);border-radius:var(--radius);box-shadow:0 12px 30px #000a}
+.wm-results button{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;padding:6px 8px;border-radius:4px;text-align:left}
+.wm-results li[aria-selected=true] button,.wm-results button:hover{background:var(--panel-3)}
+.wm-results img{width:20px;height:20px;object-fit:contain;flex:none}
+.wm-results span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.wm-results small{color:var(--dim);white-space:nowrap;flex:none}
+
+/* Layers */
+.wm-layers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.wm-layers button{display:flex;align-items:center;gap:9px;min-height:44px;padding:0 10px;border:1px solid var(--line-2);border-radius:var(--radius);background:var(--sunk);color:var(--muted);font-size:14px;font-weight:600;white-space:nowrap;min-width:0;text-align:left;transition:border-color .12s,background .12s,color .12s}
+.wm-layers button:hover{border-color:var(--line-3);color:var(--text)}
+.wm-layers button img{width:20px;height:20px;object-fit:contain;flex:none;filter:saturate(.35);opacity:.7}
+.wm-layer-name{flex:1;min-width:0}
+.wm-layers small{color:var(--dim);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.wm-layer-check{display:grid;place-items:center;width:16px;height:16px;flex:none;border:1.5px solid var(--line-3);border-radius:4px;color:#1a1206}
+.wm-layers button[aria-pressed=true]{border-color:#a8661a;color:var(--text);background:var(--warn-bg)}
+.wm-layers button[aria-pressed=true] img{filter:none;opacity:1}
+.wm-layers button[aria-pressed=true] small{color:#d9b27a}
+.wm-layers button[aria-pressed=true] .wm-layer-check{background:var(--orange);border-color:var(--orange)}
+
+/* Directions: the trip's rows (start, stops, destination) in one box, each with a drag handle, the place field and
+   up and down buttons; the reverse button on the right. */
+.wm-trip-box{position:relative;padding-right:36px;border:1px solid var(--line-2);border-radius:var(--radius);background:var(--sunk)}
+.wm-trip{display:grid;margin:0;padding:0;list-style:none}
+.wm-stop{position:relative;display:flex;align-items:center;min-width:0;background:var(--sunk);border-radius:var(--radius)}
+.wm-stop+.wm-stop::before{content:'';position:absolute;left:58px;right:0;top:0;border-top:1px solid var(--line)}
+.wm-stop .wm-field{flex:1;min-width:0}
+.wm-trip .wm-search{border:0;background:none;border-radius:var(--radius);padding-left:4px}
+.wm-trip .wm-search:has(input:focus-visible){outline-offset:-2px}
+.wm-stop-handle{display:grid;place-items:center;width:26px;align-self:stretch;flex:none;margin-left:2px;color:var(--dim);cursor:grab;touch-action:none;border-radius:4px}
+.wm-stop-handle:hover,.wm-stop-handle:focus-visible{color:var(--text)}
+.wm-stop-handle:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+.wm-stop.is-drag{z-index:2;background:var(--panel-3);box-shadow:0 6px 18px #000a,0 0 0 1px #a8661a inset}
+.wm-stop.is-drag::before{display:none}
+.wm-trip.is-dragging,.wm-trip.is-dragging .wm-stop-handle{cursor:grabbing;user-select:none}
+/* On touch screens the handle drags; the up and down buttons stay for keyboards and screen readers only. */
+.wm-swap{position:absolute;right:3px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:34px;height:40px;border-radius:var(--radius);color:var(--muted)}
+.wm-swap:hover{color:var(--text)}
+.wm-trip-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:-4px}
+.wm-link{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 2px;color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap;min-width:0}
+.wm-link:hover:not(:disabled){color:var(--gold)}
+.wm-link:disabled{opacity:1;cursor:default}
+.wm-link svg{flex:none}
+.wm-trip-actions .wm-link:last-child{text-decoration:underline;text-decoration-color:var(--line-3);text-underline-offset:3px}
+.wm-spinner{width:14px;height:14px;border:2px solid var(--line-3);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+.wm-trip-total{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
+.wm-trip-total b{font:700 22px var(--rs);color:var(--yellow);text-shadow:1px 1px 0 #000}
+.wm-trip-total span{color:var(--muted);font-size:13px}
+/* Directions as one timeline: the trip's places as pins on one line, and between two of them the leg's time, its
+   "Change" and its steps; the line is solid where you walk and dashed for a teleport or transport hop, as on the map. */
+.wm-itin{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.wm-itin.is-stale .wm-itin-leg{opacity:.5}
+.wm-node{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:center;min-height:28px}
+.wm-node-pin{display:grid;place-items:center}
+.wm-node b{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:700}
+.wm-itin-leg{display:flex;flex-direction:column;padding:2px 0}
+.wm-itin-head,.wm-itin-steps li,.wm-itin-leg .wm-alts{position:relative}
+.wm-itin-head::before,.wm-itin-steps li::before,.wm-itin-leg .wm-alts::before{content:'';position:absolute;left:12.5px;top:0;bottom:0;width:3px}
+.wm-itin-leg .wm-alts::before{left:-23.5px}
+.wm-itin-leg .is-walk::before{background:var(--seg)}
+.wm-itin-leg .is-hop::before{background:repeating-linear-gradient(var(--seg) 0 5px,transparent 5px 10px)}
+.wm-itin-head{display:flex;align-items:center;gap:8px;min-width:0;min-height:36px;padding-left:36px}
+.wm-itin-time{flex:none;font:700 16px var(--rs);color:var(--yellow);text-shadow:1px 1px 0 #000;white-space:nowrap}
+.wm-itin-head small{min-width:0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wm-itin-head small.is-best,.wm-alt small.is-best{color:#ffd08a}
+.wm-ways-toggle{display:inline-flex;align-items:center;gap:4px;flex:none;margin-left:auto;min-height:32px;padding:0 6px;border-radius:5px;color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap}
+.wm-ways-toggle:hover,.wm-ways-toggle[aria-expanded=true]{color:var(--text)}
+.wm-ways-toggle svg{transition:transform .15s}
+.wm-ways-toggle[aria-expanded=true] svg{transform:rotate(180deg)}
+.wm-itin-steps{margin:0;padding:0;list-style:none}
+.wm-itin-steps li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;min-height:34px;padding-left:36px}
+.wm-itin-name{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px;font-weight:600}
+.wm-itin-steps small{color:var(--dim);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.wm-step-icon{display:grid;place-items:center;width:24px;height:24px;color:var(--muted)}
+.wm-step-icon img{width:22px;height:22px;object-fit:contain}
+/* A leg's ways, opened from "Change": one-line radio rows, fastest first. */
+.wm-route-icons{display:flex;gap:3px;flex:none}
+.wm-route-icons span{display:grid;place-items:center;width:20px;height:20px;color:var(--muted)}
+.wm-route-icons img{width:20px;height:20px;object-fit:contain}
+.wm-route-icons svg{width:16px;height:16px}
+.wm-alts{display:flex;flex-direction:column;margin:2px 0 6px 36px;border:1px solid var(--line-2);border-radius:8px}
+.wm-alt{position:relative;display:flex;align-items:center;gap:10px;min-height:42px;padding:4px 12px;cursor:pointer;background:var(--sunk)}
+.wm-alt:first-child{border-radius:7px 7px 0 0}
+.wm-alt:last-child{border-radius:0 0 7px 7px}
+.wm-alt+.wm-alt{border-top:1px solid var(--line)}
+.wm-alt:hover,.wm-alt.is-on{background:var(--panel-2)}
+.wm-alt input{position:absolute;opacity:0;pointer-events:none}
+.wm-alt-radio{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid var(--line-3)}
+.wm-alt.is-on .wm-alt-radio{border-color:var(--gold);background:radial-gradient(var(--gold) 0 3px,transparent 4px)}
+.wm-alt:has(input:focus-visible){outline:2px solid var(--orange);outline-offset:-2px}
+.wm-alt-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;font-size:14px}
+.wm-alt.is-on .wm-alt-name{font-weight:700}
+.wm-alt small{flex:none;white-space:nowrap;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.wm-ways-toggle svg{transition:none}}
+/* Where a pointer can hover, a filled row's × and pick buttons show on hover or focus, giving the name the room. */
+@media (hover:hover) and (pointer:fine){.wm-stop:not(:hover):not(:focus-within) .wm-search:has(input.has-value) .wm-field-btn:not([aria-pressed=true]){display:none}}
+
+/* Map */
+.wm-map{position:relative;isolation:isolate;min-width:0;min-height:0;background:#0e0d0b}
+.wm-canvas{position:absolute;inset:0;background:#0e0d0b;font:inherit}
+.wm-canvas.leaflet-container{background:#0e0d0b;font:inherit;outline:none}
+.wm-canvas.is-picking.leaflet-container,.wm-canvas.is-picking .leaflet-interactive{cursor:crosshair}
+.wm-loading{display:flex;align-items:center;justify-content:center;color:#8f8672;font-size:13px}
+.wm-canvas .leaflet-tile{image-rendering:pixelated}
+.wm-canvas .leaflet-control-zoom{border:1px solid var(--line-3);box-shadow:0 4px 14px #0008}
+.wm-canvas .leaflet-control-zoom a{width:36px;height:36px;line-height:34px;background:var(--panel-2);color:var(--text);border-color:var(--line-2)}
+.wm-canvas .leaflet-control-zoom a:hover{background:var(--panel-3);color:var(--gold)}
+.wm-canvas .leaflet-control-attribution{background:#0e0d0bcc;color:#8f8672;font-size:10px}
+.wm-canvas .leaflet-control-attribution a{color:#c9b27a}
+/* Where the map is and the way back, over the map's top left corner. */
+.wm-where{position:absolute;z-index:1000;top:10px;left:10px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:calc(100% - 70px);pointer-events:none}
+.wm-where>*{pointer-events:auto}
+.wm-where-name{max-width:100%;padding:3px 9px;border-radius:5px;background:#0e0d0bcc;font:700 15px var(--rs);color:#f3e6c4;text-shadow:1px 1px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Teleports: a third button under + and −, sized and framed like Leaflet's zoom bar (30px button in a 2px translucent
+   frame), that opens the teleport options. */
+.wm-quick-teleports{position:absolute;z-index:1000;top:80px;right:10px;display:grid;place-items:center;width:34px;height:34px;padding:0;box-sizing:border-box;border:2px solid #0003;border-radius:4px;background:var(--panel-2);background-clip:padding-box}
+.wm-quick-teleports img{width:20px;height:20px;object-fit:contain;image-rendering:pixelated}
+.wm-quick-teleports:hover{background-color:var(--panel-3)}
+.wm-quick-teleports:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
+/* The map's context menu: a card like the map's hover cards, one line per item. */
+.wm-ctx{position:absolute;z-index:1100;display:flex;flex-direction:column;min-width:180px;padding:4px;background:#1d1a14f7;border:1px solid #514632;border-radius:6px;box-shadow:0 8px 22px #000b}
+.wm-ctx button{display:flex;align-items:center;gap:9px;min-height:36px;padding:0 10px;border-radius:4px;color:#efe6d2;font-size:13.5px;font-weight:600;white-space:nowrap;text-align:left}
+.wm-ctx button svg{flex:none;color:#ffd98f}
+.wm-ctx button:hover,.wm-ctx button:focus-visible{background:#2e271c;outline:none}
+.wm-ctx button:focus-visible{box-shadow:inset 0 0 0 1px #c98a1c}
+.wm-ctx button:disabled{opacity:.45;cursor:default;background:none}
+.wm-ctx button.is-cancel{color:#b9ae98;border-top:1px solid #3a3226;border-radius:0 0 4px 4px;margin-top:2px}
+.wm-ctx button.is-cancel svg{color:#b9ae98}
+@media (pointer:coarse){.wm-ctx button{min-height:44px}}
+/* Place markers, sized by the map (iconSize grows with the zoom), with a dark halo so they read on any terrain. */
+.wm-marker{background:none;border:0}
+.wm-marker img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 1.5px #000) drop-shadow(0 2px 2px #000b);transition:transform .12s}
+.wm-marker:hover img,.wm-marker:focus-visible img{transform:scale(1.15)}
+/* Game art: spell icons (20px) scale up crisp; item icons (36×32) leave room around the item, so they are drawn a
+ * little larger to match the map's own icons. */
+.wm-canvas img[src^="/icons/spells/"],.wm-card img[src^="/icons/spells/"],.wm-results img[src^="/icons/spells/"],.wm-step-icon img[src^="/icons/spells/"],.wm-route-icons img[src^="/icons/spells/"],.wm-chip img[src^="/icons/spells/"],.map-tip img[src^="/icons/spells/"]{image-rendering:pixelated}
+.wm-marker img[src^="/items/"]{width:122%;height:122%;margin:-11%}
+.wm-marker img[src$="/mushtree.png"]{width:130%;height:130%;margin:-15%}
+.map-tip li img[src^="/items/"]{width:22px;height:22px;margin:-2px}
+.wm-card-teleports img[src^="/items/"],.wm-step-icon img[src^="/items/"],.wm-step-icon img[src^="/drops/"],.wm-card header>img[src^="/drops/"]{width:26px;height:26px;margin:-2px}
+.wm-chip img[src^="/items/"],.wm-route-icons img[src^="/items/"],.wm-results img[src^="/items/"],.wm-chip img[src^="/drops/"],.wm-route-icons img[src^="/drops/"],.wm-results img[src^="/drops/"]{width:24px;height:24px;margin:-2px}
+.wm-marker:focus-visible{outline:2px solid #ffd36b;outline-offset:2px;border-radius:4px}
+.wm-marker.is-off img{filter:grayscale(.8) brightness(.85) drop-shadow(0 0 1.5px #000);opacity:.6}
+.wm-count{position:absolute;right:-7px;bottom:-5px;font:700 12px/1 var(--rs);color:#ffe9a8;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;pointer-events:none}
+@media (pointer:coarse){.wm-marker::before{content:'';position:absolute;inset:-6px}}
+/* The selected place: its own icon grows a little and glows gold along its outline (no pin over it). */
+.wm-marker.is-selected img,.wm-marker.is-selected img.is-pixel{transform:scale(1.25);filter:drop-shadow(0 0 1.5px #ffe08a) drop-shadow(0 0 1.5px #ffd36b) drop-shadow(0 0 6px #ffb02e) drop-shadow(0 0 3px #ffb02e)}
+.wm-marker.is-selected:hover img{transform:scale(1.3)}
+/* The fade between floors and areas. */
+.wm-veil{position:absolute;inset:0;z-index:690;background:#0e0d0b;opacity:0;pointer-events:none;transition:opacity .28s ease}
+.wm-veil.is-on{opacity:1;transition-duration:.2s}
+.wm-veil.is-instant{transition:none}
+@media (prefers-reduced-motion:reduce){.wm-veil{transition:none}}
+.wm-label{background:none;border:0;width:auto!important;height:auto!important}
+.wm-label span{display:block;transform:translate(-50%,-50%);white-space:nowrap;font:700 13px var(--rs);color:#f3e6c4;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;pointer-events:none}
+.wm-label.is-near span{font-size:15px;color:#ffe9a8}
+.wm-pin{position:relative;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:linear-gradient(135deg,#ffd36b,#c98a1c);border:2px solid #1a1206;box-shadow:0 3px 8px #000a}
+.wm-pin b{transform:rotate(45deg);color:#1a1206;font-size:13px;font-weight:800;line-height:1}
+.wm-pin img{width:18px;height:18px;object-fit:contain;transform:rotate(45deg)}
+
+/* Place card over the map */
+/* The selected spot's card: a roomy panel at the map's top left (under the area name and back button when they show),
+ * with the name large, its facts in a row, the start text, and the actions in equal-height buttons. */
+.wm-card{position:absolute;z-index:1000;left:16px;top:16px;width:min(400px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:auto;display:flex;flex-direction:column;gap:14px;padding:16px 18px 18px;background:var(--panel);border:1px solid var(--line-3);border-radius:10px;box-shadow:0 16px 44px #000c}
+.wm-where~.wm-card{top:96px;max-height:calc(100% - 112px)}
+.wm-card header{display:flex;align-items:center;gap:12px;min-width:0}
+.wm-card header>img{width:36px;height:36px;object-fit:contain;flex:none}
+.wm-card header>img[src^="/icons/map/game/"]{image-rendering:pixelated}
+.wm-card header>svg{color:var(--gold);flex:none}
+.wm-card header>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.wm-card header .icon-btn{align-self:flex-start;margin:-4px -6px 0 0}
+.wm-card h2{font:700 22px/1.15 var(--rs);color:var(--orange);text-shadow:1px 1px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wm-card header small{color:var(--muted);font-size:13.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wm-card-facts{display:flex;gap:6px 22px;flex-wrap:wrap;margin:0;padding:12px 0 0;border-top:1px solid var(--line-2)}
+.wm-card-facts div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.wm-card-facts dt{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.wm-card-facts dd{margin:0;font-size:14.5px;font-weight:600;color:var(--text);white-space:nowrap}
+.wm-card-facts .diff img{width:16px;height:16px;object-fit:contain}
+.wm-card-start{color:#ddd5c4;font-size:14.5px;line-height:1.55}
+.wm-card-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.wm-card-actions .btn{justify-content:center;min-height:40px;padding:8px 12px;font-size:14px}
+.wm-card-actions .is-wide,.wm-card-actions .guide-link{grid-column:1/-1}
+.wm-card-teleports{display:flex;flex-direction:column;gap:2px;max-height:200px;overflow:auto;margin:0;padding:0;list-style:none}
+.wm-card-teleports li{display:flex;align-items:center;gap:9px;min-height:30px;font-size:14px}
+.wm-card-teleports img{width:22px;height:22px;object-fit:contain;flex:none}
+.wm-card-teleports span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wm-card-teleports small{margin-left:auto;color:var(--dim);font-size:12px;white-space:nowrap;flex:none}
+.wm-card-teleports li.is-off{color:var(--dim)}
+.wm-card-teleports li.is-off img{filter:grayscale(1);opacity:.55}
+/* A map icon's rows (each kind of fishing spot with its level), and the way through on a dungeon entrance. */
+.wm-card-rows{display:flex;flex-direction:column;gap:2px;max-height:200px;overflow:auto;margin:0;padding:0;list-style:none}
+.wm-card-rows li{display:flex;align-items:center;gap:12px;min-height:28px;font-size:14px;color:#ddd5c4}
+.wm-card-rows span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wm-card-rows small{margin-left:auto;color:var(--dim);font-size:12.5px;white-space:nowrap;flex:none}
+.wm-card-way img{width:20px;height:20px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 0 1px #0008)}
+
+/* Travel options dialog */
+.wm-options{width:min(720px,calc(100vw - 24px));height:min(720px,calc(100dvh - 24px))}
+.wm-options .modal-body{height:100%}
+.wm-options .modal-scroll{display:flex;flex-direction:column;gap:18px;min-height:0}
+.wm-options .modal-foot .muted{flex:1}
+.wm-option-group{display:flex;flex-direction:column;gap:8px}
+.wm-option-group h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.wm-option-group .fine{margin-top:2px}
+.wm-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
+.wm-chip{display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 10px;border:1px solid var(--line-2);border-radius:var(--radius);background:var(--sunk);color:var(--muted);text-align:left;min-width:0}
+.wm-chip img{width:20px;height:20px;object-fit:contain;flex:none;opacity:.6}
+.wm-chip span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px;font-weight:600}
+.wm-chip svg{flex:none;color:var(--gold)}
+.wm-chip[aria-pressed=true]{border-color:#a8661a;background:var(--warn-bg);color:#ffd08a}
+.wm-chip[aria-pressed=true] img{opacity:1}
+.wm-chip:hover{border-color:var(--line-3)}
+.wm-seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));max-width:420px}
+.wm-seg button{justify-content:center;min-height:36px}
+.wm-presets{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}
+.wm-presets button{justify-content:center;min-height:36px;padding:5px 6px;white-space:nowrap}
+.wm-presets img{width:18px;height:18px;object-fit:contain;flex:none;image-rendering:pixelated}
+.wm-select{min-height:40px;max-width:280px;padding:0 10px;background:var(--sunk);border:1px solid var(--line-2);border-radius:var(--radius)}
+.wm-levels{display:flex;gap:10px;flex-wrap:wrap}
+.wm-level{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 4px 0 12px;border:1px solid var(--line-2);border-radius:var(--radius);background:var(--sunk);font-weight:600;font-size:13.5px}
+.wm-level img{width:20px;height:20px;object-fit:contain;flex:none}
+.wm-level input{margin-left:2px;width:56px;height:32px;border:1px solid var(--line-2);border-radius:4px;background:var(--panel);text-align:center;font-size:15px}
+
+@media(max-width:820px){
+ .wm-page{display:flex;flex-direction:column}
+ .wm-map{order:-1;height:58%;flex:none}
+ .wm-panel{flex:1;min-height:0;border-right:0;border-top:1px solid var(--line)}
+ .wm-panel-body{padding:12px 12px 20px}
+ .wm-head{--wm-tab-h:44px;padding:8px 6px 0 12px}
+ /* On phones the card is a sheet along the map's bottom edge, over the attribution. */
+ .wm-card{left:0;right:0;top:auto;bottom:0;width:auto;max-height:78%;padding:14px 16px 16px;border-width:1px 0 0;border-radius:14px 14px 0 0;box-shadow:0 -10px 32px #000b}
+ .wm-where~.wm-card{top:auto;max-height:78%}
+ .wm-card-actions .btn{min-height:44px}
+ .wm-where{top:8px;left:8px}
+ .wm-chips{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .wm-presets{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .wm-presets button{min-height:40px}
+ .wm-chip{padding:6px 8px;gap:7px}
+ .wm-chip span{font-size:13px}
+ .wm-chip svg{display:none}
+ .wm-options{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;margin:0}
+ .wm-options .modal-title h2{font-size:24px}
+ .wm-options .tabs{padding:0 12px;overflow-x:auto}
+ .wm-options .tabs button{padding:10px 12px;white-space:nowrap}
+ .wm-options .modal-scroll{padding:14px 12px}
+ .wm-options.is-sheet{position:fixed;inset:auto 0 0;height:min(50dvh,460px);max-height:50dvh;border-radius:12px 12px 0 0;border-bottom:0}
+ .wm-options.is-sheet::backdrop{background:none;backdrop-filter:none}
+ .wm-options.is-sheet .modal-head{padding:10px 12px 6px}
+ .wm-options.is-sheet .modal-title h2{font-size:20px}
+ .wm-options.is-sheet .modal-foot{padding:8px 12px}
+}
+
+/* The game's own map look (lib/world-map-game-icons.ts): map-function sprites drawn as the game draws them, square
+   pixels and no added shadow, and the game's area names in its font sizes and colours. */
+.wm-marker img.is-pixel{image-rendering:pixelated!important;filter:none;width:100%;height:100%;margin:0}
+.wm-marker.is-off img.is-pixel{filter:grayscale(.8) brightness(.85);opacity:.6}
+.wm-label.is-game span{font:400 11px/1.15 Verdana,Tahoma,sans-serif;color:#fff;text-align:center;text-shadow:1px 1px 0 #000}
+.wm-label.is-game span.size-1{font-size:13px}
+.wm-label.is-game span.size-2{font-size:15px}
+
+/* Where a dashed teleport or transport hop lands (WorldMapView): an arrowhead, and a badge with the way's icon. */
+.wm-arrow-mark,.wm-landing-mark{background:none;border:0}
+.wm-landing{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:2px solid;background:#1a1206;box-shadow:0 0 0 1.5px #1a1206,0 2px 6px #000a}
+.wm-landing img{width:18px;height:18px;object-fit:contain}
+.wm-arrow{display:block;width:20px;height:20px;transform-origin:50% 50%}

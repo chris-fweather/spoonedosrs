@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {existsSync,readFileSync} from 'node:fs';
 import {inflateSync} from 'node:zlib';
-import {emptyGuide,parseGuide,guideItems,guideItemChoices,guideItemImage,guideSlotChoices,searchGuideItems,guideInline,guidePlainText,GUIDE_TEXT_STYLES} from './guides.ts';
+import {emptyGuide,isCostSpell,parseGuide,guideItems,guideItemChoices,guideItemImage,guideSlotChoices,searchGuideItems,guideInline,guidePlainText,GUIDE_TEXT_STYLES} from './guides.ts';
 import {GUIDE_EMOJIS} from './guide-emojis.ts';
+import {GUIDE_SPELLS} from './guide-references.ts';
 import {guideTopics,guideTopicImage} from './guide-topics.ts';
 import {EQUIP_SLOTS,wearables} from './flair.ts';
 const file=(path:string)=>existsSync('public'+path);
@@ -41,6 +42,27 @@ test('numbered lists are a supported text style',()=>{
  const g={...valid(),blocks:[{id:'steps',kind:'text',text:'Enter\n{gold}Kill{/gold}',style:'numbered',tone:'default'}]};
  assert.equal(parseGuide(g).blocks?.[0].kind==='text'&&parseGuide(g).blocks?.[0].style,'numbered');
  assert.throws(()=>parseGuide({...g,blocks:[{...g.blocks[0],style:'ordered'}]}));
+});
+test('a cost table can name one use and label its rows, such as a farming run by level',()=>{
+ const row={itemId:'5374',label:'High level',parts:[{itemId:'5374',quantity:5},{itemId:'5974',quantity:125}]};
+ const g={...valid(),blocks:[{id:'cost',kind:'costs',title:'Run',per:'run',rows:[row]}]};
+ const b=parseGuide(g).blocks?.[0];
+ assert.ok(b?.kind==='costs'&&b.per==='run'&&b.rows[0].label==='High level');
+ // Older tables have neither, and stay as they were.
+ const plain=parseGuide({...g,blocks:[{id:'cost',kind:'costs',title:'Weapon',rows:[{itemId:'5374',parts:row.parts}]}]}).blocks?.[0];
+ assert.ok(plain?.kind==='costs'&&plain.per===undefined&&!('label' in plain.rows[0]));
+ assert.throws(()=>parseGuide({...g,blocks:[{...g.blocks[0],per:'<b>run'}]}));
+ assert.throws(()=>parseGuide({...g,blocks:[{...g.blocks[0],rows:[{...row,label:'x'.repeat(41)}]}]}));
+});
+test('a cost row can price a spell by its runes instead of an item',()=>{
+ const runes=[{itemId:'560',quantity:4},{itemId:'565',quantity:2},{itemId:'555',quantity:6}];
+ const g={...valid(),blocks:[{id:'cost',kind:'costs',title:'Spell',rows:[{spell:'Ice Barrage',parts:runes}]}]};
+ const b=parseGuide(g).blocks?.[0];
+ assert.ok(b?.kind==='costs'&&b.rows[0].spell==='Ice Barrage'&&!('itemId' in b.rows[0]));
+ // A spell without runes, an unknown spell, or a row naming both a spell and an item is refused.
+ assert.throws(()=>parseGuide({...g,blocks:[{...g.blocks[0],rows:[{spell:'Ice Blitzkrieg',parts:runes}]}]}));
+ assert.throws(()=>parseGuide({...g,blocks:[{...g.blocks[0],rows:[{spell:'Ice Barrage',itemId:'560',parts:runes}]}]}));
+ assert.ok(GUIDE_SPELLS.filter(isCostSpell).includes('Ice Barrage'));
 });
 test('guide emojis are the site emoji set and every image exists',()=>{
  const manifest=JSON.parse(readFileSync('artwork/discord/emojis/manifest.json','utf8')) as {name:string;source:string}[];

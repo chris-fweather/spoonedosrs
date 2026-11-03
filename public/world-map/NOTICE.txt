@@ -1,0 +1,121 @@
+World map data notices
+======================
+
+The files in this folder are built by scripts/build-world-map.mjs (exits.json by scripts/build-map-exits.mjs) and loaded
+by the /map page and guide maps.
+
+1. Shortest Path
+----------------
+collision.dat, travel.json, travel-options.json, exits.json, and the banks, transport stops and teleport
+arrivals in places.json are derived from Shortest Path by Skretzo and contributors
+(https://github.com/Skretzo/shortest-path, commit c48960159a738066a230f76899821da9d5369439,
+src/main/resources). Changes: the collision map keeps only the two movement bits per tile; transports,
+teleports and banks keep only positions, durations and requirements. lib/guide-travel.json (built by
+scripts/build-guide-travel.mjs for guide travel hover cards) is derived from travel.json and places.json.
+The project's licence file
+reads as follows (its copyright line is the template's placeholder):
+
+BSD 2-Clause License
+
+Copyright (c) <YEAR>, <COPYRIGHT HOLDER>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+2. Quest Helper
+---------------
+Quest start positions in places.json come from Quest Helper by Zoinkwiz and contributors
+(https://github.com/Zoinkwiz/quest-helper), read from its quest step definitions.
+
+BSD 2-Clause License
+
+Copyright (c) 2020, Zoinkwiz
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+3. RuneLite
+-----------
+icon-details.json (built by scripts/build-map-icon-details.mjs) takes agility shortcut names, Agility levels and the
+world map points of their icons from RuneLite's AgilityShortcut enum, the fish of each kind of fishing spot and the map
+squares named in its NPC ids from FishingSpot, and Fishing levels from the skill calculator's FishingAction
+(https://github.com/runelite/runelite, commit 9fad2c588ca957ae47d883b09544725a796ed9fe). Changes: only names, levels
+and positions are kept, matched to the game's map icons; names are in sentence case. The obstacle names and other
+skills of shortcuts RuneLite does not place come from Shortest Path (section 1).
+
+BSD 2-Clause License
+
+Copyright (c) 2016-2017, Adam <Adam@sigterm.info>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+4. Other sources
+----------------
+Quest names, difficulty, length and start text come from the Old School RuneScape Wiki
+(https://oldschool.runescape.wiki/), CC BY-NC-SA 3.0 (lib/quest-reference.json; see
+public/DATA-SOURCES.txt).
+
+Map tiles are rendered from the game by Mejrs (https://github.com/mejrs/layers_osrs) and served
+through /api/map-tile. Old School RuneScape, its world and its game data are (c) Jagex Ltd.
+
+game-icons.json (map-function icon placements and area labels) and the sprites in public/icons/map/game are read
+from the game cache (world map geography, world map composite, map element and object configs, sprites); preview
+only, see lib/world-map-game-icons.ts.

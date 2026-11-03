@@ -3,7 +3,8 @@ import {hasGildedSupporter} from './staff-appearance';
 import {achievementTitle, earnedMarks, badgeCatalogue} from './flair';
 import type {Journal} from './model';
 import type {PublicStaff, StaffRole} from './staff-policy';
-export type Presentation = {staffBadge:StaffRole|'gilded'|null;staffPrefix:'Sir'|null;titleChoice:string;showDonation:boolean};
+import {earnedPrefix,NAME_PREFIXES,type NamePrefix} from './name-prefix';
+export type Presentation = {staffBadge:StaffRole|'gilded'|null;staffPrefix:NamePrefix|null;titleChoice:string;showDonation:boolean};
 export type Donation = {amountMinor:number|null;currency:string;hidden:boolean;badge?:'gilded'|null;supporter?:boolean};
 export function signatureTitle(name:string){return name.toLowerCase()==='spoonedosrs'?'the One and Only':null;}
 export function titleChoices(j:Journal,supporter=false,role?:StaffRole|null) {
@@ -49,13 +50,19 @@ export function selectedTitle(j:Journal,choice:string,mark:string|null,owner=fal
  if(choice==='none')return null;
  return titleChoices(j,supporter,role??(owner?'owner':null)).find(t=>t.id===choice&&(t.unlocked||owner))?.label??(supporter?'Supporter':null);
 }
-export function parsePresentation(input:Partial<Presentation>,prior:Presentation,j:Journal,staff:PublicStaff|null,donation?:Donation,supporter=false):Presentation {
- const p={...prior,...input}, owner=staff?.role==='owner';
+/** guideWriter: the person has a published guide, which earns Squire (lib/name-prefix.ts). */
+export function parsePresentation(input:Partial<Presentation>,prior:Presentation,j:Journal,staff:PublicStaff|null,donation?:Donation,supporter=false,guideWriter=false,squire?:boolean):Presentation {
+ const p={...prior,...input}, owner=staff?.role==='owner', earned=earnedPrefix(staff?.role,guideWriter,squire);
  if(![null,'helper','moderator','admin','owner','gilded'].includes(p.staffBadge))throw Error('Choose a valid staff badge.');
- if(![null,'Sir'].includes(p.staffPrefix))throw Error('Choose a valid staff prefix.');
+ if(p.staffPrefix!==null&&!NAME_PREFIXES.includes(p.staffPrefix))throw Error('Choose a valid staff prefix.');
  if(p.staffBadge==='gilded'&&!hasGildedSupporter(donation))throw Error('That supporter badge is not unlocked.');
  if(!owner&&p.staffBadge!==null&&p.staffBadge!=='gilded')throw Error('Only the site owner can choose alternate staff badges.');
- if(!staff&&p.staffPrefix!==null)throw Error('That name title is not unlocked.');
+ if(p.staffPrefix!==null){
+  // Asking for a prefix shows the one earned today; a prefix kept from before that is no longer earned just switches off.
+  if(earned)p.staffPrefix=earned;
+  else if(input.staffPrefix!=null)throw Error('That name title is not unlocked.');
+  else p.staffPrefix=null;
+ }
  if(typeof p.showDonation!=='boolean')throw Error('Choose whether to show your donation amount.');
  if(!['auto','none'].includes(p.titleChoice)&&!titleChoices(j,supporter,staff?.role).some(t=>t.id===p.titleChoice&&(t.unlocked||owner)))throw Error('That title is not unlocked.');
  return p;

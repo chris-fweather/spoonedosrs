@@ -1,5 +1,18 @@
 export type StaffRole = 'helper' | 'moderator' | 'admin' | 'owner';
-export type PublicStaff = {role: StaffRole; prefix: 'Sir' | null; displayRole?:StaffRole|null; displayPrefix?:'Sir'|null};
+/** displayPrefix: the Sir or Squire shown before the name (lib/name-prefix.ts); prefix is the staff portal's own Sir setting. */
+/** title: the job title an admin gave them for their scimitar's hover card ("Head Admin"); null shows "Site <rank>". */
+export type PublicStaff = {role: StaffRole; prefix: 'Sir' | null; title?: string | null; displayRole?:StaffRole|null; displayPrefix?:'Sir'|'Squire'|null};
+export const STAFF_TITLE_MAX=32;
+/** A staff hover title: trimmed, single spaces, 2–32 letters, numbers, spaces and & ' -. Empty clears it (null). */
+export function staffTitle(value:unknown):string|null {
+  if(value===null||value===undefined)return null;
+  if(typeof value!=='string')throw Error('Enter a title in plain text.');
+  const title=value.trim().replace(/\s+/g,' ');
+  if(!title)return null;
+  if(title.length<2||title.length>STAFF_TITLE_MAX)throw Error(`Keep the title between 2 and ${STAFF_TITLE_MAX} characters.`);
+  if(!/^[A-Za-z0-9 &'-]+$/.test(title)||!/[A-Za-z]/.test(title))throw Error("Use letters, numbers, spaces and & ' - only.");
+  return title;
+}
 export const STAFF_LABEL: Record<StaffRole,string> = {helper:'Helper',moderator:'Moderator',admin:'Admin',owner:'Owner'};
 /** Rank colour class: helper green, moderator blue, admin red, owner gold (colours in app/globals.css, --rank-*). */
 /** The username in the rank's colour wherever a staff member's name shows (the rank they display, if the owner picked another). */
@@ -27,3 +40,8 @@ export function evidenceUrl(value:unknown, wikiOnly=false):string {
 const RANK_ORDER:Record<StaffRole,number>={helper:0,moderator:1,admin:2,owner:3};
 /** A reviewer decides proposals from their own rank or below: a moderator never signs off an admin's change. */
 export function mayReviewProposal(reviewer:StaffRole,proposer:StaffRole|null|undefined){return !proposer||RANK_ORDER[reviewer]>=RANK_ORDER[proposer];}
+/** SQL for a rank's order (helper 0 … owner 3), so writes can recheck mayReviewProposal against the ranks at that moment. */
+export function rankOrderSql(role:string){return `CASE ${role} WHEN 'helper' THEN 0 WHEN 'moderator' THEN 1 WHEN 'admin' THEN 2 WHEN 'owner' THEN 3 END`;}
+/** SQL that is true while the proposer (a staff_members discord_id expression) ranks no higher than `reviewerRole` (a bound value or column).
+ * Someone no longer on staff counts as no rank, like mayReviewProposal. */
+export function proposerRankGuard(proposerId:string,reviewerRole:string){return `COALESCE((SELECT ${rankOrderSql('p.role')} FROM staff_members p WHERE p.discord_id=${proposerId}),-1)<=${rankOrderSql(reviewerRole)}`;}

@@ -434,8 +434,13 @@ button.staff-stat:hover>span{color:var(--text)}
 .player-hidden-note{margin-left:8px;font-size:11px;color:var(--dim)}
 /* Latest activity: the same rows as Access history. */
 .ws-feed .ws-row-head{grid-template-columns:32px minmax(0,1fr) auto!important}
-.ws-feed-text{display:block;font-size:13px;line-height:1.5;color:var(--muted)}
-.ws-feed-text b{color:var(--text)}
+/* Feed rows: what changed (title), then who (by-line). */
+.ws-feed-title{display:block;font-size:13.5px;line-height:1.45;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-feed-title b{color:var(--text);font-weight:600}
+.ws-feed-by{display:block;margin-top:2px;font-size:12px;line-height:1.45;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-by-sep{margin:0 7px;color:var(--line)}
+.ws-by-part{white-space:nowrap}
+@media(max-width:600px){.ws-feed-title,.ws-feed-by{white-space:normal}.ws-feed-by .ws-by-part{display:block}.ws-feed-by .ws-by-sep,.ws-feed-title .activity-where{display:none}}
 .ws-feed .ws-row-icon .case-icon{width:20px;height:20px;border:0;background:none}
 .staff-feed .ws-head{margin-bottom:14px}
 @media(max-width:700px){
@@ -451,3 +456,6 @@ button.staff-stat:hover>span{color:var(--text)}
  .ws-row-title>b{white-space:nowrap}
  .ws-row-title>small{flex-basis:100%;white-space:normal}
 }
+/* A published guide in the feed opens the guide: the row is a link styled like the other rows. */
+a.ws-row-head{color:var(--text);text-decoration:none}
+a.ws-row-head:hover b{text-decoration:underline;text-underline-offset:3px}

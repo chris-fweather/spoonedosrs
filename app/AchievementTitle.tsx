@@ -1,11 +1,13 @@
 'use client';
-import {achievementDescription,titleEffect} from '@/lib/presentation';
+import {titleEffect} from '@/lib/presentation';
+import {achievementTitleInfo} from '@/lib/badge-info';
 import './title-rarities.css';
-import {HoverTip} from './HoverTip';
+import {BadgeHover} from './BadgeCard';
 
-/** Profiles show title help; compact community rows show only the title. */
-export function AchievementTitle({label,className='',showHelp=true}:{label:string;className?:string;showHelp?:boolean}) {
- if(!showHelp)return <span className={`achievement-title ${className}`}><span className={`achievement-text ${titleEffect(label)}`}>{label}</span></span>;
- const description=achievementDescription(label);
- return <span className={`achievement-title ${className}`}><HoverTip className="achievement-help" label={`${label}: ${description}`} content={<span className="achievement-tooltip-content"><strong className="tooltip-heading">{label}</strong><span>{description}</span></span>}><span className={`achievement-text ${titleEffect(label)}`}>{label}</span></HoverTip></span>;
+/** An earned title in its rarity colour; hover, focus or tap it for how it is earned and its rarity.
+ * Inside a link (board rows) pass tabIndex -1 so the link stays the only tab stop. */
+export function AchievementTitle({label,className='',showHelp=true,tabIndex=0}:{label:string;className?:string;showHelp?:boolean;tabIndex?:number}) {
+ const text=<span className={`achievement-text ${titleEffect(label)}`}>{label}</span>;
+ if(!showHelp)return <span className={`achievement-title ${className}`}>{text}</span>;
+ return <span className={`achievement-title ${className}`}><BadgeHover className="achievement-help" info={achievementTitleInfo(label)} tabIndex={tabIndex}>{text}</BadgeHover></span>;
 }
