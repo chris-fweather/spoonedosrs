@@ -21,7 +21,7 @@ export function statements(sql){
  return out;
 }
 
-const types={'.png':'image/png','.gif':'image/gif','.webp':'image/webp','.svg':'image/svg+xml','.json':'application/json','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.ttf':'font/ttf'};
+const types={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.svg':'image/svg+xml','.json':'application/json','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.ttf':'font/ttf'};
 /** The ASSETS binding, served from the built static files like Workers static assets. */
 async function assets(request){
  const root=path.resolve('dist/client'),file=path.resolve(root,'.'+decodeURIComponent(new URL(request.url).pathname));

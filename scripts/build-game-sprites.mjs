@@ -1,7 +1,7 @@
 // Interface art from the game cache: the world map globe (WorldmapIconLarge, sprite 1698), the site's Map nav icon, and
 // the game sprites that stand in for the site's own drawings (public/icons/game: spellbook tabs, the minigame grouping
-// icon, the damage hitsplat, the PK skull, chat bubbles, the bank search glass and the inventory tab). Sprite names
-// follow RuneLite's SpriteID.
+// icon, the damage hitsplat, the PK skull, chat bubbles, the bank search glass and the inventory tab; see
+// docs/icon-audit.md). Sprite names follow RuneLite's SpriteID.
 // Reads the sprite index of a flat cache dump such as https://github.com/abextm/osrs-cache (8.flatcache) and writes
 // nearest-neighbour upscaled PNGs (paths relative to the repo root). Sprite decoding follows RuneLite's cache
 // SpriteLoader. Game imagery belongs to Jagex.

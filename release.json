@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0-beta.1",
+  "version": "0.3.0-beta.2",
   "channel": "beta",
-  "notes": "releases/0.3.0-beta.1.md",
+  "notes": "releases/0.3.0-beta.2.md",
   "minimumMigration": "0037_staff_title.sql"
 }

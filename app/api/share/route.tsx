@@ -9,13 +9,25 @@ import {profileJournal,publicProfile} from '@/lib/profile-store';
 import {renderShareCharacter,renderSharePet} from '@/lib/share-character';
 import {OWNER_LAVA_MASK,RANK_STYLE,hasGildedSupporter} from '@/lib/staff-appearance';
 import {DEFAULT_APPEARANCE,shownBackground} from '@/lib/appearance';
+import {SHARE_CARD_SECONDS,drawsPlayerCard,shareCardKey} from '@/lib/share-cache';
 // Character renderer is shared with the model catalogue rather than a screenshot service.
 export async function GET(request:Request){
  const value=new URL(request.url).searchParams.get('username');
  let name:string|undefined;
  try{if(value!==null)name=accountName(value);}catch{return new Response('Invalid player name',{status:400});}
- const revision=name?(await db().prepare('SELECT version FROM board_revision WHERE id=1').first<{version:number}>())!.version:0;
- const key=new Request(new URL('/api/share?cache=castle-v7&name='+encodeURIComponent(name?.toLowerCase()??'')+'&revision='+revision,request.url));
+ // One read answers three questions: is this profile public, which board version is it, and which journal revision.
+ // The board version bumps on any visibility, rank, badge or presentation change, so a cached card cannot outlive them.
+ let revision=0,board=0,visibility:string|null=null;
+ if(name){
+  const state=await db().prepare("SELECT (SELECT version FROM board_revision WHERE id=1) AS board,(SELECT revision FROM journals WHERE id=?1) AS revision,(SELECT visibility FROM profile_visibility WHERE rsn=?1) AS visibility").bind(name.toLowerCase()).first<{board:number|null;revision:number|null;visibility:string|null}>();
+  board=state?.board??0;revision=state?.revision??0;visibility=state?.visibility??null;
+  // Private (set by the owner or by staff): no player data and no drawing. The ready-made site image is served instead.
+  if(!drawsPlayerCard(visibility)){
+   const fallback=await shareAsset('/brand/og-share.jpg',import.meta.env.DEV?new URL(request.url).origin:'https://spoonedosrs.com');
+   return new Response(fallback,{headers:{'Content-Type':'image/jpeg','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+  }
+ }
+ const key=shareCardKey(request.url,name,board,revision);
  let cache:Cache|undefined;
  try{cache=await caches.open('spooned-public-share-v1');const hit=await cache.match(key);if(hit){const response=new Response(hit.body,hit);response.headers.set('Cache-Control',name?'no-store':'public, max-age=3600');return response;}}catch{}
  try{await takeBudget('share-minute',60,60);await takeBudget('share-daily',3000,86400);}catch(e){return new Response(e instanceof RequestError?e.message:'Share images temporarily unavailable',{status:e instanceof RequestError?e.status:503,headers:{'Cache-Control':'no-store','Retry-After':String(e instanceof RequestError?e.retryAfter??60:60)}});}
@@ -63,6 +75,6 @@ export async function GET(request:Request){
  const bytes=await image.arrayBuffer();
  if(bytes.byteLength===0)throw Error('Empty share image');
  const response=new Response(bytes,{headers:image.headers});
- if(cache){const stored=response.clone();stored.headers.set('Cache-Control','public, max-age=300');try{await cache.put(key,stored);}catch{}}
+ if(cache){const stored=response.clone();stored.headers.set('Cache-Control','public, max-age='+SHARE_CARD_SECONDS);try{await cache.put(key,stored);}catch{}}
  return response;
 }
