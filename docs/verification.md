@@ -2,7 +2,7 @@
 
 A profile is **verified** when its RuneScape name is linked to a Discord account **and** that same Discord
 account proved the game account through the RuneLite plugin under this name. Proof is a row in
-`plugin_account_owners` (migration `0036`, see `docs/plugin-hub-submission.md` → Plugin-verified characters)
+`plugin_account_owners` (migration `0036`)
 whose current `rsn` is the profile's name and whose `discord_id` is the name's link.
 
 | Case | Verified |

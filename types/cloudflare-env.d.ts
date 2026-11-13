@@ -9,6 +9,10 @@ declare namespace Cloudflare {
     ASSETS?: Fetcher;
     /** R2 bucket for guide images (spoonedosrs-uploads / spoonedosrs-dev-uploads). Absent until the bucket exists. */
     UPLOADS?: R2Bucket;
+    /** R2 bucket holding our copy of the world map tiles (spoonedosrs-map-tiles / spoonedosrs-dev-map-tiles), lib/map-tile.ts. */
+    MAP_TILES?: R2Bucket;
+    /** Sync queue producer (spoonedosrs-sync / spoonedosrs-dev-sync), lib/sync-queue.ts. Absent in local runs: syncs then run inline. */
+    SYNC_QUEUE?: Queue<import('../lib/sync-queue').SyncMessage>;
     /** Public Discord OAuth client id. Wrangler var, not a secret. */
     DISCORD_CLIENT_ID?: string;
     /** Worker secret. Never store the value in the repo. */
@@ -21,5 +25,7 @@ declare namespace Cloudflare {
     DISCORD_ROLE_SYNC_SECRET?: string;
     /** Dev environment only: the owner's sign-in password (Worker secret). Ignored everywhere else. */
     DEV_LOGIN_PASSWORD?: string;
+    /** Optional Wise Old Man API key (Worker secret): raises WOM pacing from 18 to 90 requests a minute. */
+    WOM_API_KEY?: string;
   }
 }

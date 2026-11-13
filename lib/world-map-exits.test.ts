@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {areaExtent, undergroundLinks} from './world-map-areas.ts';
-import {SURFACE, areaExits, areaFor, areaWith, backLabel, exitArt, exitDetail, exitAction, exitDirection, exitLabel, exitNear, exitsIn, findExits, inBox, onSurface, readExits, wayOut, type ExitsFile} from './world-map-exits.ts';
+import {SURFACE, areaExits, areaFor, areaMinZoom, areaWith, backLabel, exitArt, exitDetail, exitAction, exitDirection, exitLabel, exitNear, exitsIn, findExits, inBox, onSurface, readExits, wayOut, type ExitsFile} from './world-map-exits.ts';
 import type {Collision, TravelEdge} from './world-map-routing.ts';
 
 const t = (x: number, y: number, plane = 0) => ({x, y, plane});
@@ -144,9 +144,9 @@ test('the built exits reach the castle floors, its cellar and the Wizards\' Towe
 });
 
 test('the back control names the way back to the surface ground floor', () => {
-  assert.equal(backLabel({plane: 0, at: t(3222, 3218)}), null);
-  assert.equal(backLabel({plane: 1, at: t(3222, 3218)}), 'Down to the ground floor');
-  assert.equal(backLabel({plane: 0, at: t(3104, 9576)}), 'Back to the surface');
+  assert.equal(backLabel(true, 0), null);
+  assert.equal(backLabel(true, 1), 'Down to the ground floor');
+  assert.equal(backLabel(false, 0), 'Back to the surface');
 });
 
 test('an area is every tile reachable on foot and by its own stairs, and never the surface', () => {
@@ -175,4 +175,17 @@ test('a dungeon icon stands for the way in that starts beside it, and says Enter
   assert.equal(exitAction(cave), 'Enter');
   assert.equal(exitAction(ladder), 'Exit');
   assert.equal(exitAction({from: t(3000, 9600), to: t(2500, 5000)}), 'Enter');
+});
+
+test('a map framed on the surface after a small underground area zooms out as far as before', () => {
+  // As Leaflet's getBoundsZoom: the zoom where a box of tiles fits a 1280×900 view, never below the map's minimum.
+  const map = {options: {minZoom: 3 as number | undefined}, getMaxZoom: () => 11, getBoundsZoom(b: {w: number; h: number}) {return Math.max(this.options.minZoom ?? 0, Math.floor(6 + Math.log2(Math.min(1280 / b.w, 900 / b.h))));}};
+  const surface = {w: SURFACE.x1 - SURFACE.x0, h: SURFACE.y1 - SURFACE.y0}, basement = {w: 220, h: 200};
+  const first = areaMinZoom(map, 3, surface);
+  assert.equal(first, 4);
+  map.options.minZoom = areaMinZoom(map, 3, basement);
+  assert.equal(map.options.minZoom, 8);
+  assert.equal(areaMinZoom(map, 3, surface), first);
+  assert.equal(map.options.minZoom, 8, 'the map keeps its own minimum until the caller sets the new one');
+  assert.equal(areaMinZoom(map, 3, {w: 1, h: 1}), 11, 'a tiny area stops at the closest zoom');
 });

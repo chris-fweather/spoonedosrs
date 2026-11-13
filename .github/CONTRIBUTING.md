@@ -6,6 +6,6 @@ Because of that, pull requests can't be merged here. You can still help:
 
 - **Found a bug or have an idea?** [Open an issue](https://github.com/chris-fweather/spoonedosrs/issues) or tell us on [Discord](https://discord.gg/spoonedosrs).
 - **Want to write guides or help the community?** Say hello on [Discord](https://discord.gg/spoonedosrs).
-- **Found a security problem?** Report it privately, as the [security policy](SECURITY.md) explains.
+- **Found a security problem?** Report it privately, as the [security policy](https://github.com/chris-fweather/SpoonedOSRS/blob/main/.github/SECURITY.md) explains.
 
-To build and check the site yourself, see [docs/development.md](../docs/development.md).
+To build and check the site yourself, see [docs/development.md](https://github.com/chris-fweather/SpoonedOSRS/blob/main/docs/development.md).

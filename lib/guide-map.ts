@@ -1,6 +1,6 @@
 /** Guide maps: a view of the game world with numbered stops, saved in the guide as a document section. Coordinates are
  * game tiles (x east, y north) on one of the four floors (plane 0 is the ground floor). */
-import {exitDirection, far, onSurface, type MapExit} from './world-map-exits';
+import {areaFor, exitDirection, far, onSurface, sameBox, type Box, type MapExit} from './world-map-exits';
 
 /** `fight` is a fight in any combat style (the plain hitsplat); `fight-melee`, `fight-ranged` and `fight-magic` are fights
  * where one style is recommended (the hitsplat with its weapon). Stops saved before the styles were split keep `fight`,
@@ -113,6 +113,16 @@ export function guideMapExits(pins: GuideMapPin[], known: MapExit[] = []): Guide
     out.push({from, to, name: 'Next stop', dir: exitDirection(from, to), stop: i});
   }
   return out;
+}
+
+/** The known exits a guide map shows its readers: only those the route uses, with a stop on each side (the surface and
+ * the dungeon a stop is in). A route that stays on the surface shows none, so cave entrances and trapdoors near its
+ * stops do not read as part of the steps. `areas` are the named underground areas (exits.json). */
+export function routeExits(pins: GuideMapPin[], known: MapExit[], areas: Box[] = []): MapExit[] {
+  const side = (t: {x: number; y: number}) => onSurface(t) ? null : areaFor(t, areas);
+  const sides = pins.map(side);
+  const has = (t: {x: number; y: number}) => {const want = side(t); return sides.some(s => want === null ? s === null : s !== null && sameBox(s, want));};
+  return known.filter(e => has(e.from) && has(e.to));
 }
 
 const finite = (n: unknown, min: number, max: number): n is number => typeof n === 'number' && Number.isInteger(n) && n >= min && n <= max;

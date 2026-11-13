@@ -1,6 +1,7 @@
 'use client';
 import {rankNameClass} from '@/lib/staff-policy';
 import {lazy, Suspense, useEffect, useId, useRef, useState} from 'react';
+import {HoverTip} from './HoverTip';
 import {createPortal} from 'react-dom';
 import {lockPageScroll} from '@/lib/scroll-lock';
 import './community-join.css';
@@ -15,9 +16,10 @@ import {FeatureLinks} from './FeatureLinks';
 import {HeaderNavigation} from './HeaderNavigation';
 import {Pagination} from './Pagination';
 import type {BoardRow} from '@/lib/flair';
-import {BOARD_METRICS, COMMUNITY_NAME, metricValue, rankedPlayers, rankedSupporters, communityPage, comparisonSeries, type BoardMetric} from '@/lib/community';
+import {BOARD_METRICS, BOARD_PAGE_SIZES, COMMUNITY_NAME, type BoardPageSize, metricValue, rankedPlayers, rankedSupporters, communityPage, comparisonSeries, type BoardMetric} from '@/lib/community';
 import {num} from '@/lib/ui';
 import {PlayerSearch, SiteAuth, SiteBrand} from './SiteHeader';
+import {useSiteSession} from './site-session';
 import {FittedScore} from './FittedScore';
 import {AchievementTitle} from './AchievementTitle';
 import {AccountModeBadge} from './AccountModeBadge';
@@ -29,10 +31,10 @@ import {CommunityDistribution} from './CommunityDistribution';
 export function PublicHeader({page, onError}: {page?: string; onError: (message: string) => void}) {
   return <header className="hdr"><div className="hdr-in"><SiteBrand/><PlayerSearch/><HeaderNavigation><FeatureLinks page={page}/><SiteAuth onError={onError}/></HeaderNavigation></div></header>;
 }
-export function useCommunity(options?:{metric:string;skill:string;query:string;page:number}) {
+export function useCommunity(options?:{metric:string;skill:string;query:string;page:number;size?:number}) {
   const [totals,setTotals]=useState<{journals:number;pets:number;log:number}|null>(null);
   const [paging,setPaging]=useState({pages:1,page:0});
-  const url=options?'/api/leaderboard?'+new URLSearchParams({metric:options.metric,skill:options.skill,q:options.query,page:String(options.page)}):'/api/leaderboard';
+  const url=options?'/api/leaderboard?'+new URLSearchParams({metric:options.metric,skill:options.skill,q:options.query,page:String(options.page),...(options.size?{size:String(options.size)}:{})}):'/api/leaderboard';
   const [rows, setRows] = useState<BoardRow[] | null>(null);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
@@ -55,9 +57,10 @@ export function useCommunity(options?:{metric:string;skill:string;query:string;p
   return {rows, totals, paging, error, setError, retry: () => setRetry(n => n + 1)};
 }
 export function CommunityStatus({rows, error, retry}: {rows: BoardRow[] | null; error: string; retry: () => void}) {
+  const session = useSiteSession();
   if (error) return <div className="community-notice" role="alert">{error} <button className="link" onClick={retry}>Try again</button></div>;
   if (!rows) return <p className="community-notice" role="status">Loading community progress…</p>;
-  if (!rows.length) return <p className="community-notice">Be the first on the board. Sign in, link your account and sync your progress.</p>;
+  if (!rows.length) return <p className="community-notice">Be the first on the board. {session.user?'Link':'Sign in, link'} your account and sync your progress.</p>;
   return null;
 }
 /** The community's running totals as banner counters; they refresh with every board load. */
@@ -107,22 +110,24 @@ function DiscordGuideContent(){
  return <div className="discord-guide-content"><figure className="discord-client-example"><div className="discord-example-title"><DiscordMark/><b>Join a Server</b></div><p>Enter an invite to join your friends.</p><div className="discord-example-dialog"><small>Invite link</small><code>discord.gg/spoonedosrs</code><span className="discord-example-action primary">Join Server</span></div><figcaption>Discord client · invite screen example</figcaption></figure><section><h3><DiscordMark/> Join in Discord</h3><ol><li>Choose <b>+</b> in the server list.</li><li>Under “Have an invite already?”, choose <b>Join a Server</b>.</li><li>Paste the invite below and choose <b>Join Server</b>.</li></ol><div className="discord-invite-copy"><code>discord.gg/spoonedosrs</code><button className="btn sm" aria-label="Copy Discord invite" onClick={async()=>{try{await navigator.clipboard.writeText('https://discord.gg/spoonedosrs');setCopied(true);setCopyError(false);}catch{setCopyError(true);}}}><Copy size={14}/><span role="status">{copied?'Copied':'Copy'}</span></button></div>{copyError&&<p role="status">Copy unavailable. Use discord.gg/spoonedosrs.</p>}<p>Follow the welcome and rules prompts once you join.</p><a className="link" href="https://support.discord.com/hc/en-us/articles/360034842871-How-do-I-join-a-Server" target="_blank" rel="noreferrer">Discord’s joining guide ↗</a></section></div>;
 }
 const PODIUM=['Gold','Silver','Bronze'];
-/** Board ranks 1–3 get a gold, silver or bronze crown beside the name and a matching rank number. */
+/** Board ranks 1–3 get a gold, silver or bronze crown in front of the name and a matching rank number. */
 const podium=(rank:number|null|undefined)=>rank&&rank<=3?rank:null;
 function RankCell({rank,label}:{rank:number|null|undefined;label:string}){return <span className={`collector-rank${podium(rank)?' podium-'+rank:''}`} aria-label={label}>{rank??'—'}</span>;}
 function CommunityIdentity({row,fallbackTitle,onPreview,expanded,previewId,rank}:{row:BoardRow;fallbackTitle?:string;onPreview?:()=>void;expanded?:boolean;previewId?:string;rank?:number|null}) {
  const place=podium(rank);
  const achievement=row.achievementTitle??fallbackTitle;
  return <a className="collector-name collector-identity" title={onPreview?`Preview ${row.name}’s collection`:`View ${row.name}’s profile`} onPointerEnter={()=>{if(onPreview){void loadPreviewModule();void loadCollectorPreview(row.name).catch(()=>{});}}} onFocus={()=>{if(onPreview){void loadPreviewModule();void loadCollectorPreview(row.name).catch(()=>{});}}} aria-expanded={onPreview?expanded:undefined} aria-controls={expanded?previewId:undefined} onClick={e=>{if(onPreview&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.altKey){e.preventDefault();onPreview();}}} href={'/player/'+encodeURIComponent(row.name)}>
+  {/* The podium crown leads the row, before the scimitar; rows without one keep the empty slot so names line up. */}
+  <span className="identity-crown">{place&&<img className={`podium-crown podium-${place}`} src={`/icons/ranks/crown-${PODIUM[place-1].toLowerCase()}.png`} alt={`${PODIUM[place-1]} crown, rank ${place}`}/>}</span>
   {/* Badges show the same cards as on the profile. */}
   <span className="identity-prefix"><StaffPrefix staff={row.staff} donation={row.donation} tabIndex={-1} showWord={false}/></span>
   <span className="identity-mode"><AccountModeBadge mode={row.accountMode} tabIndex={-1}/></span>
-  <span className="identity-text"><b>{/* Sir or Squire reads with the name, so every scimitar sits in the same slot. */}<NamePrefixWord staff={row.staff} prefix={row.namePrefix} tabIndex={-1}/><span className={rankNameClass(row.staff)}>{row.name}</span>{row.title&&<small className="rs-title"><BadgeHover info={supporterTitleInfo(row.title,row.donation)} tabIndex={-1}>{row.title}</BadgeHover></small>}{place&&<img className={`podium-crown podium-${place}`} src={`/icons/ranks/crown-${PODIUM[place-1].toLowerCase()}.png`} alt={`${PODIUM[place-1]} crown, rank ${place}`}/>}</b>
+  <span className="identity-text"><b>{/* Sir or Squire reads with the name, so every scimitar sits in the same slot. */}<NamePrefixWord staff={row.staff} prefix={row.namePrefix} tabIndex={-1}/><span className={rankNameClass(row.staff)}>{row.name}</span>{row.title&&<small className="rs-title"><BadgeHover info={supporterTitleInfo(row.title,row.donation)} tabIndex={-1}>{row.title}</BadgeHover></small>}</b>
    {achievement&&<AchievementTitle label={achievement} tabIndex={-1}/>}
   </span>
  </a>;
 }
-export function CollectorList({rows, metric = 'pets', query = '', limit, pageSize = 20, skill, expandable=false, serverPaging}: {rows: BoardRow[]; metric?: BoardMetric; query?: string; limit?: number; pageSize?: number; skill?:string;expandable?:boolean;serverPaging?:{page:number;pages:number;onPage:(page:number)=>void}}) {
+export function CollectorList({rows, metric = 'pets', query = '', limit, pageSize = 20, skill, expandable=false, serverPaging, sizes}: {sizes?: PageSizeChoice; rows: BoardRow[]; metric?: BoardMetric; query?: string; limit?: number; pageSize?: number; skill?:string;expandable?:boolean;serverPaging?:{page:number;pages:number;onPage:(page:number)=>void}}) {
   const [page, setPage] = useState(0),[preview,setPreview]=useState<string|null>(null);
   const previewId=useId();
  useEffect(()=>setPreview(null),[page]);
@@ -131,17 +136,22 @@ export function CollectorList({rows, metric = 'pets', query = '', limit, pageSiz
   const slice = communityPage(ranked,serverPaging?0:page,pageSize,limit);
   const shown = slice.items;
   const label = metric==='xp'&&skill?`${skill} XP`:BOARD_METRICS.find(m => m.id === metric)!.label;
-  return <>{!ranked.length && query && <p className="community-notice">No players match this filter. Search a RuneScape name above to open any profile.</p>}<ol className={'collector-list'+(shown.some(({row})=>row.accountMode&&row.accountMode!=='normal')?'':' no-modes')}>{shown.map(({row, rank}) => {
+  return <>{!ranked.length && query && <p className="community-notice">No players match this filter. Search a RuneScape name above to open any profile.</p>}<ol className={'collector-list'+(shown.some(({rank})=>podium(rank))?'':' no-crowns')}>{shown.map(({row, rank}) => {
     const value = metricValue(row, metric, skill);
-    return <li key={row.name}><RankCell rank={rank} label={rank ? `Rank ${rank}` : 'Unranked'}/><CommunityIdentity row={row} rank={rank} onPreview={expandable?()=>setPreview(preview===row.name?null:row.name):undefined} expanded={preview===row.name} previewId={previewId}/><span className={`collector-score ${value!==null&&num(value,0).length>8?'collector-score-long':''}`}><FittedScore text={value == null ? '—' : num(value, 0)}/><small>{value == null ? 'Not synced' : label}</small></span>{expandable&&preview===row.name&&<Suspense fallback={<span className="collector-preview" role="status">Loading preview…</span>}><CollectorPreview key={row.name} name={row.name} id={previewId} metric={metric}/></Suspense>}</li>;
-  })}{!query&&<EmptyBoardRows count={pageSize-shown.length}/>}</ol><CommunityPager slice={serverPaging?{...slice,current:serverPaging.page,pages:serverPaging.pages}:slice} setPage={serverPaging?.onPage??setPage} label={`${label} rankings`}/></>;
+    return <li key={row.name}><RankCell rank={rank} label={rank ? `Rank ${rank}` : 'Unranked'}/><CommunityIdentity row={row} rank={rank} onPreview={expandable?()=>setPreview(preview===row.name?null:row.name):undefined} expanded={preview===row.name} previewId={previewId}/><span className={`collector-score ${value!==null&&num(value,0).length>8?'collector-score-long':''}`}><FittedScore text={value == null ? '—' : num(value, 0)}/><small>{value == null ? <NotSynced row={row} metric={metric}/> : label}</small></span>{expandable&&preview===row.name&&<Suspense fallback={<span className="collector-preview" role="status">Loading preview…</span>}><CollectorPreview key={row.name} name={row.name} id={previewId} metric={metric}/></Suspense>}</li>;
+  })}{!query&&<EmptyBoardRows count={pageSize-shown.length}/>}</ol><CommunityPager slice={serverPaging?{...slice,current:serverPaging.page,pages:serverPaging.pages}:slice} setPage={serverPaging?.onPage??setPage} label={`${label} rankings`} sizes={sizes}/></>;
 
 }
-function CommunityPager({slice,setPage,label}:{slice:{pages:number;current:number;start:number;end:number;total:number};setPage:(page:number)=>void;label:string}){
- // Always shown, so every board has the same footer; an empty board reads Page 1 of 1 with both arrows disabled.
- return <Pagination page={slice.current} pages={Math.max(1,slice.pages)} onPage={setPage} label={label}/>;
+/** How many players a board page shows, chosen in its footer: one click on 10, 15, 20 or 25 (the Leaderboard page only). */
+export type PageSizeChoice={size:number;onSize:(size:BoardPageSize)=>void};
+function PageSizes({choice}:{choice:PageSizeChoice}){
+ return <span className="board-page-sizes" role="group" aria-label="Players per page"><span aria-hidden="true">Per page</span>{BOARD_PAGE_SIZES.map(n=><button type="button" key={n} aria-pressed={choice.size===n} aria-label={`${n} players per page`} onClick={()=>choice.onSize(n)}>{n}</button>)}</span>;
 }
-export function SupporterList({rows,pageSize=5,limit,query='',expandable=false,serverPaging}:{rows:BoardRow[];pageSize?:number;limit?:number;query?:string;expandable?:boolean;serverPaging?:{page:number;pages:number;onPage:(page:number)=>void}}){
+function CommunityPager({slice,setPage,label,sizes}:{slice:{pages:number;current:number;start:number;end:number;total:number};setPage:(page:number)=>void;label:string;sizes?:PageSizeChoice}){
+ // Always shown, so every board has the same footer; an empty board reads Page 1 of 1 with both arrows disabled.
+ return <Pagination page={slice.current} pages={Math.max(1,slice.pages)} onPage={setPage} label={label} extra={sizes&&<PageSizes choice={sizes}/>}/>;
+}
+export function SupporterList({rows,pageSize=5,limit,query='',expandable=false,serverPaging,sizes}:{sizes?:PageSizeChoice;rows:BoardRow[];pageSize?:number;limit?:number;query?:string;expandable?:boolean;serverPaging?:{page:number;pages:number;onPage:(page:number)=>void}}){
  const [page,setPage]=useState(0),[chosenCurrency,setCurrency]=useState('USD'),[preview,setPreview]=useState<string|null>(null);
  const previewId=useId();
  useEffect(()=>setPreview(null),[page]);
@@ -149,7 +159,7 @@ export function SupporterList({rows,pageSize=5,limit,query='',expandable=false,s
  const currencies=[...new Set(rows.filter(r=>r.donation&&(r.supporterRank!=null||(!r.donation.hidden&&r.donation.amountMinor!==null))).map(r=>r.donation!.currency))].sort();
  const currency=currencies.includes(chosenCurrency)?chosenCurrency:currencies[0]??'USD';
  const slice=communityPage(rankedSupporters(rows,currency).filter(({row})=>row.name.toLowerCase().includes(query.trim().toLowerCase())),serverPaging?0:page,pageSize,limit);
- return <>{currencies.length>1&&<label className="supporter-currency">Donation currency<select value={currency} onChange={e=>{setCurrency(e.target.value);setPage(0);}}>{currencies.map(c=><option key={c}>{c}</option>)}</select></label>}<ol className={'collector-list supporter-list'+(slice.items.some(({row})=>row.accountMode&&row.accountMode!=='normal')?'':' no-modes')}>{slice.items.map(({row:r,rank})=><li key={r.name}><RankCell rank={rank} label={rank?`Supporter rank ${rank}`:'Amount not ranked'}/><CommunityIdentity row={r} rank={rank} onPreview={expandable?()=>setPreview(preview===r.name?null:r.name):undefined} expanded={preview===r.name} previewId={previewId}/><span className="collector-score"><b>{r.donation?.hidden?'—':r.donation?.amountMinor==null?'?':new Intl.NumberFormat('en-US',{style:'currency',currency:r.donation.currency,maximumFractionDigits:2}).format(r.donation.amountMinor/100)}</b><small>{r.donation?.hidden?'Hidden':r.donation?.amountMinor==null?'Unknown':r.donation.currency}</small></span>{expandable&&preview===r.name&&<Suspense fallback={<span className="collector-preview" role="status">Loading preview…</span>}><CollectorPreview name={r.name} id={previewId}/></Suspense>}</li>)}{!query&&<EmptyBoardRows count={pageSize-slice.items.length}/>}</ol><CommunityPager slice={serverPaging?{...slice,current:serverPaging.page,pages:serverPaging.pages}:slice} setPage={serverPaging?.onPage??setPage} label="Supporters"/></>;
+ return <>{currencies.length>1&&<label className="supporter-currency">Donation currency<select value={currency} onChange={e=>{setCurrency(e.target.value);setPage(0);}}>{currencies.map(c=><option key={c}>{c}</option>)}</select></label>}<ol className={'collector-list supporter-list'+(slice.items.some(({rank})=>podium(rank))?'':' no-crowns')}>{slice.items.map(({row:r,rank})=><li key={r.name}><RankCell rank={rank} label={rank?`Supporter rank ${rank}`:'Amount not ranked'}/><CommunityIdentity row={r} rank={rank} onPreview={expandable?()=>setPreview(preview===r.name?null:r.name):undefined} expanded={preview===r.name} previewId={previewId}/><span className="collector-score"><b>{r.donation?.hidden?'—':r.donation?.amountMinor==null?'?':new Intl.NumberFormat('en-US',{style:'currency',currency:r.donation.currency,maximumFractionDigits:2}).format(r.donation.amountMinor/100)}</b><small>{r.donation?.hidden?'Hidden':r.donation?.amountMinor==null?'Unknown':r.donation.currency}</small></span>{expandable&&preview===r.name&&<Suspense fallback={<span className="collector-preview" role="status">Loading preview…</span>}><CollectorPreview name={r.name} id={previewId}/></Suspense>}</li>)}{!query&&<EmptyBoardRows count={pageSize-slice.items.length}/>}</ol><CommunityPager slice={serverPaging?{...slice,current:serverPaging.page,pages:serverPaging.pages}:slice} setPage={serverPaging?.onPage??setPage} label="Supporters" sizes={sizes}/></>;
 }
 export function PlayerComparison({rows}: {rows: BoardRow[]}) {
  const [left,setLeft]=useState(''),[right,setRight]=useState('average');
@@ -183,3 +193,19 @@ export function BoardSkeleton({count,label='Loading leaderboard'}:{count:number;
  return <><ol className="collector-list board-loading" aria-label={label} aria-busy="true">{Array.from({length:count},(_,i)=><li className="board-loading-row" key={i} aria-hidden="true"><span className="bl-rank"><i/></span><span className="bl-identity"><i className="bl-badge"/><span><i/><i/></span></span><span className="bl-score"><i/><i/></span></li>)}</ol><div className="board-loading-pager" aria-hidden="true"><Pagination page={0} pages={1} onPage={()=>{}} label="Loading"/></div></>;
 }
 function EmptyBoardRows({count}:{count:number}) {return <>{Array.from({length:Math.max(0,count)},(_,i)=><li className="collector-placeholder" key={'empty-'+i} aria-label="Empty leaderboard place"><span className="collector-rank">—</span><span className="empty-player"><span/>Open place</span><span className="collector-score">—</span></li>)}</>;}
+
+/** "Not synced" on a board row, with what each public source gave for this player: a tick for what we could pull, a
+ * cross for what we could not, and how to fill the gap. Hidden sections say so instead. */
+function NotSynced({row,metric}:{row:BoardRow;metric:string}){
+ if(row.stats?.hidden?.includes(metric))return <>Hidden</>;
+ const s=row.stats;
+ const sources:[string,boolean][]=[
+  ['OSRS Hiscores: skills and boss kills',s?.xp!=null],
+  ['Collection log and pets: RuneProfile or TempleOSRS',s?.logTotal!=null||s?.petsKnown===true],
+  ['Quests, diaries and combat tasks: RuneProfile',s?.questPoints!=null],
+ ];
+ const tip=<span className="not-synced-tip"><strong className="tooltip-heading">What we could pull</strong>
+  {sources.map(([label,ok])=><span key={label} className={ok?'ns-ok':'ns-missing'}>{ok?'✓':'✗'} {label}</span>)}
+  <span className="tooltip-detail">Sync the collection log with the RuneProfile plugin in RuneLite, or track it on TempleOSRS, then search the name again.</span></span>;
+ return <HoverTip className="not-synced" label={'Not synced. '+sources.map(([label,ok])=>`${label}: ${ok?'pulled':'not available'}`).join('. ')} content={tip}>Not synced</HoverTip>;
+}

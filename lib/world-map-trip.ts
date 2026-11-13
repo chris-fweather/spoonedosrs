@@ -5,7 +5,10 @@
 /** The most stops between the start and the destination. */
 export const MAX_STOPS = 8;
 
-export type TripRow<P> = {id: number; point: P | null};
+/** `asStop` marks a destination that was added with "Add a stop" (it fills an empty destination so the route shows
+ * straight away): "Directions to here" then keeps it as a stop and sets the new destination after it. */
+export type TripRow<P> = {id: number; point: P | null; asStop?: true};
+const placed = <P>(r: TripRow<P>, point: P | null): TripRow<P> => ({id: r.id, point});
 type Tile = {x: number; y: number; plane: number};
 
 let lastId = 0;
@@ -24,17 +27,17 @@ export const canAddStop = (trip: readonly TripRow<unknown>[]) => stopCount(trip)
 /** Set the start or the destination. */
 export function setEnd<P>(trip: TripRow<P>[], role: 'from' | 'to', point: P | null): TripRow<P>[] {
   const i = role === 'from' ? 0 : trip.length - 1;
-  return trip.map((r, j) => j === i ? {...r, point} : r);
+  return trip.map((r, j) => j === i ? placed(r, point) : r);
 }
 /** Set the point of one row. */
 export function setRow<P>(trip: TripRow<P>[], index: number, point: P | null): TripRow<P>[] {
-  return trip.map((r, j) => j === index ? {...r, point} : r);
+  return trip.map((r, j) => j === index ? placed(r, point) : r);
 }
-/** "Add a stop": the point becomes a stop just before the destination. With no destination yet it becomes the
- * destination; with the stops full nothing changes. */
+/** "Add a stop": the point becomes a stop just before the destination. With no destination yet it fills the destination,
+ * marked as a stop, so the route shows straight away; with the stops full nothing changes. */
 export function addStop<P>(trip: TripRow<P>[], point: P): TripRow<P>[] {
   const last = trip.length - 1;
-  if (!trip[last].point) return setRow(trip, last, point);
+  if (!trip[last].point) return trip.map((r, j) => j === last ? {id: r.id, point, asStop: true as const} : r);
   if (stopCount(trip) >= MAX_STOPS) return trip;
   return [...trip.slice(0, last), tripRow(point), trip[last]];
 }
@@ -86,7 +89,11 @@ export function parseStops<T>(values: readonly string[], parse: (v: string) => T
 /** What the map's menu and a place card can do with a spot. */
 export type TripAction = 'from' | 'to' | 'stop';
 /** The trip after a menu or card action on a point. "Directions to here" on a trip with stops keeps them and replaces
- * the destination. */
+ * the destination, unless the destination was added as a stop: then it stays, as the last stop, and the new
+ * destination follows it. */
 export function applyTripAction<P>(trip: TripRow<P>[], action: TripAction, point: P): TripRow<P>[] {
-  return action === 'stop' ? addStop(trip, point) : setEnd(trip, action, point);
+  if (action === 'stop') return addStop(trip, point);
+  const last = trip[trip.length - 1];
+  if (action === 'to' && last.asStop && last.point && stopCount(trip) < MAX_STOPS) return [...trip.slice(0, -1), {id: last.id, point: last.point}, tripRow(point)];
+  return setEnd(trip, action, point);
 }

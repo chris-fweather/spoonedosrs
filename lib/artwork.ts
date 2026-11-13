@@ -1,6 +1,11 @@
 import bosses from './boss-artwork.json';
+import hiscoreIcons from './hiscore-icons.json';
 const map=bosses as Record<string,string>;
 export function bossArtwork(name:string|null|undefined){return name?map[name.toLowerCase()] : undefined;}
+/** The official hiscores icon of a boss or activity (runescape.com's own game icons, public/hiscores), for the Boss
+ * ranks and Activities grid on profiles only; everywhere else keeps `bossArtwork`. */
+const official=hiscoreIcons as Record<string,string>;
+export function hiscoreIcon(name:string|null|undefined){return name?official[name.toLowerCase()] : undefined;}
 
 const clue='/bosses/clue-scrolls-all.png';
 const skill=(name:string)=>map[name];

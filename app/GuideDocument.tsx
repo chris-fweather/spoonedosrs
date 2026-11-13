@@ -5,6 +5,7 @@ import {GuideWritingField,type GuideWritingCommand} from './GuideWritingField';
 import {BagSlots,WornSlots,ItemImage,RequirementBadges,RequirementGroups,GuideKit,SetupTabList,OtherIcon,CostTable,GuideDrops,FormattedText} from './GuideParts';
 import {GuideMap,GuideMapEditor,newGuideMap} from './GuideMap';
 import {GuideRewards} from './GuideRewards';
+import {GuidePrayerBook} from './GuidePrayerBook';
 import {EntityHover} from './EntityHover';
 import {referenceTarget} from '@/lib/guide-hovers';
 import {GuideRewardsEditor,newRewards,rewardsProblem,tidyRewards} from './GuideRewardsEditor';
@@ -28,7 +29,7 @@ const COST_SPELL=-2;
 const COST_SPELLS=GUIDE_SPELLS.filter(isCostSpell);
 type InsertKind='gear'|'inventory'|'requirements'|'odds'|'loadouts'|'costs'|'drops'|'prayers'|'spells'|'image'|'map'|'rewards';
 const textBlock=(style:GuideTextStyle='body'):GuideBlock=>({id:crypto.randomUUID(),kind:'text',text:'',style,tone:'default'});
-const TONE_LABEL:Record<GuideTone,string>={default:'Default colour',gold:'Gold',orange:'Orange',green:'Green'};
+const TONE_LABEL:Record<GuideTone,string>={default:'Default colour',gold:'Gold',orange:'Orange',green:'Green',red:'Red',blue:'Blue'};
 const STYLE_LABEL:Record<GuideTextStyle,string>={body:'Paragraph',heading:'Heading',subheading:'Subheading',list:'Bulleted list',numbered:'Numbered list'};
 const blockLabel=(b:GuideBlock):string=>b.kind==='columns'?'Two columns':b.kind==='text'?STYLE_LABEL[b.style]:b.kind==='gear'?'Gear profile':b.kind==='inventory'?'Inventory profile':b.kind==='odds'?'Drop odds chart':b.kind==='requirements'?'Requirements':b.kind==='loadouts'?'Gear and inventory':b.kind==='costs'?'Cost table':b.kind==='drops'?'Drop table':b.kind==='prayers'?'Prayers':b.kind==='spells'?'Spells':b.kind==='image'?'Image':b.kind==='map'?'Map':b.kind==='rewards'?'Rewards':'Divider';
 const quests=questReference.quests as Record<string,{difficulty?:string}>;
@@ -193,7 +194,8 @@ function DocumentBlock({guide,block:b,narrow=false}:{guide:Guide;block:GuideBloc
  if(b.kind==='drops')return <GuideDrops page={b.page}/>;
  if(b.kind==='loadouts'||b.kind==='gear'||b.kind==='inventory'){const all=guideSetups(guide),setups=guideSectionSetups(b).map(id=>all.find(s=>s.id===id)).filter(s=>!!s);if(!setups.length)return null;return <GuideKit key={setups.map(s=>s.id).join()} setups={setups} gear={b.kind!=='inventory'} inventory={b.kind!=='gear'} notes={b.kind!=='gear'} fallback={b.kind==='loadouts'?all.find(s=>s.id===b.inventoryId):undefined}/>;}
  if(b.kind==='odds')return <GuideOdds block={b} narrow={narrow}/>;
- if(b.kind==='prayers'||b.kind==='spells')return <section className="guide-casts"><h3>{b.kind==='prayers'?'Prayers':'Spells'}</h3><ul>{b.names.map(n=>{const r=guideReference(n);return <li key={n}><EntityHover target={referenceTarget(r)} name={r.name} href={r.href}><a href={r.href} target="_blank" rel="noreferrer">{r.icon&&<img src={r.icon} alt=""/>}<span>{r.name}</span></a></EntityHover></li>;})}</ul></section>;
+ if(b.kind==='prayers')return <GuidePrayerBook names={b.names} hide={b.hide}/>;
+ if(b.kind==='spells')return <section className="guide-casts"><h3>Spells</h3><ul>{b.names.map(n=>{const r=guideReference(n);return <li key={n}><EntityHover target={referenceTarget(r)} name={r.name} href={r.href}><a href={r.href} target="_blank" rel="noreferrer">{r.icon&&<img src={r.icon} alt=""/>}<span>{r.name}</span></a></EntityHover></li>;})}</ul></section>;
  if(b.kind==='map')return <GuideMap map={b}/>;
  if(b.kind==='rewards')return <GuideRewards block={b}/>;
  if(b.kind==='image')return <figure className="guide-image"><img src={b.url} alt={b.caption||'Guide image'} loading="lazy" referrerPolicy="no-referrer"/>{b.caption&&<figcaption>{b.caption}</figcaption>}</figure>;
@@ -314,7 +316,7 @@ function KitEditor({kind,kit,setKit,setup,slot,onSlot,picker}:{kind:'gear'|'inve
    <span className="guide-kit-editor-actions"><button type="button" className="btn sm ghost" aria-label="Move tab left" title="Move left" disabled={at<=0} onClick={()=>move(-1)}><ArrowLeft size={15}/></button><button type="button" className="btn sm ghost" aria-label="Move tab right" title="Move right" disabled={at>=kit.tabs.length-1} onClick={()=>move(1)}><ArrowRight size={15}/></button><button type="button" className="btn sm ghost is-danger" disabled={kit.tabs.length<2} onClick={remove}><Trash2 size={14} aria-hidden="true"/>Delete tab</button></span>
   </div>
   <div className={'guide-insert-loadout kit-'+kind}><div className="guide-kit-editor-grids">{kind!=='inventory'&&<WornSlots setup={setup} selected={slot} onSelect={onSlot}/>}{kind!=='gear'&&<BagSlots setup={setup} selected={slot} onSelect={onSlot}/>}</div>{picker}</div>
-  {kind==='loadouts'&&<label className="guide-kit-editor-note">Note under {setup.name||'this tab'}<textarea rows={2} maxLength={400} placeholder="Cost, why this setup, what to upgrade next…" value={setup.note??''} onChange={e=>{const note=e.target.value;setKit(k=>({...k,profiles:k.profiles.map(p=>p.id===k.active?{...p,note}:p)}));}}/></label>}
+  {<label className="guide-kit-editor-note">Note under {setup.name||'this tab'}<textarea rows={2} maxLength={400} placeholder="Cost, why this setup, what to upgrade next…" value={setup.note??''} onChange={e=>{const note=e.target.value;setKit(k=>({...k,profiles:k.profiles.map(p=>p.id===k.active?{...p,note}:p)}));}}/></label>}
  </div>;
 }
 function InsertDialog({kind,guide,block,uploads,onClose,onApply}:{kind:InsertKind;guide:Guide;block?:GuideBlock;uploads:boolean;onClose:()=>void;onApply:(b:GuideBlock,extra:Partial<Guide>)=>void}) {
@@ -328,7 +330,7 @@ function InsertDialog({kind,guide,block,uploads,onClose,onApply}:{kind:InsertKin
  const [costs,setCosts]=useState<Extract<GuideBlock,{kind:'costs'}>>(()=>block?.kind==='costs'?structuredClone(block):{id:crypto.randomUUID(),kind:'costs',title:'Weapon',rows:[]}),[costTarget,setCostTarget]=useState<number>(-1),[costQuery,setCostQuery]=useState('');
  const [dropBlock,setDropBlock]=useState<Extract<GuideBlock,{kind:'drops'}>>(()=>block?.kind==='drops'?structuredClone(block):{id:crypto.randomUUID(),kind:'drops',page:guide.activity});
  const [oddsPage,setOddsPage]=useState(guide.activity),[picked,setPicked]=useState<string|null>(()=>block?.kind==='odds'?block.name:null);
- const [casts,setCasts]=useState<string[]>(()=>block&&(block.kind==='prayers'||block.kind==='spells')?block.names:[]),[castQuery,setCastQuery]=useState('');
+ const [casts,setCasts]=useState<string[]>(()=>block&&(block.kind==='prayers'||block.kind==='spells')?block.names:[]),[castQuery,setCastQuery]=useState(''),[hidePrayers,setHidePrayers]=useState(()=>block?.kind==='prayers'&&!!block.hide);
  const [image,setImage]=useState(()=>block?.kind==='image'?{url:block.url,caption:block.caption}:{url:'',caption:''});
  const [mapDraft,setMapDraft]=useState<GuideMapData>(()=>block?.kind==='map'?{title:block.title,x:block.x,y:block.y,plane:block.plane,zoom:block.zoom,pins:block.pins,...(block.lines===false?{lines:false}:{})}:newGuideMap());
  const [rewards,setRewards]=useState<GuideRewardsBlock>(()=>block?.kind==='rewards'?structuredClone(block):newRewards(guideQuests.includes(guide.activity)?guide.activity:''));
@@ -355,7 +357,7 @@ function InsertDialog({kind,guide,block,uploads,onClose,onApply}:{kind:InsertKin
   else if(kind==='requirements')onApply({id:block?.id??crypto.randomUUID(),kind},{requirements:requirements.requirements,requiredItems:requirements.requiredItems,requiredQuests:requirements.requiredQuests,requiredDiaries:requirements.requiredDiaries,requiredSkills:requirements.requiredSkills,requiredOther:requirements.requiredOther,recommendedSkills:requirements.recommendedSkills,recommendedItems:requirements.recommendedItems});
   else if(kind==='drops'){if(!dropBlock.page.trim())return setError('Name the boss or activity whose drop table to show.');onApply({...dropBlock,id:block?.id??dropBlock.id},{});}
   else if(kind==='costs'){if(!costs.rows.length||costs.rows.some(r=>!r.parts.length))return setError('Add at least one item or spell, each with what one use consumes.');onApply({...costs,id:block?.id??costs.id},{});}
-  else if(kind==='prayers'||kind==='spells'){if(!casts.length)return setError(`Choose at least one ${kind==='prayers'?'prayer':'spell'}.`);onApply({id:block?.id??crypto.randomUUID(),kind,names:casts},{});}
+  else if(kind==='prayers'||kind==='spells'){if(!casts.length)return setError(`Choose at least one ${kind==='prayers'?'prayer':'spell'}.`);onApply({id:block?.id??crypto.randomUUID(),kind,names:casts,...(kind==='prayers'&&hidePrayers?{hide:true as const}:{})},{});}
   else if(kind==='map'){if(mapDraft.pins.some(p=>p.label.length>60))return setError('Keep each stop label to 60 characters.');if(mapDraft.pins.some(p=>(p.dialogue??[]).filter(l=>l.trim()).length>MAP_STOP_LIMITS.dialogue))return setError(`Use up to ${MAP_STOP_LIMITS.dialogue} chat options on a stop.`);onApply({id:block?.id??crypto.randomUUID(),kind:'map',...mapDraft,title:mapDraft.title.trim(),pins:mapDraft.pins.map(tidyStop)},{});}
   else if(kind==='rewards'){const problem=rewardsProblem(rewards);if(problem)return setError(problem);onApply({...tidyRewards(rewards),id:block?.id??rewards.id},{});}
   else if(kind==='image'){if(!/^https:\/\//i.test(image.url.trim())&&!isUploadUrl(image.url.trim()))return setError('Upload an image or paste a link that starts with https://.');onApply({id:block?.id??crypto.randomUUID(),kind:'image',url:image.url.trim(),caption:image.caption.trim()},{});}
@@ -376,7 +378,8 @@ function InsertDialog({kind,guide,block,uploads,onClose,onApply}:{kind:InsertKin
  {(kind==='prayers'||kind==='spells')&&(()=>{const list=kind==='prayers'?GUIDE_PRAYERS:GUIDE_SPELLS,q=castQuery.trim().toLowerCase(),shown=list.filter(n=>!q||n.toLowerCase().includes(q));return <div className="guide-cast-editor">
   <label className="search"><Search size={16} aria-hidden="true"/><input aria-label={`Search ${kind}`} placeholder={kind==='prayers'?'Search prayers…':'Search spells and teleports…'} value={castQuery} onChange={e=>setCastQuery(e.target.value)}/></label>
   <div className="guide-cast-options">{shown.map(n=>{const on=casts.includes(n),r=guideReference(n);return <button type="button" key={n} aria-pressed={on} onClick={()=>setCasts(c=>on?c.filter(x=>x!==n):c.length<16?[...c,n]:c)}>{r.icon&&<img src={r.icon} alt=""/>}<span>{n}</span>{on&&<Check size={14} aria-hidden="true"/>}</button>;})}</div>
-  <p className="fine">{casts.length?`Chosen, in order: ${casts.join(', ')}`:`Pick the ${kind} in the order to use them (up to 16).`}</p></div>;})()}
+  <p className="fine">{casts.length?`Chosen, in order: ${casts.join(', ')}`:`Pick the ${kind} in the order to use them (up to 16).`}</p>
+  {kind==='prayers'&&<><label className="guide-prayer-hide"><input type="checkbox" checked={hidePrayers} onChange={e=>setHidePrayers(e.target.checked)}/> Hide the prayers not chosen (otherwise they show faded)</label><GuidePrayerBook names={casts} hide={hidePrayers}/></>}</div>;})()}
  {kind==='map'&&<GuideMapEditor value={mapDraft} onChange={setMapDraft}/>}
  {kind==='rewards'&&<GuideRewardsEditor value={rewards} onChange={setRewards}/>}
  {kind==='image'&&<div className="guide-image-editor">{uploads&&<><label className={'guide-upload'+(uploading?' is-busy':'')}><Upload size={18} aria-hidden="true"/><span><b>{uploading?'Uploading…':isUploadUrl(image.url)?'Replace the uploaded image':'Upload an image or GIF'}</b><small>PNG, JPG, WebP or GIF, up to {UPLOAD_LIMITS.fileBytes/1024/1024} MB</small></span><input type="file" accept="image/png,image/jpeg,image/gif,image/webp" disabled={uploading} onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)void upload(f);}}/></label><p className="guide-upload-or">or paste a link</p></>}<label>Image or GIF link<input type="url" placeholder="https://…/picture.gif" value={isUploadUrl(image.url)?'':image.url} onChange={e=>setImage(i=>({...i,url:e.target.value}))}/></label><label>Caption (optional)<input maxLength={200} value={image.caption} onChange={e=>setImage(i=>({...i,caption:e.target.value}))}/></label>{(/^https:\/\//i.test(image.url.trim())||isUploadUrl(image.url))&&<figure className="guide-image"><img src={image.url.trim()} alt="Preview" referrerPolicy="no-referrer"/></figure>}<p className="fine">{uploads?'A direct link works too, for example from Imgur or the OSRS Wiki.':'Use a direct link to a PNG, JPG, WebP or GIF (for example from Imgur or the OSRS Wiki).'}</p></div>}

@@ -18,6 +18,9 @@
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /portraits/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+# Our own 3D character models (body, worn items and pets for the character viewer, about 160 MB).
+/models/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /ui/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /brand/*

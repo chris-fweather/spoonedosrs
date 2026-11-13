@@ -5,7 +5,7 @@ import {accountModeInfo,achievementTitleInfo,badgeLabel,emblemInfo,rankBadgeInfo
 test('an emblem card names how it was earned, its tier and the title it unlocks', () => {
  const info=emblemInfo({id:'pets-25',name:'25 pets',detail:'Collect 25 different pets',short:'25',img:'/brand/rocky-mascot.webp'},'the Pet Tamer');
  assert.deepEqual(info,{name:'25 pets',description:'Collect 25 different pets.',details:[['Tier','Gold'],['Title','the Pet Tamer']]});
- assert.equal(emblemInfo({id:'clog-1717',name:'Collection log complete',detail:'All 1,717 unique collection log items',short:'Full',img:''}).details[0][1],'Legendary');
+ assert.equal(emblemInfo({id:'clog-1734',name:'Collection log complete',detail:'All 1,734 unique collection log items',short:'Full',img:''}).details[0][1],'Legendary');
 });
 
 test('a rank badge describes the badge shown, never a hidden role, and adds Sir', () => {

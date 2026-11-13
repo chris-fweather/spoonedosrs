@@ -1,6 +1,6 @@
 import {db} from './storage';
 import {leaderboard} from './profile-store';
-import {BOARD_SKILLS,HOME_BOARD_ROWS} from './community';
+import {BOARD_SKILLS,DEFAULT_BOARD_PAGE_SIZE,HOME_BOARD_ROWS,boardPageSize} from './community';
 import {RequestError} from './request-body';
 
 // Only small numeric rows cross this query. Full journal JSON is never read to rank a board.
@@ -13,7 +13,12 @@ const visible=`FROM (SELECT rsn FROM journal_summaries UNION SELECT rsn FROM cla
  AND (c.rsn IS NOT NULL OR NOT EXISTS(SELECT 1 FROM profile_link_owners r WHERE r.rsn=n.rsn))`;
 const shared=(key:string,value:string)=>`CASE WHEN COALESCE(json_extract(o.details,'$.${key}'),1)=0 THEN NULL ELSE ${value} END`;
 const scores={pets:shared('pets',`CASE WHEN j.pets>0 OR json_extract(j.data,'$.logSyncedAt') IS NOT NULL OR j.log IS NOT NULL THEN j.pets END`),log:shared('log','j.log'),xp:shared('skills','j.xp'),questPoints:shared('quests','j.quest_points'),combat:shared('combat','j.combat'),supporters:'pd.amount_minor'};
-export async function boardPage(params:URLSearchParams,limit=10){
+/** One page of a board. `size` in the request picks 10, 15, 20, 25, 35 or 40 players per page (lib/community.ts BOARD_PAGE_SIZES; 20 by default);
+ * the home boards pass their own `homeRows`. */
+export async function boardPage(params:URLSearchParams,homeRows?:number){
+ const size=params.has('size')?boardPageSize(params.get('size')):DEFAULT_BOARD_PAGE_SIZE;
+ if(size===null)throw new RequestError(400,'Invalid leaderboard filter.');
+ const limit=homeRows??size;
  const metric=params.get('metric')??'pets',query=(params.get('q')??'').trim().toLowerCase().replaceAll('_',' '),skill=params.get('skill')??'Overall';
  const page=Number(params.get('page')??0),currency=params.get('currency')??'USD';
  if(!Object.hasOwn(scores,metric)||!Number.isSafeInteger(page)||page<0||page>100_000||query.length>12||!/^\w{3}$/.test(currency)||!(skill==='Overall'||BOARD_SKILLS.some(s=>s.name===skill)))throw new RequestError(400,'Invalid leaderboard filter.');

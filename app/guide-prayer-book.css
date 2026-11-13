@@ -1,0 +1,13 @@
+/* The prayer book (GuidePrayerBook.tsx): the game's prayer tab, a stone panel holding the prayers five to a row. A chosen
+   prayer sits on the pale glow the game draws behind an active prayer; the others are faded, or empty when hidden.
+   Five 40px slots, 1px gaps, 5px padding and the 2px border come to 218px, the width of the inventory and worn-equipment
+   boxes, so the three line up in a guide. 40px keeps every prayer a full tap target, so phones use the same size. */
+.gpb-book{display:grid;grid-template-columns:repeat(5,40px);gap:1px;width:max-content;padding:5px;border:2px solid #2a241a;border-radius:6px;
+ background:radial-gradient(ellipse at 50% 40%,#4a4132,#3a3226 70%,#2f291f);box-shadow:inset 0 0 0 1px #5d523f,inset 0 0 18px #0006}
+.gpb-slot{display:grid;place-items:center;width:40px;height:40px;border-radius:50%}
+.gpb-slot .skc-trigger{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;cursor:help}
+.gpb-slot img{width:32px;height:32px;object-fit:contain;image-rendering:pixelated}
+.gpb-slot.is-on{background:radial-gradient(circle,#f6edc4d9 0 46%,#e8d79a80 58%,transparent 70%)}
+.gpb-slot.is-off img{opacity:.32;filter:grayscale(.7)}
+.gpb-slot.is-off:hover img,.gpb-slot.is-off:focus-within img{opacity:.7;filter:none}
+.gpb-slot .skc-trigger:focus-visible{outline:2px solid var(--gold);outline-offset:1px}

@@ -5,7 +5,7 @@
 // - Shortest Path (https://github.com/Skretzo/shortest-path, BSD-2-Clause): collision map, transports,
 //   teleports and bank locations from src/main/resources. Record the commit in SHORTEST_PATH_COMMIT below.
 // - Quest Helper (https://github.com/Zoinkwiz/quest-helper, BSD-2-Clause): quest start positions, read from the
-//   quest-stages.json snapshot made by preview/guides/scripts/build-stages.mjs on codex/interactive-guide-preview.
+//   quest-stages.json snapshot of Quest Helper's quest stages.
 // - lib/quest-reference.json (OSRS Wiki, CC BY-NC-SA 3.0): quest difficulty, length and start text.
 // Explv's map labels and Mejrs' NPC list are not used: neither has a licence that allows redistribution.
 import {readFileSync, writeFileSync, mkdirSync, existsSync} from 'node:fs';

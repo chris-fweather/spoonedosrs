@@ -1,6 +1,7 @@
 'use client';
 import {receivedMethod} from '@/lib/hunt-history';
 import {farmingRunStats,isTreeRun,TREE_RUNS,TREE_RUN,treeRunStats,treeRunsMethod} from '@/lib/farming-runs';
+import {raidFact,raidRate,type RaidInputs} from '@/lib/raid-rates';
 import {TANGLEROOT_TREES,treeFact,treeMethod,treeRate,treeRow} from '@/lib/tangleroot-trees';
 import {skillingDrops} from '@/lib/skilling-drops';
 import {DropTable} from './DropTable';
@@ -8,7 +9,7 @@ import {EffortBasis} from './EffortBasis';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {X, Plus, ExternalLink, Dices, Swords, MapPin, BookOpen, Check, Search, RefreshCw} from 'lucide-react';
 import {petUnitLabel,acquisitionUnit,acquisitionUnits,xpAtLevel,unitShort,hiscoresCount} from '@/lib/pet-record';
-import {lifetimeSkill, petSkill, oddsMethod, usesAcquisition, HONOUR_PER_GAMBLE} from '@/lib/estimates';
+import {lifetimeSkill, petSkill, oddsMethod, usesAcquisition, HONOUR_PER_GAMBLE, ZEAL_PER_CRATE} from '@/lib/estimates';
 import {type Journal, type Pet, type Method, initial, expectedHours, budgetHours, hoursSpent, likelihood, estimateReviewed} from '@/lib/model';
 import {IllustratedSelect} from './IllustratedSelect';
 import {PetOdds} from './ProgressCharts';
@@ -20,7 +21,7 @@ import {DriestRecord} from './DriestRecord';
 import {RateBasis} from './PetPanel';
 import './method-counts.css';
 
-const UNITS = ['rewards', 'rolls', 'actions', 'laps', 'logs', 'catches', 'uniques', 'kills', 'runs', 'crates', 'gambles', 'pickpockets', 'thefts', 'games', 'raids', 'XP', 'eligible rolls', 'attempts', 'master clues', 'harvests', 'rumours', 'plants', 'trees', 'seeds', 'activities'];
+const UNITS = ['rewards', 'rolls', 'actions', 'laps', 'logs', 'catches', 'uniques', 'kills', 'runs', 'crates', 'gambles', 'pickpockets', 'thefts', 'games', 'raids', 'XP', 'eligible rolls', 'attempts', 'master clues', 'harvests', 'rumours', 'plants', 'trees', 'seeds', 'activities', 'contracts', 'delves', 'tasks'];
 const TABS = ['Drops & odds', 'Guides', 'Progress & notes'] as const;
 /** The collection-log page that lists the skilling pets themselves. It is not a drop table, so a skilling pet shows
  * its own sources instead: every activity that rolls it, at the player's level (`lib/skilling-drops.ts`). */
@@ -58,6 +59,15 @@ export function PetDialog({journal, pet, setPet, busy, error, canEdit=false, edi
   function setMethod(at: number, patch: Partial<Method>) {
     if (!pet || busy || !pet.methods[at]) return;
     const methods = [...pet.methods]; methods[at] = {...methods[at], ...patch}; setPet({...pet, methods});
+  }
+  /** Method inputs (raid points and level, team size, deepest delve): the rate follows them, here and on load
+   * (normalizeRates), unless the player typed their own rate. Blank keeps the value. */
+  function setRaid(at: number, key: 'points' | 'level' | 'team' | 'delve', value: string) {
+    const m = pet?.methods[at], raid = m?.raid;
+    if (!m || !raid || !(key in raid) || value === '' || !Number.isFinite(Number(value))) return;
+    const n = Number(value), clamp = (min: number, max: number) => Math.max(min, Math.min(max, Math.round(n)));
+    const next = {...raid, [key]: key === 'points' ? Math.max(1, Math.min(10_000_000, n)) : key === 'level' ? clamp(0, 600) : key === 'team' ? clamp(1, 100) : clamp(1, 1000)} as RaidInputs;
+    setMethod(at, {raid: next, ...(m.rateOverride ? {} : {rate: raidRate(next), rateConfirmed: true})});
   }
   function change(key: keyof Method, value: string, at = index) {
     const m = pet?.methods[at];
@@ -118,7 +128,7 @@ export function PetDialog({journal, pet, setPet, busy, error, canEdit=false, edi
 
 
           {skill&&<p className="current-skill"><b>Current {skill.name}: level {skill.level}</b><span>{num(skill.xp,0)} XP</span></p>}
-          <PetOdds pet={pet}/>
+          <PetOdds pet={pet} journal={journal}/>
           <DriestRecord name={pet.name} activity={activity}/>
           <details key={pet.id} className="rate-explanation"><summary>Method &amp; calculation details</summary><RateBasis journal={journal} pet={pet}/></details>
           {skillDrops && <><h3 className="sub">{pet.name} drop table</h3>
@@ -164,12 +174,19 @@ export function PetDialog({journal, pet, setPet, busy, error, canEdit=false, edi
               {pet.obtained&&pet.obtainedMethod&&!receivedMethod(pet)&&<p className="fine">Saved as “{pet.obtainedMethod}”. Pick the method it matches.</p>}
               <div className="pet-edit-fields">
                 <label className="field pet-edit-wide">{m.unit==='XP'?'Mean XP per pet':`Drop rate: 1 in … ${petUnitLabel(pet,m.unit)}`}<input type="number" min={1} max={1e12} step="any" value={m.rate==null?'':m.rate>=1000?Math.round(m.rate):Number(m.rate.toFixed(2))} placeholder="e.g. 3000" onChange={e=>change('rate',e.target.value)}/><small>{m.rateOverride?'Your own estimate; it changes only your numbers.':methodFact(pet,m)??'Wiki or saved rate.'}</small></label>
+                {(m.raid?.kind==='cox'||m.raid?.kind==='toa')&&<label className="field">Your points per raid<input type="number" min={1} max={10000000} step={1} value={m.raid.points} onChange={e=>setRaid(index,'points',e.target.value)}/><small>{m.raid.kind==='cox'?'Your own points, not the team total.':'Your reward points, without the starting 5,000.'}</small></label>}
+                {m.raid?.kind==='toa'&&<label className="field">Raid level<input type="number" min={0} max={600} step={5} value={m.raid.level??0} onChange={e=>setRaid(index,'level',e.target.value)}/></label>}
+                {m.raid?.kind==='nightmare'&&<label className="field">Team size<input type="number" min={1} max={100} step={1} value={m.raid.team} onChange={e=>setRaid(index,'team',e.target.value)}/><small>Players in the room when the fight starts; five or more is 1/4,000.</small></label>}
+                {m.raid?.kind==='dom'&&<label className="field">Deepest delve each run<input type="number" min={1} max={1000} step={1} value={m.raid.delve} onChange={e=>setRaid(index,'delve',e.target.value)}/><small>Dom rolls at every delve you finish from 6 on.</small></label>}
+                {m.unit==='crates'&&pet.name==="Lil' Creator"&&<label className="field">Zeal per hour<input type="number" min={1} step="any" value={m.kph?Math.round(m.kph*ZEAL_PER_CRATE):''} onChange={e=>change('kph',Number(e.target.value)>0?String(Number(e.target.value)/ZEAL_PER_CRATE):'')}/><small>A Spoils of war costs {ZEAL_PER_CRATE} Zeal.</small></label>}
+                {m.unit==='crates'&&pet.name==="Lil' Creator"&&<label className="field">Crates per hour<input type="number" min={0.01} step="any" value={m.kph?Number(m.kph.toFixed(2)):''} onChange={e=>change('kph',Number(e.target.value)>0?e.target.value:'')}/><small>Either box sets the other.</small></label>}
                 {m.unit==='gambles'&&<label className="field">Honour points per hour<input type="number" min={1} step="any" value={m.kph?Math.round(m.kph*HONOUR_PER_GAMBLE):''} onChange={e=>change('kph',Number(e.target.value)>0?String(Number(e.target.value)/HONOUR_PER_GAMBLE):'')}/><small>A high-level gamble costs 500 points in each role (2,000).</small></label>}
                 {['runs','raids','games'].includes(m.unit)&&<label className="field">Minutes per {m.unit.replace(/s$/,'')}<input type="number" min={0.01} step="any" value={m.kph?Number((60/m.kph).toFixed(2)):''} onChange={e=>change('kph',Number(e.target.value)>0?String(60/Number(e.target.value)):'')}/></label>}
               </div>
               {pet.name==='Tiny tempor'&&<p className="fine">One spent reward permit = one reward-pool roll. Enter permits spent; Tempoross completions and unspent permits do not count.</p>}
               {pet.name==='Phoenix'&&m.unit==='rolls'&&<p className="fine">Enter reward rolls, not Wintertodt subdues.</p>}
               {m.rateOverride&&pet.name==='Tangleroot'&&isTreeRun(m)&&m.name==='Tree runs'&&<button type="button" className="btn ghost sm" onClick={()=>setMethod(index,{rate:treeRunStats(skill?.level??99).xpPerPet,rateOverride:false,rateConfirmed:true})}>Reset to tree-run estimate</button>}
+              {m.rateOverride&&m.raid&&<button type="button" className="btn ghost sm" onClick={()=>setMethod(index,{rate:raidRate(m.raid),rateOverride:false,rateConfirmed:true})}>{m.raid.kind==='cox'||m.raid.kind==='toa'?'Reset to raid estimate':'Reset to Wiki estimate'}</button>}
               {m.rateOverride&&m.farmingRun&&<button type="button" className="btn ghost sm" onClick={()=>setMethod(index,{rate:farmingRunStats(m.farmingRun!,skill?.level??99).runsPerPet,rateOverride:false,rateConfirmed:true})}>Reset to tree-run chance</button>}
               {m.rateOverride&&pet.name==='Tangleroot'&&!wikiMethod(pet.name,m.name)&&treeRow(m.name)?.unit===m.unit&&<button type="button" className="btn ghost sm" onClick={()=>setMethod(index,{rate:treeRate(treeRow(m.name)!,skill?.level),rateOverride:false,rateConfirmed:true})}>Reset to sheet estimate</button>}
               {m.rateOverride&&wikiMethod(pet.name,m.name)&&skill&&<button type="button" className="btn ghost sm" onClick={()=>{const calc=atLevel(wikiMethod(pet.name,m.name)!,skill.level);if(!calc)return;const methods=[...pet.methods];methods[index]={...m,rate:m.unit==='XP'?calc.expectedXp:calc.actions,rateOverride:false,rateConfirmed:true};setPet({...pet,methods});}}>Reset to Wiki estimate</button>}
@@ -223,6 +240,7 @@ function UnitInput({unit,label,...props}:{unit:string;label:string}&React.InputH
 const cap=(s:string)=>s.charAt(0).toUpperCase()+s.slice(1);
 /** One short muted fact under a method's rate, when the method has one: the tree run's make-up, XP per tree. */
 function methodFact(pet:Pet,m:Method):string|null{
+  if(m.raid)return raidFact(m.raid);
   if(pet.name!=='Tangleroot')return null;
   if(m.name===TREE_RUNS&&isTreeRun(m))return `Average run: ${TREE_RUN.magic} magic + ${TREE_RUN.palm} palm, ~${num(treeRunStats(99).xp/1000,0)}k XP`;
   return treeFact(m);

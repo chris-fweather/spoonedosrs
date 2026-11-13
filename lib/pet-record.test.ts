@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {initial,validatePet,type Journal} from './model.ts';
-import {acquisitionUnit,acquisitionMethod} from './pet-record.ts';
+import {acquisitionUnit,acquisitionMethod,countUnit} from './pet-record.ts';
 import {normalizeRates} from './estimates.ts';
 import {wikiMethod,atLevel} from './skill-rates.ts';
 import {petRateLines} from './pet-rates.ts';
@@ -25,4 +25,8 @@ test('acquisition units and methods remain independent of the planned method',()
  pet.obtainedUnit='XP';assert.equal(validatePet(pet),true);
  pet.obtainedCount=200000001;assert.equal(validatePet(pet),false);
  const boss=structuredClone(initial.pets.find(p=>p.name==='Baby Mole')!);boss.obtainedCount=300;boss.obtainedUnit='XP';assert.equal(validatePet(boss),false);
+});
+test('a count of one reads in the singular, in every unit',()=>{
+ for(const [unit,one] of [['kills','kill'],['eligible rolls','eligible roll'],['master clues','master clue'],['searches','search'],['activities','activity'],['subdues','subdue'],['XP','XP']])assert.equal(countUnit(1,unit),one);
+ assert.equal(countUnit(0,'kills'),'kills');assert.equal(countUnit(2,'searches'),'searches');
 });

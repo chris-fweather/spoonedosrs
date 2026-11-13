@@ -11,11 +11,15 @@ export type SkillCategory = 'Combat' | 'Gathering' | 'Artisan' | 'Support';
 export type SkillFact = {label: string; value: string; icon?: string};
 export type SkillInfo = {summary: string; facts: SkillFact[]; members: boolean; category?: SkillCategory};
 export const SKILL_MAX_LEVEL = 99;
+/** The game's own skill icon (the small sprite from the skills tab and hiscores), used wherever a requirement is listed. */
+export const officialSkillIcon = (skill: string) => `/bosses/${skill.toLowerCase()}.png`;
 
 /** An unlock and the level it needs, with its icon. */
 const at = (label: string, level: number, icon?: string): SkillFact => ({label, value: `Level ${level}`, ...(icon ? {icon} : {})});
 /** Icons: an item's inventory icon (as guides show it), a spell, a prayer, a boss. */
 const item = (id: number, file = `/items/${id}.png`) => file;
+/** A tree's or plant's seed, the thing a farmer plants (the Spirit seed has no inventory icon here, so its drop image). */
+export const seed = (id: number) => id === 5317 ? '/drops/Spirit_seed_5.png' : `/items/${id}.png`;
 const spell = (name: string) => `/icons/spells/${name}.png`;
 const prayer = (name: string) => `/icons/prayers/${name}.png`;
 
@@ -42,7 +46,7 @@ export const SKILL_INFO: Record<string, SkillInfo> = {
   Cooking: {summary: 'Cook food that heals; burn less as you level.', category: 'Artisan', members: false, facts: [at('Lobsters', 40, item(379)), at('Sharks', 80, item(385)), at('Anglerfish', 84, item(13441))]},
   Firemaking: {summary: 'Light logs to make fires.', category: 'Artisan', members: false, facts: [at('Wintertodt', 50, '/bosses/wintertodt.png'), at('Yew logs', 60, item(1515)), at('Magic logs', 75, item(1513))]},
   Woodcutting: {summary: 'Chop trees for logs.', category: 'Gathering', members: false, facts: [at('Willow trees', 30, item(1519)), at('Yew trees', 60, item(1515)), at('Magic trees', 75, item(1513))]},
-  Farming: {summary: 'Grow crops, herbs and trees, even while offline.', category: 'Gathering', members: true, facts: [at('Ranarr weed', 32, item(257)), at('Magic tree', 75, item(5316)), at('Spirit tree', 83, '/icons/map/spirit-tree.png')]},
+  Farming: {summary: 'Grow crops, herbs and trees, even while offline.', category: 'Gathering', members: true, facts: [at('Ranarr weed', 32, seed(5295)), at('Magic tree', 75, seed(5316)), at('Spirit tree', 83, seed(5317))]},
   Sailing: {summary: 'Sail your own ship across Gielinor’s oceans.', members: true, facts: [{label: 'Added', value: '2025'}]},
 };
 

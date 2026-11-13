@@ -22,7 +22,8 @@
 .profile-studio .studio-tab-appearance .studio-controls{overflow-y:auto;scrollbar-gutter:stable;padding-right:18px}
 .profile-studio .compact-appearance{overflow:visible;max-width:430px;flex:none}
 .profile-studio .studio-tab-appearance .studio-fields{flex:none;display:block}
-.profile-studio .studio-identity .player-username,.profile-studio .title-sample .player-username{color:#eeeae0}
+/* Names without a site rank are off-white; a rank keeps its colour (globals.css .rank-name-*), as on the profile. */
+.profile-studio .studio-identity .player-username:not([class*=rank-name-]),.profile-studio .title-sample .player-username:not([class*=rank-name-]){color:#eeeae0}
 
 .profile-studio .emblem-toolbar,.profile-studio .studio-search-row{display:flex;flex-wrap:nowrap;gap:7px;align-items:center}
 .profile-studio .emblem-toolbar .studio-search,.profile-studio .studio-search-row .studio-search{flex:1;min-width:0}
@@ -40,9 +41,7 @@
 
 /* Titles and emblems: one grid of equal cards. Locked cards are dimmed and say how to unlock on hover, tap or focus. */
 .profile-studio .identity-options,.profile-studio .studio-badge-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));grid-auto-rows:120px;gap:8px;align-content:start;min-height:0}
-.profile-studio .achievement-options{grid-template-rows:auto}
-.profile-studio .achievement-options>.studio-search{grid-column:1/-1}
-.profile-studio .emblem-toolbar+.studio-badge-list{margin-top:10px}
+.profile-studio .emblem-toolbar+.studio-badge-list,.profile-studio .studio-search-row+.identity-options{margin-top:10px}
 .profile-studio .choice-cell{display:grid;min-width:0;border-radius:4px}
 .profile-studio .choice-cell>button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:0;height:100%;padding:12px 10px;text-align:center;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:4px;box-shadow:none}
 .profile-studio .choice-cell>button:hover:not(:disabled){background:var(--panel-2);border-color:var(--muted)}
@@ -57,13 +56,14 @@
 .profile-studio .choice-check{position:absolute;top:6px;right:6px;color:var(--gold)}
 .profile-studio .choice-none{color:var(--muted);flex:none}
 .profile-studio .choice-cell .title-sample{max-width:100%;font:700 15px/1.25 var(--rs);color:var(--gold);text-wrap:balance}
-.profile-studio .choice-cell .title-sample .player-username{color:#eeeae0}
+.profile-studio .choice-cell .title-sample .player-username:not([class*=rank-name-]){color:#eeeae0}
+/* Achievement titles keep one line: long ones (the Giant Mole Grandmaster) shrink to the card's width, from the title's
+   length in characters (--title-chars, set by the editor). Only a very long boss name reaches the 9px floor and wraps. */
+.profile-studio .achievement-options .choice-cell>button{container-type:inline-size}
+.profile-studio .choice-cell .title-sample.fit-title{font-size:clamp(9px,calc(100cqi * 2.05 / var(--title-chars)),15px)}
 .profile-studio .choice-cell .achievement-emblem{display:grid;place-items:center;flex:none;width:44px;height:44px;margin:0}
 .profile-studio .choice-cell .achievement-emblem img{width:36px;height:36px;max-width:none;max-height:none;object-fit:contain}
 .profile-studio .choice-cell .achievement-emblem.pet-emblem img{width:44px;height:44px}
-.profile-studio .choice-cell .achievement-emblem.max-emblem img{width:29px;height:34px}
-.profile-studio .choice-cell .achievement-emblem.max-emblem:after{right:6px;top:4px}
-.profile-studio .choice-cell .collection-emblem:not(.pet-emblem)>i{inset:4px}
 .profile-studio .choice-cell .rank-icon{position:relative;display:block;flex:none;width:38px;height:38px}
 .profile-studio .choice-cell .rank-weapon{position:absolute;inset:0;width:38px;height:38px;transform:none}
 .profile-studio .choice-cell .rank-weapon>img{width:100%;height:100%;object-fit:contain}
@@ -109,6 +109,8 @@
 /* Styles of the chosen item (lib/item-variants.ts): a tray under its row, notched at the card. The chosen style's name
  * shows once; each square swatch names itself on hover and to screen readers. Later cards fill the row beside the card. */
 .profile-studio .studio-item .style-count{font-size:9px;line-height:1.3;color:#d2b470}
+/* Rows grow to the tallest card, so two-line style names (Infernal completionist cape) keep their style count inside. */
+.profile-studio .studio-item-list{grid-auto-rows:max-content}
 .profile-studio .studio-item-list{grid-auto-flow:row dense}
 .profile-studio .studio-styles{--notch:43px;position:relative;grid-column:1/-1;min-width:0;margin-top:2px;padding:8px 10px 10px;background:#27241e;border:1px solid #484237;border-radius:4px}
 .profile-studio .studio-styles:before{content:"";position:absolute;top:-6px;left:clamp(10px,calc(var(--notch) - 5px),calc(100% - 20px));width:10px;height:10px;background:#27241e;border:solid #484237;border-width:1px 0 0 1px;transform:rotate(45deg)}
@@ -122,3 +124,7 @@
 .profile-studio .style-swatch:hover{border-color:#a08653}
 .profile-studio .style-swatch[aria-pressed=true]{background:#393224;border-color:var(--gold);box-shadow:inset 0 -2px var(--gold)}
 .profile-studio .style-swatch:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
+/* A second group in the Title tab ("After your name"), set apart from the name prefixes above it. */
+/* Section labels over a grid of cards (Title, Achievement title and Emblems tabs): inset to the cards' inner padding,
+   with more room above (between sections) than below (to their own cards). */
+.profile-studio .identity-group-label{margin:20px 0 9px;padding:0 11px;font-size:11px;font-weight:600;line-height:1.3;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-wrap:nowrap}

@@ -27,17 +27,19 @@ test('donation labels distinguish unknown, zero and hidden totals',()=>{
 });
 
 test('Sir is available to staff without granting badge overrides',()=>{
- for(const role of ['helper','moderator','admin','owner'] as const)assert.equal(parsePresentation({staffPrefix:'Sir'},prior,initial,{role,prefix:null}).staffPrefix,'Sir');
+ for(const role of ['moderator','admin','owner'] as const)assert.equal(parsePresentation({staffPrefix:'Sir'},prior,initial,{role,prefix:null}).staffPrefix,'Sir');
+ // Squire is live: a helper earns Squire, so a saved Sir becomes Squire.
+ assert.equal(parsePresentation({staffPrefix:'Sir'},prior,initial,{role:'helper',prefix:null}).staffPrefix,'Squire');
  assert.throws(()=>parsePresentation({staffPrefix:'Sir'},prior,initial,null));
  assert.throws(()=>parsePresentation({staffPrefix:'Sir'},prior,initial,null));
 });
-test('with Squire on, helpers and guide writers save Squire, Sir outranks it, and anyone else is refused',()=>{
+test('with Squire on, helpers and guide writers save Squire, Sir holders may pick either, and anyone else is refused',()=>{
  const save=(input:object,staff:{role:'helper'|'moderator'|'admin'|'owner';prefix:null}|null,writer=false,squire=true)=>parsePresentation(input,prior,initial,staff,undefined,false,writer,squire).staffPrefix;
  assert.equal(save({staffPrefix:'Squire'},{role:'helper',prefix:null}),'Squire');
  // A helper's Sir kept from before reads as the prefix they earn now.
  assert.equal(save({staffPrefix:'Sir'},{role:'helper',prefix:null}),'Squire');
  assert.equal(save({staffPrefix:'Squire'},null,true),'Squire');
- for(const role of ['moderator','admin','owner'] as const)assert.equal(save({staffPrefix:'Squire'},{role,prefix:null},true),'Sir');
+ for(const role of ['moderator','admin','owner'] as const){assert.equal(save({staffPrefix:'Squire'},{role,prefix:null},true),'Squire');assert.equal(save({staffPrefix:'Sir'},{role,prefix:null},true),'Sir');}
  assert.throws(()=>save({staffPrefix:'Squire'},null,false));
  assert.throws(()=>save({staffPrefix:'Sir'},null,false));
  // Squire off (the live site): guide writers earn nothing, every staff rank keeps Sir.
@@ -54,8 +56,9 @@ test('completion titles require complete data, while milestone and quest titles 
  assert.equal(selectedTitle(j,'completionist',null),null);
  j.log.obtained=3;
  assert.equal(selectedTitle(j,'completionist',null),'the Completionist');
- assert.equal(titleEffect('the Completionist'),'title-log-master');
- assert.equal(titleEffect('the Beastmaster'),'title-pet-master');
+ assert.equal(titleEffect('the Completionist'),'title-legendary');
+ assert.equal(titleEffect('the Beastmaster'),'title-legendary');
+ assert.equal(titleEffect('the Giant Mole Champion'),'title-legendary');
  assert.equal(titleRarity('the Pet Hunter'),'common');assert.equal(titleRarity('the Clogger'),'rare');assert.equal(titleRarity('the One and Only'),'legendary');assert.equal(titleEffect('the Maxed'),'title-maxed');
 });
 
@@ -99,7 +102,8 @@ test('legacy automatic choices become explicit without changing the displayed ti
  assert.equal(editableTitleChoice(j,'none',null,false,true),'none');
  j.pets.forEach((p,i)=>p.obtained=i<25);
  assert.equal(editableTitleChoice(j,'auto','pets-10'),'pet-collector');
- assert.equal(titleEffect('Supporter'),'title-supporter');
+ assert.equal(titleEffect('Supporter'),'title-uncommon','Supporter wears the uncommon colour');
+ assert.equal(titleEffect('the Achiever'),'title-rare');assert.equal(titleRarity('the Achiever'),'rare');
 });
 
 test('title progress uses the same goals as unlock eligibility',()=>{
@@ -136,8 +140,26 @@ test('pet and log title ladders unlock at their exact rarity milestones',()=>{
  j.log.obtained=100;assert.equal(selectedTitle(j,'log-collector',null),'the Log Collector');assert.equal(titleRarity('the Log Collector'),'uncommon');
 });
 
-test('donor title thresholds are separate from supporter eligibility',async()=>{
+test('"the Generous" comes with any supporter status: any amount, any currency, or a grant',async()=>{
  const {supporterTitle}=await import('./staff-appearance');
- assert.equal(supporterTitle(999,'USD'),null);assert.equal(supporterTitle(1000,'USD'),'the Generous');assert.equal(supporterTitle(1000,'AUD'),null);
+ assert.equal(supporterTitle(1),'the Generous');assert.equal(supporterTitle(true),'the Generous');
+ assert.equal(supporterTitle(0),null,'not supporting, or the supporter hid it');assert.equal(supporterTitle(null),null);
  assert.equal(selectedTitle(initial,'supporter',null,false,true),'Supporter');
+});
+test('"the Generous" can be hidden per name; it shows by default and only a true or false is accepted',async()=>{
+ const {shownSupporterTitle}=await import('./staff-appearance.ts');
+ assert.equal(shownSupporterTitle(1,null),'the Generous');assert.equal(shownSupporterTitle(1,1),'the Generous');
+ assert.equal(shownSupporterTitle(1,0),null,'hidden by the owner');assert.equal(shownSupporterTitle(0,1),null,'not earned');
+ const {initial}=await import('./model.ts');
+ const prior={staffBadge:null,staffPrefix:null,titleChoice:'auto',showDonation:true} as unknown as Parameters<typeof parsePresentation>[1];
+ assert.equal(parsePresentation({},prior,initial,null).showTitle,true);
+ assert.equal(parsePresentation({showTitle:false},prior,initial,null).showTitle,false);
+ assert.throws(()=>parsePresentation({showTitle:'no' as never},prior,initial,null),/the Generous/);
+});
+test('someone who earns Sir may save Squire instead; a helper cannot save Sir',()=>{
+ const base={staffBadge:null,staffPrefix:null,titleChoice:'auto',showDonation:true,showTitle:true} as const;
+ assert.equal(parsePresentation({staffPrefix:'Squire'},base,initial,{role:'moderator',prefix:null},undefined,false,false,true).staffPrefix,'Squire');
+ assert.equal(parsePresentation({staffPrefix:'Sir'},base,initial,{role:'moderator',prefix:null},undefined,false,false,true).staffPrefix,'Sir');
+ assert.equal(parsePresentation({staffPrefix:'Sir'},base,initial,{role:'helper',prefix:null},undefined,false,false,true).staffPrefix,'Squire');
+ assert.equal(parsePresentation({staffPrefix:'Squire'},base,initial,{role:'moderator',prefix:null},undefined,false,false,false).staffPrefix,'Sir','with Squire off, Sir');
 });

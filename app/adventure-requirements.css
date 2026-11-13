@@ -14,10 +14,10 @@
 .adventure-requirement-list .requirement-check{margin-left:auto;color:var(--good);font-size:12px;flex:none}
 .adventure-requirement-list li.req-met{color:var(--good)}
 .adventure-requirement-list li.req-miss{color:var(--bad)}
-/* The amount, then the name and a muted note, all on one line ("90 × Steel nails"), so an amount never drifts away from its name. */
+/* The amount, then the name and a muted note ("90 × Steel nails"), so an amount never drifts away from its name. A long name or note wraps. */
 .adventure-requirement-list .req-name{display:flex;align-items:baseline;gap:6px;flex:0 1 auto;min-width:0}
-.adventure-requirement-list .req-name>a,.adventure-requirement-list .req-name>b{flex:0 1 auto;min-width:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.adventure-requirement-list .req-note{flex:0 1 auto;min-width:0;font-size:11px;font-weight:400;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adventure-requirement-list .req-name>a,.adventure-requirement-list .req-name>b{flex:0 1 auto;min-width:0;font-weight:500;overflow-wrap:anywhere}
+.adventure-requirement-list .req-note{flex:0 1 auto;min-width:0;font-size:11px;font-weight:400;color:var(--muted);overflow-wrap:anywhere}
 .adventure-requirement-list .req-qty{flex:none;margin-right:-4px;font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 /* Item rows open their price card on hover, focus or tap: the whole row is the trigger; hovering lights the name. */
 .adventure-requirement-list li.has-card{padding:0}

@@ -14,9 +14,11 @@ const ALIAS: Record<string, string> = {
   zmi: 'ourania altar',
   'true blood altar': 'blood rune',
   'ardougne knights': 'pickpocketing not specified',
+  'ardy knights': 'pickpocketing not specified',
   'seers village rooftop no teleport': 'seers village rooftop',
   belladonna: 'cave nightshade',
   belladona: 'cave nightshade',
+  'dark crabs': 'dark crab',
 };
 
 export function methodWiki(link: string) {

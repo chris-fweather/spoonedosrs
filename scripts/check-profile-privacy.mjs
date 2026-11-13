@@ -52,13 +52,15 @@ try {
  await post({username:name,...prior,staffBadge:'owner'},h,400);
  await post({username:name,...prior,titleChoice:'beastmaster'},h,400);
  await post({username:name,...prior,pinnedMark:'pets-all'},h,400);
- // Squire (helpers and guide writers) is dev only: on this production build a guide writer cannot choose it or show it.
- await sql("INSERT INTO community_guides(id,author_id,title,draft,published,revision,updated_at,published_at,publisher_id) VALUES(?,?,'QA guide','{}','{}',1,'2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z',?)",['qa-squire-'+id,id,id]);
+ // Squire (helpers and guide writers) is live since 1.0.0: refused without a published guide, then chosen and shown.
  await post({username:name,...prior,staffPrefix:'Squire'},h,400);
+ await sql("INSERT INTO community_guides(id,author_id,title,draft,published,revision,updated_at,published_at,publisher_id) VALUES(?,?,'QA guide','{}','{}',1,'2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z',?)",['qa-squire-'+id,id,id]);
+ // Asking for Sir gives the prefix earned today: a guide writer gets Squire, never Sir.
+ await post({username:name,...prior,staffPrefix:'Sir'},h);
  const writerRow=(await get('/api/leaderboard')).rows.find(r=>r.name===name);
- assert.ok(!writerRow.namePrefix&&!writerRow.staff,'no Squire on the production build');
- assert.ok(!(await get('/api/profile?username='+encodeURIComponent(name))).namePrefix);
- console.log('PASS: a guide writer gets no Squire on the production build.');
+ assert.equal(writerRow.namePrefix,'Squire','a guide writer shows Squire on the production build');assert.ok(!writerRow.staff);
+ assert.equal((await get('/api/profile?username='+encodeURIComponent(name))).namePrefix,'Squire');
+ console.log('PASS: a guide writer earns and shows Squire; asking for Sir still shows Squire.');
  await sql("INSERT INTO staff_members(discord_id,role,revision) VALUES(?,'owner','test')",[id]);
  await sql("INSERT INTO profile_supporter_totals(rsn,amount_minor,currency) VALUES(?,500,'USD')",[rsn]);
  await post({username:name,...prior,pinnedMark:'pets-all'},h,400);

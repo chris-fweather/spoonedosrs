@@ -28,8 +28,10 @@ test('provider client runs in the Workers runtime without following redirects',a
  }));
  try{
   const db=await mf.getD1Database('DB');
-  const migration=readFileSync(new URL('../drizzle/0021_provider_controls.sql',import.meta.url),'utf8');
-  await db.batch(migration.split(';').map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s)));
+  for(const file of ['0021_provider_controls.sql','0039_provider_backoff.sql']){
+   const migration=readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8').replace(/^--.*$/gm,'');
+   await db.batch(migration.split(';').map(s=>s.trim()).filter(Boolean).map(s=>db.prepare(s)));
+  }
   const call=async(url:string)=>(await mf.dispatchFetch('http://spooned.test/?'+new URLSearchParams({url}))).json();
   const rp='https://api.runeprofile.com/v1/accounts/Tester/full';
   assert.deepEqual(await call(rp),{status:200,cache:'miss',body:{ok:true}});

@@ -3,11 +3,12 @@
  * world map and every guide map on it. */
 import {useEffect, useState} from 'react';
 import {readExits, type Box, type ExitsFile, type MapExit} from '@/lib/world-map-exits';
+import {worldMapData} from '@/lib/world-map-data';
 
 export type MapExits = {exits: MapExit[]; areas: Box[]};
 let loading: Promise<MapExits | null> | null = null;
 function load() {
-  loading ??= fetch('/world-map/exits.json').then(r => r.ok ? r.json() as Promise<ExitsFile> : null).then(f => f ? readExits(f) : null).catch(() => {loading = null; return null;});
+  loading ??= fetch(worldMapData('exits.json')).then(r => r.ok ? r.json() as Promise<ExitsFile> : null).then(f => f ? readExits(f) : null).catch(() => {loading = null; return null;});
   return loading;
 }
 /** The exits and areas, or null until they arrive (maps work without them: the surface needs neither). */

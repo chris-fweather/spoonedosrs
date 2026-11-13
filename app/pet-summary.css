@@ -9,6 +9,7 @@
 .pet-summary-grid small{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:600px){.pet-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .ov-top.is-full{grid-template-columns:minmax(0,1fr)}
-@media(min-width:1101px){.ov-two .dry-row{grid-template-columns:30px minmax(90px,1fr) minmax(40px,.7fr) max-content}}
+/* Beside the bar and the value the name column is narrow, so a long pet name or count wraps instead of being cut. */
+@media(min-width:1101px){.ov-two .dry-row{grid-template-columns:30px minmax(90px,1fr) minmax(40px,.7fr) max-content}.ov-two .dry-name b,.ov-two .dry-name small{white-space:normal;overflow-wrap:anywhere}}
 @media(max-width:1100px){.ov-two .dry-row{grid-template-columns:28px minmax(0,1fr) max-content}}
 .ov-two .dry-val small{white-space:nowrap}

@@ -1,12 +1,13 @@
 /* Guide maps (GuideMap.tsx, GuideMapView.tsx). */
 .guide-map{margin:0;display:flex;flex-direction:column;gap:12px}
-.guide-map>header{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
-.guide-map>header h3{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.guide-map .gm-title{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.guide-map .gm-title h3{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gm-frame{position:relative;isolation:isolate;border:1px solid #514632;border-radius:8px;overflow:hidden;background:#0e0d0b}
 .gm-canvas{height:min(440px,62vw);min-height:260px;background:#0e0d0b;font:inherit}
 .gm-canvas.is-editing{height:min(400px,60vw)}
 .gm-loading{display:flex;align-items:center;justify-content:center;color:#8f8672;font-size:13px}
 .gm-canvas .leaflet-container,.gm-canvas.leaflet-container{background:#0e0d0b;font:inherit;outline:none}
+.gm-canvas.leaflet-container.is-dark{background:#000}
 .gm-canvas.is-editing.leaflet-container{cursor:crosshair}
 .gm-canvas .leaflet-tile{image-rendering:pixelated}
 .gm-canvas .leaflet-control-zoom a{background:#1d1a14;color:#e9c97a;border-color:#514632}
@@ -94,13 +95,13 @@
 .gm-stop.is-lit,.gm-stop:hover{background:#ffffff08}
 .gm-stop.is-active{background:#ffc3480f}
 .gm-stop-text{display:flex;flex-direction:column;gap:2px;min-width:0;padding-top:2px}
-.gm-stop-label{min-width:0;font-size:14px;line-height:20px;color:#e7e4dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-stop-label{min-width:0;font-size:14px;line-height:20px;color:#e7e4dc;overflow-wrap:anywhere}
 .gm-stop.is-active .gm-stop-label{color:#ffd98f}
-.gm-stop-meta{display:flex;align-items:center;gap:8px;min-width:0;height:20px;color:#8f8672;font-size:12px}
+.gm-stop-meta{display:flex;align-items:flex-start;gap:8px;min-width:0;min-height:20px;line-height:20px;color:#8f8672;font-size:12px}
 .gm-stop-items{display:inline-flex;align-items:center;gap:2px;flex:none}
 .gm-stop-items img{width:24px;height:24px;margin:-3px 0;object-fit:contain;image-rendering:pixelated}
 .gm-stop-items small{margin-left:2px;font-size:11px}
-.gm-stop-note{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-stop-note{min-width:0;overflow-wrap:anywhere}
 .gm-stop-mark{transition:box-shadow .15s}
 .gm-stop.is-lit .gm-stop-mark,.gm-stop.is-active .gm-stop-mark{box-shadow:0 0 0 2px #0e0d0b,0 0 0 4px #fff6}
 .gm-directions{display:grid;place-items:center;width:36px;height:40px;margin-top:0;border-radius:6px;color:#8f8672;opacity:.55;transition:opacity .15s}
@@ -166,9 +167,13 @@
 .gm-edit-via{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;gap:8px}
 .gm-edit-via img{width:24px;height:24px;object-fit:contain;image-rendering:pixelated}
 
-/* Every map with stops is a wide section of its own: on a desktop the stops are the steps on the left and the map sits on the
-   right; on narrower pages the stops follow under the map. A stop that says what to do there shows it under its name. */
+/* Every map with stops is a wide section of its own: on a desktop the title and stops are the steps column on the left, the
+   title level with the map's top edge, and the map sits on the right; on narrower pages the title stays on top and the stops
+   follow under the map. A stop that says what to do there shows it under its name. */
 .gm-body{display:flex;flex-direction:column;gap:12px;min-width:0}
+.gm-steps{display:contents}
+.gm-steps>.gm-title{order:-1}
+.gm-steps>.gm-stops{order:1}
 .guide-map{container-type:inline-size}
 .gm-stop-say{grid-column:1/-1;margin:-6px 0 0;padding:0 12px 8px 44px;color:#b3a990;font-size:13.5px;line-height:1.5;text-wrap:pretty}
 .gm-stop-say .guide-ref{white-space:nowrap}
@@ -176,8 +181,11 @@
 .gm-stop.is-active .gm-stop-say{color:#d6cdb6}
 .guide-map.is-steps .gm-stop-label{font-weight:600}
 @container (min-width:720px){
- .guide-map .gm-body:has(>.gm-stops){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:18px;align-items:start}
- .guide-map .gm-body>.gm-stops{order:-1}
- .guide-map .gm-body>.gm-stops .gm-stop-label{white-space:normal}
+ .guide-map .gm-body:has(>.gm-steps>.gm-stops){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:18px;align-items:start}
+ .guide-map .gm-body>.gm-steps:has(>.gm-stops){display:flex;flex-direction:column;gap:10px;min-width:0;order:-1}
+ .guide-map .gm-steps:has(>.gm-stops)>*{order:0}
+ .guide-map .gm-steps .gm-title h3{white-space:normal}
+ .guide-map .gm-steps .gm-stop-label{white-space:normal}
  .guide-map .gm-body>.gm-frame .gm-canvas{height:440px}
 }
+

@@ -6,7 +6,7 @@ The MIT licence in [LICENSE](../LICENSE) covers this project's **source code** o
 
 | Content | Where | Owner and terms |
 | --- | --- | --- |
-| Old School RuneScape artwork: item, pet, boss and interface sprites, chat badges, character and item models | `public/items`, `public/pets`, `public/bosses`, `public/drops`, `public/ui`, `public/models`, `public/portraits` | © Jagex Ltd; all rights reserved. Old School RuneScape and RuneScape are trademarks of Jagex Ltd. |
+| Old School RuneScape artwork: item, pet, boss and interface sprites, chat badges, character and item models | `public/items`, `public/pets`, `public/bosses`, `public/hiscores`, `public/drops`, `public/ui`, `public/models`, `public/portraits` | © Jagex Ltd; all rights reserved. Old School RuneScape and RuneScape are trademarks of Jagex Ltd. |
 | Site icon set (redrawn skills, tiers, ranks and interface icons) | `artwork/ui-skills`, `public/icons` | Drawn for this site after Jagex designs; the underlying designs remain Jagex's. |
 | OSRS Wiki drop rates, reference text and some images | bundled data in `lib/`, `public/bosses` | OSRS Wiki contributors, [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/). Attribution and revisions are recorded in [public/DATA-SOURCES.txt](../public/DATA-SOURCES.txt). |
 | Collection-log catalogue and item icons | `lib/`, `public/items` | Derived from [RuneProfile](https://github.com/ReinhardtR/runeprofile) data rendered from the game cache; see [public/ASSET-SOURCES.txt](../public/ASSET-SOURCES.txt). |
@@ -15,7 +15,7 @@ The MIT licence in [LICENSE](../LICENSE) covers this project's **source code** o
 | World map travel data: collision map, transports, teleports, banks | `public/world-map` (built by `scripts/build-world-map.mjs`; `exits.json`, the stairs, ladders and entrances on the maps, by `scripts/build-map-exits.mjs`); `lib/guide-travel.json`, guide travel hover cards (built by `scripts/build-guide-travel.mjs`) | Derived from [Shortest Path](https://github.com/Skretzo/shortest-path), BSD 2-Clause; notice in [public/world-map/NOTICE.txt](../public/world-map/NOTICE.txt). |
 | World map quest start positions | `public/world-map/places.json` | Derived from [Quest Helper](https://github.com/Zoinkwiz/quest-helper), BSD 2-Clause; notice in [public/world-map/NOTICE.txt](../public/world-map/NOTICE.txt). |
 | World map shortcut and fishing spot details (hover cards) | `public/world-map/icon-details.json` (built by `scripts/build-map-icon-details.mjs`) | Derived from [RuneLite](https://github.com/runelite/runelite) (AgilityShortcut, FishingSpot, FishingAction) and [Shortest Path](https://github.com/Skretzo/shortest-path), both BSD 2-Clause; notice in [public/world-map/NOTICE.txt](../public/world-map/NOTICE.txt). |
-| World map tiles | served through `/api/map-tile` | Rendered from the game by [Mejrs](https://github.com/mejrs/layers_osrs); the map itself © Jagex Ltd. |
+| World map tiles | served through `/api/map-tile` | Rendered by Spooned OSRS from the game cache with [RuneLite](https://github.com/runelite/runelite)'s map tools (BSD 2-Clause); the map itself © Jagex Ltd. Both production and dev serve our own render (`spooned-maps-2026-11-03`, `TILE_VERSIONS` in lib/map-tile-source.ts). Mejrs' earlier render ([layers_osrs](https://github.com/mejrs/layers_osrs)) is no longer served. See [map-tiles.md](map-tiles.md). |
 | Rocky mascot and site branding | `public/brand` | Spooned OSRS. |
 
 The player-facing summary is the [Credits page](../app/credits/page.tsx) (`/credits`); update it when this table changes.

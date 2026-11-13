@@ -2,7 +2,7 @@ import {parseLog, type Journal} from './model';
 import {publicHiscores} from './hiscores';
 import type {SyncedJournal} from './sync-journal';
 export type SourceState='found'|'not_found'|'unavailable';
-export type PlayerLookup={username:string;state:SourceState;hiscores:SourceState;runeprofile:SourceState;temple?:SourceState;wom?:SourceState;checkedAt:string;persisted?:boolean;skills:Journal['hiscores']['skills']};
+export type PlayerLookup={username:string;state:SourceState;hiscores:SourceState;runeprofile:SourceState;temple?:SourceState;wom?:SourceState|'skipped';checkedAt:string;persisted?:boolean;/** The paced sources were queued (lib/sync-queue.ts); the profile polls /api/sync/status. */status?:'sync_queued';skills:Journal['hiscores']['skills']};
 /** Bound public upstream JSON before parsing; an error page is never proof of a missing account. */
 async function jsonBody(response:Response):Promise<Record<string,unknown>> {
  if(!response.body)throw Error('Empty response');
@@ -49,7 +49,9 @@ export async function discoverPlayer(username:string, original:Journal, fetcher:
   try{journal=await syncJournal('all',original,null,tracked);}catch{ /* No source answered; nothing is saved. */ }
   const updated=new Set(journal?.syncReport?.filter(r=>r.status==='updated').map(r=>r.source));
   const state=(source:keyof typeof providerHosts):SourceState=>updated.has(source)?'found':statuses.get(providerHosts[source])===404?'not_found':'unavailable';
-  const sources={hiscores:state('hiscores'),runeprofile:state('runeprofile'),temple:state('temple'),wom:state('wom')};
+  // WOM is only asked for skills when the Hiscores have no answer (lib/provider-fallback.ts).
+  const womSkipped=journal?.syncReport?.some(r=>r.source==='wom'&&r.status==='skipped');
+  const sources={hiscores:state('hiscores'),runeprofile:state('runeprofile'),temple:state('temple'),wom:womSkipped?'skipped' as const:state('wom')};
   const found=Object.values(sources).includes('found');
   if(journal)delete journal.syncReport;
   return {lookup:{...lookup,...sources,state:found?'found':sources.hiscores==='not_found'?'not_found':'unavailable',skills:sources.hiscores==='found'?journal!.hiscores.skills:[]},journal:found?journal:null};

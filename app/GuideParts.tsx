@@ -9,6 +9,8 @@ import {ItemHover} from './ItemPriceCard';
 import {HoverTip} from './HoverTip';
 import {ItemRequirementTile} from './RequirementTiles';
 import {EntityHover} from './EntityHover';
+import {useSpriteFit} from './sprite-fit';
+import {officialSkillIcon} from '@/lib/skill-info';
 import {referenceTarget} from '@/lib/guide-hovers';
 import {GUIDE_EMOJIS,guideEmojiLabel} from '@/lib/guide-emojis';
 import type {EquipSlot} from '@/lib/flair';
@@ -51,7 +53,9 @@ export function lightDrops(name:string|null,from:Element){
  const row=first.getBoundingClientRect(),head=box.querySelector('thead')?.getBoundingClientRect().height??0;
  if(row.top<view.top+head)box.scrollTop-=view.top+head-row.top+8;else if(row.bottom>view.bottom)box.scrollTop+=row.bottom-view.bottom+8;
 }
-export function GuideRef({name,suffix='',quantity}:{name:string;suffix?:string;quantity?:number}){const r=guideReference(name),target=referenceTarget(r),light=r.itemId?{onMouseEnter:(e:{currentTarget:Element})=>lightDrops(r.name,e.currentTarget),onMouseLeave:(e:{currentTarget:Element})=>lightDrops(null,e.currentTarget),onFocus:(e:{currentTarget:Element})=>lightDrops(r.name,e.currentTarget),onBlur:(e:{currentTarget:Element})=>lightDrops(null,e.currentTarget)}:{},link=<a className={'guide-ref ref-'+r.kind} href={r.href} target="_blank" rel="noreferrer" title={target?undefined:`${r.name} · OSRS Wiki`} {...light}>{quantity!==undefined&&<span className="guide-ref-qty">{quantity.toLocaleString('en-US')}<i aria-hidden="true">×</i></span>}{r.icon&&<img src={r.icon} alt=""/>}{r.name}{suffix}</a>;return <EntityHover target={target} name={r.name} quantity={quantity} href={r.href}>{link}</EntityHover>;}
+export function GuideRef({name,suffix='',quantity}:{name:string;suffix?:string;quantity?:number}){const r=guideReference(name),target=referenceTarget(r),light=r.itemId?{onMouseEnter:(e:{currentTarget:Element})=>lightDrops(r.name,e.currentTarget),onMouseLeave:(e:{currentTarget:Element})=>lightDrops(null,e.currentTarget),onFocus:(e:{currentTarget:Element})=>lightDrops(r.name,e.currentTarget),onBlur:(e:{currentTarget:Element})=>lightDrops(null,e.currentTarget)}:{},link=<a className={'guide-ref ref-'+r.kind} href={r.href} target="_blank" rel="noreferrer" title={target?undefined:`${r.name} · OSRS Wiki`} {...light}>{quantity!==undefined&&<span className="guide-ref-qty">{quantity.toLocaleString('en-US')}<i aria-hidden="true">×</i></span>}{r.icon&&(r.itemId?<ItemSprite src={r.icon}/>:<img src={r.icon} alt=""/>)}{r.name}{suffix}</a>;return <EntityHover target={target} name={r.name} quantity={quantity} href={r.href}>{link}</EntityHover>;}
+/** An item's sprite in guide text, scaled to read the same size as the text around it (app/sprite-fit.ts). */
+function ItemSprite({src}:{src:string}){return <img src={src} alt="" style={useSpriteFit(src,.95)}/>;}
 /** One of the site's emojis inside guide text. */
 export function GuideEmoji({name}:{name:string}){return <img className="guide-emoji" src={GUIDE_EMOJIS[name]} alt={`:${name}:`} title={guideEmojiLabel(name)}/>;}
 /** A line of guide text. A number just before an item mention ("3 [[Plank]]s") joins the item's chip and price card. */
@@ -62,7 +66,7 @@ const clamp=(value:string,max:number)=>Math.max(1,Math.min(max,Math.round(Number
 /** Requirements chosen in the editor, as removable badges with editable levels and quantities. Recommended skills and items are marked as such. */
 export function RequirementBadges({guide,onEdit}:{guide:Guide;onEdit?:Edit}){
  const remove=(label:string,next:(g:Guide)=>Guide)=>onEdit&&<button type="button" className="link" aria-label={`Remove ${label}`} onClick={()=>onEdit(next)}>×</button>;
- const skill=(list:'requiredSkills'|'recommendedSkills',r:{skill:string;level:number})=><div className={'guide-requirement'+(list==='recommendedSkills'?' is-recommended':'')} key={list+r.skill}><img src={`/icons/skills/${r.skill.toLowerCase()}.png`} alt=""/><span>{r.skill}{onEdit?<label className="guide-requirement-qty">{list==='recommendedSkills'?'Recommended':'Level'}<input type="number" min={1} max={99} aria-label={`${r.skill} level`} value={r.level} onChange={e=>{const level=clamp(e.target.value,99);onEdit(g=>({...g,[list]:(g[list]??[]).map(x=>x.skill===r.skill?{...x,level}:x)}));}}/></label>:<small>{list==='recommendedSkills'?'Recommended':'Level'} {r.level}</small>}</span>{remove(r.skill,g=>({...g,[list]:(g[list]??[]).filter(x=>x.skill!==r.skill)}))}</div>;
+ const skill=(list:'requiredSkills'|'recommendedSkills',r:{skill:string;level:number})=><div className={'guide-requirement'+(list==='recommendedSkills'?' is-recommended':'')} key={list+r.skill}><img src={officialSkillIcon(r.skill)} alt=""/><span>{r.skill}{onEdit?<label className="guide-requirement-qty">{list==='recommendedSkills'?'Recommended':'Level'}<input type="number" min={1} max={99} aria-label={`${r.skill} level`} value={r.level} onChange={e=>{const level=clamp(e.target.value,99);onEdit(g=>({...g,[list]:(g[list]??[]).map(x=>x.skill===r.skill?{...x,level}:x)}));}}/></label>:<small>{list==='recommendedSkills'?'Recommended':'Level'} {r.level}</small>}</span>{remove(r.skill,g=>({...g,[list]:(g[list]??[]).filter(x=>x.skill!==r.skill)}))}</div>;
  const item=(list:'requiredItems'|'recommendedItems',i:{id:string;quantity:number})=><div className={'guide-requirement'+(list==='recommendedItems'?' is-recommended':'')} key={list+i.id}><ItemImage id={i.id}/><span>{guideItems[i.id]??'Unknown item'}{onEdit?<label className="guide-requirement-qty">{list==='recommendedItems'?'Recommended':'Quantity'}<input type="number" min={1} max={1000000} aria-label={`${guideItems[i.id]} quantity`} value={i.quantity} onChange={e=>{const quantity=clamp(e.target.value,1000000);onEdit(g=>({...g,[list]:(g[list]??[]).map(x=>x.id===i.id?{...x,quantity}:x)}));}}/></label>:<small>{list==='recommendedItems'?'Recommended':'Quantity'}: {i.quantity.toLocaleString()}</small>}</span>{remove(guideItems[i.id]??'item',g=>({...g,[list]:(g[list]??[]).filter(x=>x.id!==i.id)}))}</div>;
  return <div className="guide-requirement-list">
   {guide.requiredSkills?.map(r=>skill('requiredSkills',r))}
@@ -80,17 +84,18 @@ export function OtherIcon({itemId,icon='task'}:{itemId:string|null;icon?:GuideIc
  * Tiles are the same size as the profile's quest and diary requirements (app/adventure-requirements.css). */
 export function RequirementGroups({guide}:{guide:Guide}){
  // Skills show the same skill card as a [[Skill]] mention in the text, on hover, focus or tap: the whole row is the trigger.
- const skill=(r:{skill:string;level:number})=><li key={r.skill} className="has-card"><EntityHover target={{kind:'skill',name:r.skill}} className="req-card" focusable><img src={`/icons/skills/${r.skill.toLowerCase()}.png`} alt=""/><span className="req-name"><a href={wiki(r.skill)} target="_blank" rel="noreferrer">{r.level} {r.skill}</a></span></EntityHover></li>;
+ const skill=(r:{skill:string;level:number})=><li key={r.skill} className="has-card"><EntityHover target={{kind:'skill',name:r.skill}} className="req-card" focusable><img src={officialSkillIcon(r.skill)} alt=""/><span className="req-name"><a href={wiki(r.skill)} target="_blank" rel="noreferrer">{r.level} {r.skill}</a></span></EntityHover></li>;
  // Items show their price card (with the stack's worth) on hover, focus or tap, like gear and inventory slots.
  const item=(i:{id:string;quantity:number})=><ItemRequirementTile key={i.id} items={[{id:i.id,name:guideItems[i.id]??'Unknown item'}]} quantity={i.quantity}/>;
  const groups:[string,ReactNode[]][]=[
   ['Skills',(guide.requiredSkills??[]).map(skill)],
-  ['Quests',(guide.requiredQuests??[]).map(q=><li key={q}><img src="/ui/quest-point-icon.png" alt=""/><span className="req-name"><a href={wiki(q)} target="_blank" rel="noreferrer">{q}</a></span></li>)],
+  // Quests show their quest card (difficulty, start and requirements) the same way.
+  ['Quests',(guide.requiredQuests??[]).map(q=><li key={q} className="has-card"><EntityHover target={{kind:'quest',name:q}} className="req-card" focusable><img src="/ui/quest-point-icon.png" alt=""/><span className="req-name"><a href={wiki(q)} target="_blank" rel="noreferrer">{q}</a></span></EntityHover></li>)],
   ['Achievement diaries',(guide.requiredDiaries??[]).map(d=><li key={d.area+d.tier}><img src="/ui/achievement-diaries-icon.png" alt=""/><span className="req-name"><a href={wiki(`${d.area} Diary`)} target="_blank" rel="noreferrer">{d.area}</a></span><small className="req-qty">{d.tier}</small></li>)],
   ['Items',(guide.requiredItems??[]).map(item)],
-  // Custom requirements only borrow an icon (a law rune for "10,000 coins, or 33 Magic for Telekinetic Grab"), so they
-  // show no price card (lib/guide-hovers): the full label is the tooltip when the tile cuts it short.
-  ['Other requirements',(guide.requiredOther??[]).map((r,i)=><li key={i} title={r.label}><OtherIcon itemId={r.itemId} icon={r.icon}/><span className="req-name"><b>{r.label}</b></span></li>)],
+  // Custom requirements with an item's icon (Anti-venom+, a Serpentine helm) show that item's price card like the Items
+  // row (lib/guide-hovers); the rest show none. The full label is the tooltip when the tile cuts it short.
+  ['Other requirements',(guide.requiredOther??[]).map((r,i)=>{const tile=<><OtherIcon itemId={r.itemId} icon={r.icon}/><span className="req-name"><b>{r.label}</b></span></>;return r.itemId?<li key={i} className="has-card" title={r.label}><EntityHover target={{kind:'other-requirement',label:r.label,iconItem:r.itemId}} name={guideItems[r.itemId]} className="req-card" focusable>{tile}</EntityHover></li>:<li key={i} title={r.label}>{tile}</li>;})],
   ['Recommended',[...(guide.recommendedSkills??[]).map(skill),...(guide.recommendedItems??[]).map(item)]],
  ];
  return <div className="guide-req-groups">{groups.filter(([,rows])=>rows.length).map(([title,rows])=><div className={'adventure-requirement-group'+(title==='Recommended'?' is-recommended':'')} key={title}><h3>{title}</h3><ul className="adventure-requirement-list">{rows}</ul></div>)}</div>;
@@ -146,12 +151,13 @@ export function GuideKit({setups,gear=true,inventory=true,fallback,notes=false}:
  </div>;
 }
 /** What each item or spell (or row's `label`, such as a level bracket with the item's icon) costs per use: `per` names one use,
- * "cast" by default. A spell row names the spell with its card and prices its runes. */
+ * "cast" by default. A spell row names the spell with its card and prices its runes. Each part's icon, drawn at the inventory's
+ * icon size, shows its price card (the amount's worth included) on hover, focus or tap. */
 export function CostTable({title,rows,per='cast'}:{title:string;rows:GuideCostRow[];per?:string}){
  const loaded=useGuidePrices(rows.flatMap(r=>r.parts.map(p=>p.itemId))),prices=loaded==='unavailable'?null:loaded;
  // Every row has the same number of part cells, so each part lines up under the one above it.
  const width=Math.max(1,...rows.map(r=>r.parts.length));
- return <div className="guide-costs"><div className="guide-costs-head"><span className="kicker">Cost per {per}</span></div><table style={{'--parts':width} as CSSProperties}><thead className="sr-only"><tr><th>{title||'Item'}</th>{Array.from({length:width},(_,i)=><th key={i}>{i?'':`Uses per ${per}`}</th>)}<th>Cost</th></tr></thead><tbody>{rows.map(r=>{const known=prices&&r.parts.every(p=>prices[p.itemId]!==undefined),cost=known?r.parts.reduce((t,p)=>t+prices![p.itemId]*p.quantity,0):null;return <tr key={r.spell??r.itemId}><td className="guide-cost-item">{r.label?<span className="guide-cost-label">{r.label}</span>:<GuideRef name={r.spell??guideItems[r.itemId]??''}/>}</td>{Array.from({length:width},(_,i)=>{const p=r.parts[i];return <td key={i} className="guide-cost-part">{p&&<span title={guideItems[p.itemId]}><ItemImage id={p.itemId}/>{p.quantity.toLocaleString('en-US')}</span>}</td>;})}<td className="guide-cost-total">{cost!==null?<><b>{formatGp(cost)}</b>gp</>:<small className="muted">{loaded==='unavailable'?'Unavailable':prices?'No price':'Loading…'}</small>}</td></tr>;})}</tbody></table></div>;
+ return <div className="guide-costs"><div className="guide-costs-head"><span className="kicker">Cost per {per}</span></div><table style={{'--parts':width} as CSSProperties}><thead className="sr-only"><tr><th>{title||'Item'}</th>{Array.from({length:width},(_,i)=><th key={i}>{i?'':`Uses per ${per}`}</th>)}<th>Cost</th></tr></thead><tbody>{rows.map(r=>{const known=prices&&r.parts.every(p=>prices[p.itemId]!==undefined),cost=known?r.parts.reduce((t,p)=>t+prices![p.itemId]*p.quantity,0):null;return <tr key={r.spell??r.itemId}><td className="guide-cost-item">{r.label?<span className="guide-cost-label">{r.label}</span>:<GuideRef name={r.spell??guideItems[r.itemId]??''}/>}</td>{Array.from({length:width},(_,i)=>{const p=r.parts[i];return <td key={i} className="guide-cost-part">{p&&<ItemHover id={p.itemId} quantity={p.quantity} className="guide-cost-card" focusable><ItemImage id={p.itemId}/>{p.quantity.toLocaleString('en-US')}</ItemHover>}</td>;})}<td className="guide-cost-total">{cost!==null?<><b>{formatGp(cost)}</b>gp</>:<small className="muted">{loaded==='unavailable'?'Unavailable':prices?'No price':'Loading…'}</small>}</td></tr>;})}</tbody></table></div>;
 }
 /** Grand Exchange prices for the given items (OSRS Wiki real-time prices, cached ten minutes); untradeable items have none. */
 export function useGuidePrices(ids:string[]):Record<string,number>|null|'unavailable'{

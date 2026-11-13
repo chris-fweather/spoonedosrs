@@ -8,8 +8,9 @@
   --line:#37332b; --line-2:#4a443a; --line-3:#5e5648;
   --text:#ede6d4; --muted:#a59c8a; --dim:#71695b;
   --orange:#ff981f; --yellow:#ffff00; --gold:#ffcf3f;
-  /* Squire, the name prefix below Sir (gold): a cool steel, apart from white names, rank colours and gold. */
-  --squire:#a9bccf;
+  /* Squire, the name prefix below Sir (gold): the bronze of the top-1,000 rank glow (rank-glow-bronze), so the two prefixes
+     read as gold and bronze. */
+  --squire:#c0662e;
   --good:#3cc251; --warn:#ff981f; --bad:#e0452b; --info:#b9935a;
   --good-bg:rgba(60,194,81,.13); --warn-bg:rgba(255,152,31,.13); --bad-bg:rgba(224,69,43,.13);
   --rs:RuneScape,'DM Sans',sans-serif;
@@ -239,14 +240,15 @@ table{border-collapse:collapse;width:100%}
 /* odds */
 .odds{display:grid;gap:12px}
 .odds-line,.statline{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));background:var(--sunk);border:1px solid var(--line);border-radius:var(--radius)}
-.odds-line>div,.statline>div{padding:10px 12px;display:grid;gap:1px;border-right:1px solid var(--line);min-width:0}
+/* Each cell shares its row's three lines (label, value, note), so a label that wraps keeps the values level. */
+.odds-line>div,.statline>div{padding:10px 12px;display:grid;grid-row:span 3;grid-template-rows:subgrid;gap:1px;border-right:1px solid var(--line);min-width:0}
 .odds-line>div:last-child,.statline>div:last-child{border-right:0}
-.odds-line span,.statline span{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.odds-line span,.statline span{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;overflow-wrap:anywhere}
 .odds-line b,.statline b{font-family:var(--rs);font-size:19px;color:var(--yellow);text-shadow:1px 1px 0 #000;font-weight:700;white-space:nowrap}
 .odds-line.four{grid-template-columns:repeat(4,minmax(0,1fr))}
 .droptable .chance.plain{color:var(--muted);font-weight:500}
 .odds-line b.warn,.statline b.warn{color:var(--orange)} .odds-line b.bad,.statline b.bad{color:#ff6a4d} .odds-line b.good,.statline b.good{color:var(--good)}
-.odds-line small,.statline small{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.odds-line small,.statline small{color:var(--dim);overflow-wrap:anywhere}
 .odds-charts{display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
 .odds-charts figure{margin:0;background:var(--sunk);border:1px solid var(--line);border-radius:var(--radius);padding:12px 10px 6px}
 .odds-charts figcaption{font-size:12.5px;color:var(--muted);font-weight:600;margin:0 0 4px 6px}
@@ -1120,6 +1122,7 @@ html,body{height:100%}
 .rep-button b{border-left:1px solid var(--line-2);padding-left:7px;font-size:12px;font-variant-numeric:tabular-nums}.rep-button:hover:not(:disabled),.rep-button.given{border-color:var(--orange);color:var(--orange)}.rep-button:disabled{cursor:default;opacity:.8}.rep-button:focus-visible{outline:2px solid var(--orange);outline-offset:3px}
 .rep-hint{display:none;position:absolute;top:calc(100% + 7px);right:0;width:190px;max-width:calc(100vw - 40px);padding:9px 11px;background:var(--sunk);border:1px solid var(--line-2);border-radius:4px;color:var(--muted);font-size:11px;line-height:1.5;box-shadow:0 3px 12px #0007;pointer-events:none}.profile-reputation:hover .rep-hint,.profile-reputation:focus-within .rep-hint{display:block}
 .rep-error{position:absolute;right:0;top:calc(100% + 8px);width:190px;background:var(--sunk);border:1px solid var(--line-2);border-radius:4px;padding:10px;color:var(--text);font-size:11px;line-height:1.5}.rep-error button{display:block;margin-top:6px;color:var(--orange);text-decoration:underline}
+.rep-error.short{width:auto;white-space:nowrap;padding:8px 10px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 /* Profile workspace: natural card heights, one scroll surface per view. */
 @supports selector(::-webkit-scrollbar) {
@@ -1138,6 +1141,8 @@ html,body{height:100%}
 .rep-button{min-height:32px;gap:7px;padding:3px;border:0;background:transparent;box-shadow:none;font-size:13px}
 .rep-button b{border:0;padding:0;font-size:14px}.rep-button:hover:not(:disabled),.rep-button.given{color:var(--orange)}
 .rep-hint{display:none!important}
+/* The total, with the part from guide thumbs up under it in small print. */
+.rep-button:has(.rep-guides){flex-wrap:wrap;justify-content:flex-end;row-gap:1px}.rep-guides{flex-basis:100%;text-align:right;color:var(--muted);font-size:11px;font-weight:400;line-height:1.2}.rep-button:hover:not(:disabled) .rep-guides,.rep-button.given .rep-guides{color:inherit}
 .rate-explanation{border-top:1px solid var(--line);padding-top:10px}.rate-explanation summary{cursor:pointer;color:var(--muted);font-size:12px}.rate-explanation[open] summary{margin-bottom:12px}
 .quest-group{margin-bottom:8px}.quest-group summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 12px;border:1px solid var(--line);background:var(--panel);color:var(--orange);font-weight:700}
 .quest-group summary:before{content:'›';font-size:18px}.quest-group[open] summary:before{transform:rotate(90deg)}.quest-group summary span{margin-left:auto;font:12px/1.4 system-ui;color:var(--muted)}
@@ -1238,14 +1243,9 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 .studio-badges .presentation-options{display:block;flex:none;max-height:48%;overflow:auto;padding:10px;border:1px solid var(--line);border-radius:3px}.presentation-options>summary{cursor:pointer;font-size:12px;color:var(--orange)}.presentation-options[open]>summary{margin-bottom:12px}.presentation-options>.title-select{margin-top:10px}.presentation-options>small{display:block;margin-top:6px}
 .emblem-tier-filter{display:flex;align-items:center;gap:10px;flex:none;font-size:11px;color:var(--muted)}.emblem-tier-filter select{min-width:0;flex:1;padding:6px;background:var(--sunk);color:var(--text);border:1px solid var(--line);text-transform:capitalize}
 .chat-guide section h3{display:flex;align-items:center;gap:8px}.chat-guide section h3 img{width:24px;height:28px;object-fit:contain;image-rendering:pixelated}
-.achievement-title.title-pet-master,.preview-title.title-pet-master,.achievement-title.title-log-master,.preview-title.title-log-master{position:relative;color:#f2ce87;text-shadow:0 0 7px #ca642a;animation:collection-glow 4s ease-in-out infinite alternate}
-.title-pet-master:after{content:'✦ · ✦';display:block;height:8px;font-size:9px;line-height:8px;color:#db9b54;letter-spacing:5px;animation:collection-embers 4s ease-in-out infinite}
-.title-log-master:after{content:'✧';margin-left:5px;color:#ddd7a3;animation:diamond-shimmer 4s ease-in-out infinite}
 .emblem:has(img[src*="quest"]):before,.emblem:has(img[src*="diaries"]):before{display:none}.emblem:has(img[src*="quest"]) img,.emblem:has(img[src*="diaries"]) img{filter:none}
-@keyframes collection-glow{to{text-shadow:0 0 3px #ad7439;color:#e9c996}}
-@keyframes collection-embers{0%,100%{opacity:.4;transform:translateY(1px)}50%{opacity:.9;transform:translateY(-2px)}}
 @media(max-width:650px){.clog3 .cl-pages.activity-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));overflow:visible}.studio-model{max-height:none}.studio-preview h3{white-space:normal;font-size:18px}.chat-guide figure{display:block}.char-name>b,.col-left .char-name>b{font-size:20px}.studio-badges .presentation-options{max-height:140px}}
-@media(prefers-reduced-motion:reduce){.achievement-title,.preview-title,.title-pet-master:after,.title-log-master:after{animation:none!important}}
+@media(prefers-reduced-motion:reduce){.achievement-title,.preview-title{animation:none!important}}
 
 /* Matched community lists and a persistent, directly labelled average series. */
 .home-page .community-columns{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
@@ -1277,7 +1277,6 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 .staff-rank,.char-name .staff-rank{align-items:baseline;vertical-align:baseline;align-self:baseline;line-height:inherit}
 .staff-rank .rank-icon{align-self:center;transform:translateY(2px)}
 .staff-word,.char-name .staff-word{font-family:inherit;font-size:inherit;line-height:inherit}
-.title-log-master:after,.title-pet-master:after{content:none}
 .studio-navigation{padding:14px 20px 0;border-bottom:1px solid var(--line);flex:none;background:var(--panel)}
 .studio-navigation .studio-hint{margin:9px 0 12px;min-height:17px}
 .studio-layout{--outfit-height:clamp(280px,47dvh,410px);grid-template-columns:270px minmax(0,1fr)}
@@ -1315,14 +1314,10 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 .achievement-emblem.collection-emblem.gold img{filter:grayscale(1) sepia(1) saturate(3) brightness(1.45)}
 .achievement-emblem.collection-emblem.platinum img{filter:grayscale(1) sepia(.7) saturate(2) hue-rotate(115deg) brightness(1.7)}
 .achievement-emblem.collection-emblem.diamond img{filter:grayscale(1) sepia(1) saturate(2) hue-rotate(145deg) brightness(1.9)}
-.achievement-emblem.collection-emblem.legendary img{filter:brightness(1.5)}
-.achievement-emblem i{position:absolute;inset:0;background:url('/ui/infernal-lava.png') 0 0/64px 64px;mask-size:contain;mask-position:center;mask-repeat:no-repeat;-webkit-mask-size:contain;-webkit-mask-position:center;-webkit-mask-repeat:no-repeat;animation:emblem-lava 5s linear infinite;mix-blend-mode:screen;opacity:.95}
 .achievement-emblem.studio-emblem{position:absolute;width:40px;height:40px;top:10px;left:10px}
 .char-stamp .achievement-emblem{width:100%;height:100%}
-@keyframes emblem-lava{to{background-position:0 64px}}
 @media(max-width:900px){.studio-layout{grid-template-columns:230px minmax(0,1fr)}.studio-equipment{grid-template-columns:174px minmax(0,1fr);gap:10px}.studio-slots .worn-grid{grid-template-columns:repeat(3,48px)}.studio-slots .equip-slot{width:48px}.studio-identity .rs-title{font-size:14px}.studio-item-list{grid-template-columns:repeat(auto-fill,minmax(75px,1fr))}}
 @media(max-width:650px){.studio-navigation{padding:10px 12px 0}.studio-toolbar .seg{flex-wrap:wrap}.studio-toolbar .seg button{font-size:11px;padding:8px}.studio-layout{--outfit-height:380px}.studio-preview{height:255px;overflow:visible;container-type:normal}.studio-model{height:100%;grid-row:1/6}.studio-preview .studio-identity{justify-content:flex-start;font-size:18px}.studio-controls{overflow:visible;min-height:440px}.studio-tab-equipment .studio-equipment{padding-top:0}.studio-fields{height:390px;min-height:390px}.studio-equipment{grid-template-columns:166px minmax(0,1fr)}.studio-slots .worn-grid{grid-template-columns:repeat(3,45px)}.studio-slots .equip-slot{width:45px}.appearance-body{grid-template-columns:1fr}.studio-badges .presentation-options{max-height:160px}}
-@media(prefers-reduced-motion:reduce){.achievement-emblem i{animation:none}}
 /* One pagination rhythm across boards, insights and hunt planning. */
 .slim-pagination{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding-top:12px;margin-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);flex:none}
 .slim-pagination>div{display:flex;gap:9px}.slim-pagination button{display:grid;place-items:center;width:36px;height:34px;padding:4px;background:none;border:0;box-shadow:none;color:var(--muted);border-radius:3px;transition:color .15s,background .15s}
@@ -1349,7 +1344,7 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 .profile-empty .btn{flex:none;min-height:40px;margin-top:6px}
 .wbody .empty{align-content:center}
 .player-status{display:flex;align-items:center;justify-content:space-between;gap:16px;width:var(--frame-w);max-width:calc(100vw - 32px);margin:16px auto 0;padding:12px 0;border-bottom:1px solid var(--line);font-size:12px}
-.player-status>span{display:grid;gap:4px;min-width:0}.player-status small{color:var(--muted);line-height:1.5}.player-status .link{flex-shrink:0}.player-status.not_found b,.player-status.unavailable b{color:var(--orange)}
+.player-status>span{display:grid;gap:4px;min-width:0}.player-status small{color:var(--muted);line-height:1.5}.player-status .link{flex-shrink:0}.player-status.not_found b,.player-status.unavailable b{color:var(--orange)}.player-status.sync-queued b{display:inline-flex;align-items:center;gap:6px;color:var(--gold,#e0b85a)}
 .prog-val.is-unknown{font-family:inherit;font-size:11px;color:var(--muted)}
 .ov-two:empty{display:none}.ov-two> :only-child{grid-column:1/-1}
 @media(max-width:600px){.player-status{margin:8px 12px 0;padding:10px 0;align-items:flex-start}.profile-empty,.wbody.fill>.profile-empty{padding:24px 16px}}
@@ -1374,8 +1369,17 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 .char-stamp,.char-stamp.pinned{width:34px;height:34px;padding:0;flex:none}
 .char-stamp .achievement-emblem,.achievement-emblem.studio-emblem{width:34px;height:34px;max-width:34px;max-height:34px}
 .achievement-emblem img,.char-stamp .achievement-emblem img,.achievement-emblem.studio-emblem img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain}
-.achievement-emblem.max-emblem img{filter:drop-shadow(0 0 3px #edb947);animation:max-cape-shine 3s ease-in-out infinite alternate}
-.achievement-emblem.max-emblem:after{content:'✦';position:absolute;right:-2px;top:0;color:#ffe5a6;font-size:10px;animation:max-cape-spark 3s ease-in-out infinite}
+/* Legendary emblems (All pets, Max cape, Complete collection log, Quest and Diary complete, All combat tasks) share one
+   treatment: the Max cape's golden shine and five twinkling stars, each on its own beat. */
+.achievement-emblem.legendary-emblem img{filter:drop-shadow(0 0 3px #edb947);animation:max-cape-shine 3s ease-in-out infinite alternate}
+/* The max cape icon is narrow and leaves empty space in its sprite, so it is drawn larger to match the other emblems. */
+.achievement-emblem.max-emblem img{transform:scale(1.3)}
+.emblem-star{position:absolute;z-index:2;color:#ffe5a6;font-size:10px;line-height:1;pointer-events:none;text-shadow:0 0 3px #edb947;animation:max-cape-spark 3s ease-in-out infinite}
+.emblem-star-0{right:-2px;top:0}
+.emblem-star-1{left:-1px;top:22%;font-size:7px;animation-delay:-1.1s}
+.emblem-star-2{right:-3px;bottom:16%;font-size:8px;animation-delay:-2.2s}
+.emblem-star-3{left:12%;bottom:-2px;font-size:6px;animation-delay:-.6s}
+.emblem-star-4{left:46%;top:-4px;font-size:6px;animation-delay:-1.7s}
 @keyframes max-cape-shine{to{filter:brightness(1.2) drop-shadow(0 0 5px #eeae45)}}
 @keyframes max-cape-spark{0%,100%{opacity:.25;transform:scale(.65)}50%{opacity:1;transform:scale(1)}}
 /* Overview and Connections use the page's normal scroll, not a nested panel. */
@@ -1425,7 +1429,7 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 .series-key{display:inline-block;width:7px;height:7px;border-radius:50%;background:#d2b97c;margin-right:5px}.series-key.other{background:#90b28b}.series-key.average{background:#9bc4d5}
 @media(max-width:800px){.studio-layout{grid-template-columns:220px minmax(0,1fr)}.studio-tab-equipment .studio-equipment{grid-template-columns:154px minmax(0,1fr);gap:10px}.studio-slots .worn-grid{width:146px;grid-template-columns:repeat(3,46px)}.studio-slots .equip-slot{width:46px}.emblem-toolbar{flex-wrap:wrap}.emblem-tier-filter{flex:1}.comparison-refined .comparison-row{grid-template-columns:160px minmax(0,1fr);gap:10px}.comparison-refined .compare-bar{grid-template-columns:90px minmax(0,1fr) 85px}}
 @media(max-width:650px){.studio-layout{display:flex;overflow:auto}.studio-preview{display:grid;height:235px;min-height:235px;overflow:visible;grid-template-columns:135px minmax(0,1fr);grid-template-rows:repeat(5,auto)}.studio-preview .studio-model{height:100%;grid-row:1/6;grid-column:1}.studio-preview .studio-identity{grid-column:2}.studio-controls{min-height:440px;overflow:visible}.studio-fields{min-height:410px;height:auto}.studio-tab-equipment .studio-equipment{padding-top:0;min-height:390px}.studio-slots{margin-bottom:0;height:355px}.studio-badges{overflow:visible}.studio-item-list{max-height:340px}.studio-footer{padding:9px 12px}.diary-areas{grid-template-columns:1fr}.comparison-refined .comparison-row{display:block;padding:16px}.comparison-refined .comparison-label{display:flex;flex-wrap:wrap;margin-bottom:16px}.comparison-refined .comparison-label small{margin-left:auto;font-size:12px}.comparison-refined .compare-bar{grid-template-columns:90px minmax(0,1fr) 82px}.comparison-refined .comparison-row footer{margin-top:12px}.home-page .section-heading{flex-wrap:wrap;gap:12px}}
-@media(prefers-reduced-motion:reduce){.achievement-emblem.max-emblem img,.achievement-emblem.max-emblem:after{animation:none}}
+@media(prefers-reduced-motion:reduce){.achievement-emblem.legendary-emblem img,.emblem-star{animation:none}}
 
 .reputation-preview{display:grid;grid-template-columns:250px minmax(0,1fr);gap:30px;align-items:center}.reputation-preview .char-stage{height:320px;flex:none}.reputation-preview .char-card{width:250px}.reputation-preview h2{margin:8px 0 12px}.reputation-preview p{font-size:13px;line-height:1.6;max-width:430px}.rep-samples{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.rep-samples button[aria-pressed=true]{border-color:var(--gold);background:#41341f;color:var(--gold)}
 @media(max-width:650px){.reputation-preview{grid-template-columns:1fr;gap:18px}.reputation-example{justify-self:center}.reputation-preview>div:last-child{grid-row:1}}
@@ -1510,7 +1514,7 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 
 /* Identity choices share one full-height catalogue, with the title anchored to the name. */
 .studio-identity>.achievement-title{flex-basis:100%;display:block;font:12px/1.35 'DM Sans',system-ui,sans-serif;margin:2px 0 4px;text-align:center}
-.studio-identity>.achievement-title:not(.title-pet-master):not(.title-log-master){color:var(--muted)}
+.studio-identity>.achievement-title{color:var(--muted)}
 .char-name>.achievement-title{display:block;font-size:12px}
 .studio-badges{display:flex;flex-direction:column;overflow:hidden;min-height:0;padding:0;gap:12px}
 .identity-tabs{display:flex;flex-wrap:wrap;flex:none;gap:4px;border-bottom:1px solid var(--line);padding-bottom:7px}
@@ -1527,12 +1531,13 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 /* One compact, bottom-anchored tooltip for either pet hover target. */
 .floating-tooltip{padding:9px 11px;border-color:#514a3b;border-radius:5px;background:#1a1813;line-height:1.5;font-weight:400;box-shadow:0 5px 16px #0006;max-width:min(250px,calc(100vw - 16px))}
 .pet-tooltip-content,.achievement-tooltip-content{display:grid;gap:4px;white-space:normal}
+/* Hover cards never leave one word alone on their last line ("…on the / hiscores."). */
+.floating-tooltip,.floating-tooltip *{text-wrap:pretty}
 .tooltip-heading{display:block;font-size:11px;font-weight:600;color:var(--text);padding-bottom:3px;border-bottom:1px solid var(--line);margin-bottom:1px}
 .tooltip-detail{display:block;font-size:11px;color:var(--muted)}.tooltip-detail b{font-weight:400;color:var(--text)}
 .achievement-tooltip-content{max-width:210px;color:var(--muted)}
 .badge-card{max-width:230px}.char-stamp{cursor:help}
 .achievement-help{display:inline-flex;gap:5px;align-items:center;cursor:help;border-radius:3px}
-.achievement-text.title-pet-master,.achievement-text.title-log-master{position:relative;color:#f2ce87;text-shadow:0 0 7px #ca642a;animation:collection-glow 4s ease-in-out infinite alternate}
 @media(prefers-reduced-motion:reduce){.achievement-text{animation:none!important}}
 
 .insights-grid .category-panel .hbar:hover,.insights-grid .category-panel .hbar:focus-visible{background:var(--panel-2);border-color:var(--line-3)}
@@ -1557,7 +1562,7 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 .driest-line a{color:var(--text);font-weight:700}
 .driest-line a:hover{color:var(--orange)}
 
-@media(max-width:820px){.profile-sizing-pane[hidden]{display:none}}
+@media(max-width:820px){.profile-sizing-pane[hidden],.profile-sizing-pane.stack[hidden]{display:none}}
 
 .pop-placeholder{animation:none}
 @media(max-width:1100px){.pop-placeholder{display:none}}
@@ -1710,7 +1715,12 @@ button[aria-label="Previous page"],button[aria-label="Next page"]{display:inline
 
 .pet-save-calculation{padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--gold);font-size:12px;line-height:1.6}.pet-estimate-preset .fine{margin:8px 0 12px}
 
-.activity-rank-icon.rank-glow-bronze img{filter:drop-shadow(0 0 2px #c0662e) drop-shadow(0 0 5px #a4501f99)}.activity-rank-icon.rank-glow-silver img{filter:drop-shadow(0 0 2px #e4f1f8) drop-shadow(0 0 5px #a9d4ea99)}.activity-rank-icon.rank-glow-gold img{filter:drop-shadow(0 0 2px #ffd34d) drop-shadow(0 0 6px #f0b42acc)}.activity-rank-icon.rank-glow-champion img{filter:drop-shadow(0 0 2px #fff6c6) drop-shadow(0 0 6px #ffd24f);animation:hiscore-champion 2.4s ease-in-out infinite}.title-hiscore-champion{color:#ffe180!important;text-shadow:0 0 7px #e5b34180}.activity-rank-tip small{color:var(--gold);font-size:10px}@keyframes hiscore-champion{50%{filter:drop-shadow(0 0 3px #fff6c6) drop-shadow(0 0 9px #ffd24f)}}@media(prefers-reduced-motion:reduce){.activity-rank-icon.rank-glow-champion img{animation:none}}
+/* The grid shows the official hiscores icons (public/hiscores): small pixel art (about 18px), drawn a third larger
+   to fill its cell and kept crisp. */
+.activity-rank-icon{height:27px}
+.activity-rank-icon img{image-rendering:pixelated;transform:scale(1.35)}
+.activity-rank-icon:hover img,.activity-rank-icon:focus-visible img{transform:scale(1.35)}
+.activity-rank-icon.rank-glow-bronze img{filter:drop-shadow(0 0 2px #c0662e) drop-shadow(0 0 5px #a4501f99)}.activity-rank-icon.rank-glow-silver img{filter:drop-shadow(0 0 2px #e4f1f8) drop-shadow(0 0 5px #a9d4ea99)}.activity-rank-icon.rank-glow-gold img{filter:drop-shadow(0 0 2px #ffd34d) drop-shadow(0 0 6px #f0b42acc)}.activity-rank-icon.rank-glow-champion img{filter:drop-shadow(0 0 2px #fff6c6) drop-shadow(0 0 6px #ffd24f);animation:hiscore-champion 2.4s ease-in-out infinite}.activity-rank-tip small{color:var(--gold);font-size:10px}@keyframes hiscore-champion{50%{filter:drop-shadow(0 0 3px #fff6c6) drop-shadow(0 0 9px #ffd24f)}}@media(prefers-reduced-motion:reduce){.activity-rank-icon.rank-glow-champion img{animation:none}}
 /* Loading state and curated profile scenery. */
 .loading-spinner{display:inline-block;width:25px;height:25px;border:2px solid #ffffff20;border-top-color:var(--gold);border-radius:50%;animation:character-spin .8s linear infinite}.character-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:2;color:var(--muted);font-size:11px}.wallpaper-castle{background:linear-gradient(#12110d55,#12110d55),url('/brand/community-castle.webp') 68% center/cover}.wallpaper-riverside{background:linear-gradient(#12110d33,#12110d77),url('/brand/community-game.webp') 20% center/cover}@keyframes character-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.loading-spinner{animation:none;border-color:var(--gold);opacity:.65}}
 

@@ -1,7 +1,7 @@
 'use client';
-import {lazy,Suspense,useEffect,useId,useMemo,useState,useSyncExternalStore} from 'react';
+import {lazy,Suspense,useEffect,useId,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {ArrowDown,ArrowUp,ListPlus,MapPin,Navigation,Plus,Route,Search,X} from 'lucide-react';
-import {MAP_PIN_GROUPS,MAP_PIN_ICON,MAP_PIN_LABEL,MAP_PLACES,MAP_STOP_LIMITS,MAP_ZOOM,guideMapExits,guideMapLegs,guideMapStopColours,hasStopDetails,hasStopText,type GuideMap as GuideMapData,type GuideMapExit,type GuideMapPin} from '@/lib/guide-map';
+import {MAP_PIN_GROUPS,MAP_PIN_ICON,MAP_PIN_LABEL,MAP_PLACES,MAP_STOP_LIMITS,MAP_ZOOM,guideMapExits,guideMapLegs,routeExits,guideMapStopColours,hasStopDetails,hasStopText,type GuideMap as GuideMapData,type GuideMapExit,type GuideMapPin} from '@/lib/guide-map';
 import {worldMapDirections} from '@/lib/features';
 import {guideItemChoices,guideItemImage,guideItems,searchGuideItems} from '@/lib/guides';
 import {TRAVEL_METHODS,stopLook,teleportStopMethod,type StopTeleport} from '@/lib/guide-map-teleports';
@@ -9,7 +9,9 @@ import {useStopTeleports} from './guide-map-teleports';
 import {InlineText,ItemImage} from './GuideParts';
 import {ItemHover} from './ItemPriceCard';
 import {areaExits,areaFor,areaWith,backLabel,onSurface,wayOut,type Box,type MapExit,type MapPlace as MapSpot} from '@/lib/world-map-exits';
+import type {GameMap} from '@/lib/world-maps';
 import {useMapExits,type MapExits} from './map-exits';
+import {useWorldMaps} from './world-maps';
 import './guide-map.css';
 
 // Leaflet only loads on pages that show a map, and only in the browser.
@@ -18,21 +20,29 @@ const FLOORS=['Ground floor','1st floor','2nd floor','3rd floor'];
 function useMounted(){const [mounted,setMounted]=useState(false);useEffect(()=>setMounted(true),[]);return mounted;}
 const Loading=()=><div className="gm-canvas gm-loading" role="status">Loading the map…</div>;
 
-/** The area a guide map shows for a spot: the surface, or the underground area around it grown to hold the map's
- * underground stops (quest dungeons the travel data does not know). Kept as the same object while the box is the same. */
+/** The underground area around a spot, grown to hold the map's underground stops (quest dungeons the travel data does
+ * not know), for the way back to the surface. Kept as the same object while the box is the same. */
 function useArea(spot:MapSpot,pins:GuideMapPin[],doors:MapExits|null):Box{
  const b=areaWith(areaFor(spot.at,doors?.areas),pins);
  return useMemo(()=>({x0:b.x0,y0:b.y0,x1:b.x1,y1:b.y1}),[b.x0,b.y0,b.x1,b.y1]);
 }
 /** Ways into another area from the travel data, plus the route's own (a quest dungeon the data lacks). Floor changes are
  * not drawn: readers reach a stop upstairs from the list of stops. */
-function useExits(pins:GuideMapPin[],doors:MapExits|null):(MapExit|GuideMapExit)[]{
- return useMemo(()=>{const known=doors?.exits??[];return areaExits([...known,...guideMapExits(pins,known)]);},[pins,doors]);
+function useExits(pins:GuideMapPin[],doors:MapExits|null,all=false):(MapExit|GuideMapExit)[]{
+ // Readers see only the exits the route uses; writers see every one, to reach any area while placing stops.
+ return useMemo(()=>{const known=doors?.exits??[];return areaExits([...(all?known:routeExits(pins,known,doors?.areas)),...guideMapExits(pins,known)]);},[pins,doors,all]);
 }
-function BackButton({spot,onClick}:{spot:MapSpot;onClick:()=>void}){
- const label=backLabel(spot);
+/** The game's map that shows a spot (the one shown before, while it still has it) and the spot's floor on it. */
+function useShownMap(spot:MapSpot):{world:GameMap|null;plane:number;above:boolean}{
+ const worlds=useWorldMaps(),last=useRef<GameMap|null>(null),tile={x:spot.at.x,y:spot.at.y,plane:spot.plane};
+ const world=worlds?worlds.mapOf(tile,last.current)??last.current??worlds.surface:null;
+ useEffect(()=>{last.current=world;},[world]);
+ return {world,plane:world?.toDisplay(tile)?.plane??0,above:world?world.surface:onSurface(spot.at)};
+}
+function BackButton({above,plane,onClick}:{above:boolean;plane:number;onClick:()=>void}){
+ const label=backLabel(above,plane);
  // Guide maps are small, so the button says just where it goes; the full wording is its accessible name.
- return label?<button type="button" className="map-back" aria-label={label} title={label} onClick={onClick}>{onSurface(spot.at)?<><ArrowDown size={16} aria-hidden="true"/>Ground floor</>:<><ArrowUp size={16} aria-hidden="true"/>Surface</>}</button>:null;
+ return label?<button type="button" className="map-back" aria-label={label} title={label} onClick={onClick}>{above?<><ArrowDown size={16} aria-hidden="true"/>Ground floor</>:<><ArrowUp size={16} aria-hidden="true"/>Surface</>}</button>:null;
 }
 // A stop's number badge takes the colour of the route line that ends at it, so the list matches the map.
 // Its icon says what to do there ("Fight · any style") on hover; an item stop shows the item it gives.
@@ -82,35 +92,34 @@ function RouteControl({hasRoute,route,whole,onShowAll,onToggle}:{hasRoute:boolea
  return <button type="button" className="gm-route-toggle" aria-pressed={hasRoute?route&&whole:undefined} aria-label={label} title={label} onClick={whole?onToggle:onShowAll}><Route size={15} aria-hidden="true"/><span>{hasRoute?'Route':'All stops'}</span></button>;
 }
 
-/** A map in a published guide: the chosen view and its numbered stops. On a wide enough page the stops are the steps on the
- * left of the map, otherwise they follow underneath; a stop that says what to do there shows it under its name. */
+/** A map in a published guide: its title, the chosen view and its numbered stops. On a wide enough page the title and stops
+ * are the steps column on the left of the map, otherwise they follow underneath (the title stays on top); a stop that says what to do there shows it under its name. */
 export function GuideMap({map:saved}:{map:GuideMapData}){
  // The map opens on the floor and area of the writer's view. Exits (ways into another area) and
  // the stops in the list move between floors and areas; the view stays inside the area shown.
- const mounted=useMounted(),home:MapSpot={plane:saved.plane,at:{x:saved.x,y:saved.y}},[spot,setSpot]=useState<MapSpot>(home),[jump,setJump]=useState<{x:number;y:number;key:number}|null>(null);
- const [active,setActive]=useState<number|null>(null),[hover,setHover]=useState<number|null>(null),plane=spot.plane,uid=useId();
+ const mounted=useMounted(),home:MapSpot={plane:saved.plane,at:{x:saved.x,y:saved.y}},[spot,setSpot]=useState<MapSpot>(home),[jump,setJump]=useState<{x:number;y:number;plane:number;key:number}|null>(null);
+ const [active,setActive]=useState<number|null>(null),[hover,setHover]=useState<number|null>(null),{world,plane,above}=useShownMap(spot),uid=useId();
  const [route,toggleRoute]=useRouteShown(saved),map={...saved,lines:route},hasRoute=guideMapLegs({pins:saved.pins}).length>0;
  const doors=useMapExits(),area=useArea(spot,saved.pins,doors),exits=useExits(saved.pins,doors);
  const colours=guideMapStopColours(map),teleports=useStopTeleports(saved.pins),steps=hasStopText(saved);
- const goTo=(t:{x:number;y:number;plane:number})=>{setSpot({plane:t.plane,at:{x:t.x,y:t.y}});setJump({x:t.x,y:t.y,key:Date.now()});};
+ const goTo=(t:{x:number;y:number;plane:number})=>{setSpot({plane:t.plane,at:{x:t.x,y:t.y}});setJump({x:t.x,y:t.y,plane:t.plane,key:Date.now()});};
  // Choosing a stop (in the list or on the map) focuses its leg, on its floor; choosing it again shows the whole route.
  const focus=(i:number)=>{if(active===i){showAll();return;}const pin=map.pins[i];setSpot({plane:pin.plane,at:{x:pin.x,y:pin.y}});setActive(i);};
  const showAll=()=>{setActive(null);setSpot(home);};
  const onExit=(e:MapExit|GuideMapExit)=>{if('stop' in e){setSpot({plane:e.to.plane,at:{x:e.to.x,y:e.to.y}});setActive(e.stop);return;}setActive(null);goTo(e.to);};
  // Back to the surface: the area's way out, else the map's own view or first stop on the surface.
- const surfacePin=saved.pins.find(p=>onSurface(p)),out=onSurface(spot.at)?null:wayOut(doors?.exits??[],area,spot.at,doors?.areas)??(onSurface(home.at)?home.at:surfacePin??null);
- const canGoBack=onSurface(spot.at)||!!out;
+ const surfacePin=saved.pins.find(p=>onSurface(p)),out=above?null:wayOut(doors?.exits??[],area,spot.at,doors?.areas)??(onSurface(home.at)?home.at:surfacePin??null);
+ const canGoBack=above||!!out;
  const back=()=>{
   setActive(null);
-  if(onSurface(spot.at)){setSpot({plane:0,at:spot.at});return;}
+  if(above){setSpot({plane:0,at:spot.at});return;}
   if(out)goTo({...out,plane:0});
  };
  return <figure className={'guide-map'+(steps?' is-steps':'')}>
-  {map.title&&<header><h3>{map.title}</h3></header>}
   <div className="gm-body">
-  <div className="gm-frame">{mounted?<Suspense fallback={<Loading/>}><GuideMapView map={map} plane={plane} area={area} exits={exits} onExit={onExit} jump={jump} active={active} highlight={hover!==null&&map.pins[hover]?.plane===plane?hover:null} onHover={setHover} onActive={focus} teleports={teleports}/></Suspense>:<Loading/>}
-   {canGoBack&&backLabel(spot)&&<div className="gm-map-back"><BackButton spot={spot} onClick={back}/></div>}
-   {(hasRoute||active!==null)&&<div className="gm-map-tools"><RouteControl hasRoute={hasRoute} route={route} whole={active===null} onShowAll={showAll} onToggle={toggleRoute}/></div>}</div>
+  {/* The steps column: the title, level with the map's top edge, then the stops. In one column the title stays on top. */}
+  {(map.title||map.pins.length>0)&&<div className="gm-steps">
+  {map.title&&<header className="gm-title"><h3>{map.title}</h3></header>}
   {map.pins.length>0&&<ol className="gm-stops">{map.pins.map((pin,i)=>{
    const name=pin.label||MAP_PIN_LABEL[pin.kind],directions=worldMapDirections(pin,name),ways=teleports[i],details=hasStopDetails(pin)||ways.length>0,open=details&&active===i;
    // The timeline between this stop and the next takes the colour of the route line that ends there (dotted for a teleport or a floor change).
@@ -127,6 +136,10 @@ export function GuideMap({map:saved}:{map:GuideMapData}){
     {pin.text&&!open&&<StopMeta pin={pin}/>}
     {open&&<StopDetails pin={pin} teleports={ways} id={`${uid}-${i}`}/>}
    </li>;})}</ol>}
+  </div>}
+  <div className="gm-frame">{mounted?<Suspense fallback={<Loading/>}>{world?<GuideMapView map={map} world={world} plane={plane} exits={exits} onExit={onExit} jump={jump} active={active} highlight={hover} onHover={setHover} onActive={focus} teleports={teleports}/>:<Loading/>}</Suspense>:<Loading/>}
+   {canGoBack&&backLabel(above,plane)&&<div className="gm-map-back"><BackButton above={above} plane={plane} onClick={back}/></div>}
+   {(hasRoute||active!==null)&&<div className="gm-map-tools"><RouteControl hasRoute={hasRoute} route={route} whole={active===null} onShowAll={showAll} onToggle={toggleRoute}/></div>}</div>
   </div>
  </figure>;
 }
@@ -138,8 +151,8 @@ export function GuideMapEditor({value,onChange}:{value:GuideMapData;onChange:(m:
  const mounted=useMounted(),[active,setActive]=useState<number|null>(null),[jump,setJump]=useState(0);
  const [shown,setShown]=useState(value);// the view the map opens at; moving the map only updates the saved view
  // Writers reach other floors with the Floor list and underground areas through exits, like readers.
- const [at,setAt]=useState({x:value.x,y:value.y}),[moveTo,setMoveTo]=useState<{x:number;y:number;key:number}|null>(null);
- const doors=useMapExits(),area=useArea({plane:value.plane,at},value.pins,doors),exits=useExits(value.pins,doors);
+ const [at,setAt]=useState({x:value.x,y:value.y}),[moveTo,setMoveTo]=useState<{x:number;y:number;plane:number;key:number}|null>(null);
+ const doors=useMapExits(),exits=useExits(value.pins,doors,true),{world,plane}=useShownMap({plane:value.plane,at});
  const set=(patch:Partial<GuideMapData>)=>onChange({...value,...patch});
  const pins=value.pins,colours=guideMapStopColours(value),ways=useStopTeleports(pins),setPin=(i:number,patch:Partial<GuideMapPin>)=>set({pins:pins.map((p,j)=>j===i?{...p,...patch}:p)});
  const [open,setOpen]=useState<number|null>(null);// the stop whose details are open
@@ -150,8 +163,8 @@ export function GuideMapEditor({value,onChange}:{value:GuideMapData;onChange:(m:
    <label>Jump to<select value="" onChange={e=>{const p=MAP_PLACES.find(x=>x.name===e.target.value);if(p){const view={...value,x:p.x,y:p.y,zoom:Math.max(value.zoom,8),plane:0};onChange(view);setShown(view);setAt(p);setJump(j=>j+1);}}}><option value="">A town or landmark…</option>{MAP_PLACES.map(p=><option key={p.name}>{p.name}</option>)}</select></label>
    <label>Floor<select value={value.plane} onChange={e=>set({plane:Number(e.target.value)})}>{FLOORS.map((f,i)=><option key={f} value={i}>{f}</option>)}</select></label>
   </div>
-  <div className="gm-frame">{mounted?<Suspense fallback={<Loading/>}><GuideMapView key={jump} editing teleports={ways} map={{...shown,pins,lines:value.lines}} plane={value.plane} area={area} exits={exits} jump={moveTo} onExit={e=>{onChange({...value,plane:e.to.plane,x:e.to.x,y:e.to.y});setAt({x:e.to.x,y:e.to.y});setMoveTo({x:e.to.x,y:e.to.y,key:Date.now()});}} active={active} onActive={setActive}
-   onView={v=>onChange({...value,...v})} onPlace={(x,y)=>{if(pins.length>=20)return;set({pins:[...pins,{x,y,plane:value.plane,label:'',kind:pins.length?'stop':'start'}]});setActive(pins.length);}}/></Suspense>:<Loading/>}</div>
+  <div className="gm-frame">{mounted?<Suspense fallback={<Loading/>}>{world?<GuideMapView key={jump} editing teleports={ways} map={{...shown,pins,lines:value.lines}} world={world} plane={plane} exits={exits} jump={moveTo} onExit={e=>{onChange({...value,plane:e.to.plane,x:e.to.x,y:e.to.y});setAt({x:e.to.x,y:e.to.y});setMoveTo({...e.to,key:Date.now()});}} active={active} onActive={setActive}
+   onView={v=>onChange({...value,...v})} onPlace={(x,y,p)=>{if(pins.length>=20)return;set({pins:[...pins,{x,y,plane:p,label:'',kind:pins.length?'stop':'start'}]});setActive(pins.length);}}/>:<Loading/>}</Suspense>:<Loading/>}</div>
   <div className="gm-editor-hint"><p className="fine"><MapPin size={13} aria-hidden="true"/> Click the map to add a stop. Readers see the map as you leave it.</p><label className="check"><input type="checkbox" checked={value.lines!==false} onChange={e=>set({lines:e.target.checked?undefined:false})}/> Route lines</label></div>
   {pins.length>0&&<ol className="gm-edit-stops">{pins.map((pin,i)=><li key={i} className={active===i?'is-active':''} onFocus={()=>setActive(i)}>
    <StopMark pin={pin} n={i+1} colour={colours[i]} ways={ways[i]}/>

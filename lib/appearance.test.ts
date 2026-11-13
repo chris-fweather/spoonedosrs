@@ -27,7 +27,7 @@ test('every female model reference exists and representative textured gear has f
 });
 test('picker offers spaced pet and collection milestones while preserving legacy selection support',()=>{
  assert.equal(featuredEmblem('pets-15'),false);assert.equal(featuredEmblem('pets-25'),false);
- for(const id of ['pets-5','pets-10','pets-20','pets-30','pets-50','pets-all','clog-all'])assert.equal(featuredEmblem(id),true);
+ for(const id of ['pets-5','pets-10','pets-20','pets-30','pets-50','pets-all','clog-all','combat-all'])assert.equal(featuredEmblem(id),true);
 });
 
 test('a head item that hides the hair replaces the whole head, so no kit face shows through helmet visors',async()=>{
@@ -61,7 +61,7 @@ test('a head item that hides the hair replaces the whole head, so no kit face sh
 test('quest and diary emblems require completion, while collection milestones remain',()=>{
  const j=structuredClone(initial),badges=badgeCatalogue(j);
  assert.equal(badges.filter(b=>b.id.startsWith('quests-')||b.id.startsWith('diaries-')).length,0);
- for(const id of ['quest-cape','diary-cape','pets-10','clog-429'])assert.ok(badges.some(b=>b.id===id));
+ for(const id of ['quest-cape','diary-cape','pets-10','clog-434'])assert.ok(badges.some(b=>b.id===id));
  assert.equal(coerceFlair(j,{pinnedMark:'quests-50'}).pinnedMark,null);
  j.profile={quests:[{id:1,name:'Quest',state:'finished',points:1,type:'free'}],diaries:[{areaId:1,area:'Area',tiers:[{tier:'Easy',completed:1,total:2}]}],combat:[],syncedAt:''};
  assert.equal(badgeCatalogue(j).find(b=>b.id==='quest-cape')?.unlocked,true);

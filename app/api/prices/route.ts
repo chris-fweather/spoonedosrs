@@ -1,4 +1,4 @@
-import {latestTrades} from '@/lib/ge-prices';
+import {latestTrades,priceStandIn} from '@/lib/ge-prices';
 
 /** Grand Exchange prices for guide costs (lib/ge-prices.ts): callers get only the item IDs they ask for. */
 export async function GET(request: Request) {
@@ -6,10 +6,11 @@ export async function GET(request: Request) {
   if (!ids.length) return Response.json({error: 'Ask for at least one item ID.'}, {status: 400});
   try {
     const data = await latestTrades(), prices: Record<string, number> = {};
-    // Coins are always worth 1; otherwise use the average of the latest instant buy and sell, or whichever exists.
+    // Coins are always worth 1; otherwise use the average of the latest instant buy and sell, or whichever exists. A charged
+    // item that does not trade is priced by its uncharged version (lib/ge-prices.ts priceStandIn).
     for (const id of ids) {
       if (id === '995') { prices[id] = 1; continue; }
-      const p = data[id], values = [p?.high, p?.low].filter((v): v is number => typeof v === 'number' && v > 0);
+      const p = data[id] ?? data[priceStandIn(id, other => !!data[other]) ?? ''], values = [p?.high, p?.low].filter((v): v is number => typeof v === 'number' && v > 0);
       if (values.length) prices[id] = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
     }
     return Response.json({prices, source: 'OSRS Wiki real-time prices'}, {headers: {'Cache-Control': 'public, max-age=600'}});

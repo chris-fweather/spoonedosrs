@@ -7,7 +7,7 @@ import seed from './seed.json' with {type: 'json'};
 test('Soup is the Sailing pet and Phoenix and Olmlet keep wiki rates', () => {
   assert.equal(petSkill.Soup, 'Sailing');
   const fresh = upgradeEstimates(structuredClone(seed) as Journal);
-  assert.equal(fresh.calculationVersion, 4);
+  assert.equal(fresh.calculationVersion, 6);
   const phoenix = fresh.pets.find(p => p.name === 'Phoenix');
   const olmlet = fresh.pets.find(p => p.name === 'Olmlet');
   assert.ok(phoenix && olmlet);
@@ -37,7 +37,7 @@ test('a stored journal with no Phoenix rate picks up the wiki roll rate', () => 
   assert.equal(method?.rate, 5000);
   assert.equal(method?.unit, 'rolls');
   assert.equal(method?.kc, null);
-  assert.equal(next.calculationVersion, 4);
+  assert.equal(next.calculationVersion, 6);
 });
 
 test('Phoenix crate rolls are entered and are not derived from subdues', () => {

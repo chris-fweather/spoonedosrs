@@ -11,19 +11,16 @@ function date(s: string | null) {
   if (!s) return 'Never';
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return 'Never';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const hour = d.getHours();
-  const h12 = hour % 12 || 12;
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}, ${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${hour < 12 ? 'am' : 'pm'}`;
+  return d.toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'});
 }
 
-export function Connections({journal: j, busy, ready, onSync, onImport, onError}: {
-  journal: SyncedJournal; busy: boolean; ready: boolean; onSync: (source: string) => void; onImport: (data: unknown) => void; onError: (m: string) => void;
+export function Connections({journal: j, busy, ready, syncing=false, onSync, onImport, onError}: {
+  journal: SyncedJournal; busy: boolean; ready: boolean; /** Queued sources are still on their way (lib/sync-queue.ts). */ syncing?: boolean; onSync: (source: string) => void; onImport: (data: unknown) => void; onError: (m: string) => void;
 }) {
   const file = useRef<HTMLInputElement>(null);
   return <div className="connections-content">
-    <section className="panel sync-summary"><div><h2>Refresh your journal</h2><p>Update your public stats and collection. Saved entries are kept when a source is unavailable.</p></div><button className="btn primary" disabled={busy||!ready} onClick={()=>onSync('all')}><RefreshCw size={15} className={busy?'spin':''}/> Refresh all sources</button></section>
-    {j.syncReport && <div className="sync-results" aria-live="polite">{j.syncReport.map(r=><div key={r.source} className={r.status==='updated'?'sync-updated':'sync-unavailable'}><b>{{hiscores:'OSRS Hiscores',runeprofile:'RuneProfile',temple:'TempleOSRS',wom:'Wise Old Man'}[r.source]}</b><span>{r.message}</span></div>)}</div>}
+    <section className="panel sync-summary"><div><h2>Refresh your journal</h2><p>Update your public stats and collection. Saved entries are kept when a source is unavailable.</p></div><button className="btn primary" disabled={busy||syncing||!ready} aria-busy={busy||syncing} onClick={()=>onSync('all')}><RefreshCw size={15} className={busy||syncing?'spin':''}/> {syncing?'Syncing…':'Refresh all sources'}</button></section>
+    {j.syncReport && <div className="sync-results" aria-live="polite">{j.syncReport.map(r=><div key={r.source} className={'sync-'+r.status}><b>{{hiscores:'OSRS Hiscores',runeprofile:'RuneProfile',temple:'TempleOSRS',wom:'Wise Old Man'}[r.source]}</b><span>{r.message}</span></div>)}</div>}
     <section className="conn-grid">
       <div className="panel conn">
         <div className="conn-h"><span className="gi"><Shield size={20}/></span><div><h2>OSRS Hiscores</h2><small className="muted">Levels, XP and boss kill counts</small></div><span className={`tag ${j.statsSyncedAt?'good':'warn'}`}>{j.statsSyncedAt?<><Check size={12}/> Synced</>:'Not synced'}</span></div>

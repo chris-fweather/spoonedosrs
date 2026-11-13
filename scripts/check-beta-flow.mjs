@@ -70,7 +70,7 @@ try{
  assert.equal((await send('/api/accounts',{username:'Beta Tester'})).status,200);
  const synced=await json(await send('/api/sync',{source:'all',username:'Beta Tester'}));
  assert.equal(synced.status,200,JSON.stringify(synced.body));
- assert.deepEqual(Object.fromEntries(synced.body.syncReport.map(r=>[r.source,r.status])),{hiscores:'updated',runeprofile:'updated',temple:'unavailable',wom:'unavailable'});
+ assert.deepEqual(Object.fromEntries(synced.body.syncReport.map(r=>[r.source,r.status])),{hiscores:'updated',runeprofile:'updated',temple:'unavailable',wom:'skipped'},'WOM is not asked for skills once the Hiscores answer');
  const journal=await (await call('/api/journal?username=Beta%20Tester')).json();
  assert.equal(journal.hiscores.skills.find(s=>s.name==='Overall').xp,50000000);assert.equal(journal.log.obtained,1);
  assert.equal(journal.profile.quests[0].state,'finished');assert.ok(journal.statsSyncedAt);
@@ -109,8 +109,9 @@ try{
  // TempleOSRS allows one request every 12.5 seconds site-wide and the deploy check just used it, so the search
  // reports it busy and saves what the other sources returned; with a free slot it is asked too (unit tests).
  const asked=[...new Set(upstream.slice(before).map(u=>u.split('/')[0]))];
- for(const host of ['api.runeprofile.com','api.wiseoldman.net','secure.runescape.com'])assert.ok(asked.includes(host),host);
- assert.equal(search.body.temple,asked.includes('templeosrs.com')?'not_found':'unavailable');assert.equal(search.body.wom,'not_found');
+ // The Hiscores answered, so Wise Old Man is not asked for skills (its achievements lane may still be pacing).
+ for(const host of ['api.runeprofile.com','secure.runescape.com'])assert.ok(asked.includes(host),host);
+ assert.equal(search.body.temple,asked.includes('templeosrs.com')?'not_found':'unavailable');assert.equal(search.body.wom,'skipped');
  const searched=await (await call('/api/journal?username=New%20Search')).json();
  assert.equal(searched.log.obtained,1);assert.equal(searched.profile.combat[0].completed,5);assert.equal(searched.pets.find(p=>p.id==='12921').obtained,true);
  const searchCalls=upstream.length;
@@ -131,9 +132,10 @@ try{
  const beforeLegacy=upstream.length;
  const legacySearch=await json(await call('/api/player-status?username=Old%20Full'));
  assert.equal(legacySearch.status,200,JSON.stringify(legacySearch.body));assert.equal(legacySearch.body.runeprofile,'found');assert.equal(legacySearch.body.persisted,true);
- // Every source is asked; Wise Old Man and Temple may still be inside their 3.1 s and 12.5 s pacing gaps here.
+ // Every source it needs is asked; Temple may still be inside its 12.5 s pacing gap here, and Wise Old Man is
+ // skipped for skills because the Hiscores answered.
  for(const host of ['api.runeprofile.com','secure.runescape.com'])assert.ok(upstream.slice(beforeLegacy).some(u=>u.startsWith(host)),host);
- assert.ok(['not_found','unavailable'].includes(legacySearch.body.wom)&&['not_found','unavailable'].includes(legacySearch.body.temple),'all four sources reported');
+ assert.equal(legacySearch.body.wom,'skipped');assert.ok(['not_found','unavailable'].includes(legacySearch.body.temple),'every source reported');
  const upgraded=JSON.parse((await database.prepare("SELECT data FROM journals WHERE id='old full'").first()).data);
  assert.equal(upgraded.storageFormat,undefined);assert.ok(upgraded.sourcesCheckedAt);assert.equal(upgraded.log.obtained,1);assert.equal(upgraded.pets[0].notes,'Kept manual note');
 

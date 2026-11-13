@@ -13,7 +13,7 @@ export default {
     // the dev sign-in check, the per-IP API budget or the app.
     if(path==='/api/map-tile'&&(request.method==='GET'||request.method==='HEAD')){
       const {mapTile}=await import('../lib/map-tile');
-      return securityHeaders(await mapTile(request,ctx));
+      return securityHeaders(await mapTile(request,ctx,env.MAP_TILES));
     }
     // The dev environment is private: everything except its sign-in page needs the owner's dev session.
     // The RuneLite plugin cannot hold a dev session: sync uses its own token, and the profile and share card reads
@@ -43,6 +43,11 @@ export default {
     measured.headers.append('Server-Timing',`app;dur=${(performance.now()-started).toFixed(1)}`);
     measured.headers.set('X-Content-Type-Options','nosniff');
     return measured;
+  },
+  // The sync queue (lib/sync-queue.ts): paced sources for refreshes and first searches, retried on their own waits.
+  async queue(batch: MessageBatch<unknown>, _env: Cloudflare.Env, _ctx: ExecutionContext) {
+    const {consumeSyncBatch}=await import('../lib/sync-queue-worker');
+    await consumeSyncBatch(batch);
   },
   // Every ten minutes: give a couple of profiles that never had a full pull one pass over all four sources.
   async scheduled(_controller: ScheduledController, _env: Cloudflare.Env, ctx: ExecutionContext) {

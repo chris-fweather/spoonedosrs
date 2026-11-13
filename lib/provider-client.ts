@@ -2,29 +2,42 @@ import {RequestError} from './request-body';
 
 /** Read quotas are shared by the whole app, never multiplied by player count.
  * Temple's 5/min is conservative updater guidance pending an agreed read quota.
- * Hiscores/model allowances are our safeguards, not published entitlements.
+ * The Hiscores allowance is our safeguard, not a published entitlement.
+ *
+ * `gap` is each lane's minimum time between calls. Lanes in the same `group` also share the group's gap, so their
+ * total stays under the provider's published limit. `keyed` applies when we hold that provider's API key.
  */
 const policies = {
   temple: {label:'TempleOSRS', gap:12_500, ttl:300_000},
   runeprofile: {label:'RuneProfile', gap:2_100, ttl:60_000},
-  wom: {label:'Wise Old Man', gap:4_000, ttl:300_000}, // With the achievements lane (one per 12 s) this stays at WOM's 20 requests a minute without an API key.
+  wom: {label:'Wise Old Man', gap:4_000, ttl:300_000, group:'wom', keyed:{gap:1_000}},
   // Dated skill achievements change rarely: a slower lane and a long cache keep WOM's shared limit for snapshots.
-  womAchievements: {label:'Wise Old Man', gap:12_000, ttl:21_600_000},
+  womAchievements: {label:'Wise Old Man', gap:12_000, ttl:21_600_000, group:'wom', keyed:{gap:3_000}},
   hiscores: {label:'OSRS Hiscores', gap:1_100, ttl:60_000},
-};
+} as const;
+/** Wise Old Man allows 20 requests a minute without an API key and 100 with one (docs.wiseoldman.net/api).
+ * Both WOM lanes share one slot that keeps us at 18 and 90 a minute, a 10% margin. */
+const groups = {
+  wom: {gap:3_334, keyed:{gap:667}},
+} as const;
+type Group=keyof typeof groups;
+/** Backoff after a 429/503 that names no wait: 1, 2, 4, 8 minutes, capped at 15, plus up to 20% jitter. */
+export function backoffDelay(strikes:number, random=Math.random) {
+  const base=Math.min(15*60_000,60_000*2**Math.max(0,strikes-1));
+  return Math.ceil(base*(1+0.2*random()));
+}
 export function providerPolicy(url:URL) {
   if(url.protocol!=='https:' || url.username || url.password || url.port)throw new RequestError(400,'Unsupported import source.');
   let provider:keyof typeof policies;
-  let model=false;
   if(url.hostname==='templeosrs.com' && url.pathname==='/api/collection-log/player_collection_log.php')provider='temple';
   else if(url.hostname==='api.runeprofile.com' && /^\/v1\/accounts\/[^/]+\/full$/.test(url.pathname))provider='runeprofile';
-  else if(url.hostname==='runeprofile.com' && /^\/api\/profiles\/models\/[^/]+$/.test(url.pathname)){provider='runeprofile';model=true;}
   else if(url.hostname==='api.wiseoldman.net' && /^\/v2\/players\/[^/]+$/.test(url.pathname))provider='wom';
   else if(url.hostname==='api.wiseoldman.net' && /^\/v2\/players\/[^/]+\/achievements$/.test(url.pathname))provider='womAchievements';
   else if(url.hostname==='secure.runescape.com' && url.pathname==='/m=hiscore_oldschool/index_lite.json')provider='hiscores';
   else throw new RequestError(400,'Unsupported import source.');
   url.hash='';url.searchParams.sort();
-  return {provider,model,...policies[provider],ttl:model?3_600_000:policies[provider].ttl};
+  const policy:{label:string;gap:number;ttl:number;group?:Group;keyed?:{gap:number}}=policies[provider];
+  return {provider,...policy};
 }
 
 /** Respect both seconds and HTTP-date Retry-After; never shorten a provider's wait. */
@@ -47,7 +60,8 @@ export interface ProviderStatement {
 }
 export interface ProviderDatabase {prepare(sql:string):ProviderStatement}
 type Cached={status:number;content_type:string;body:ArrayBuffer|number[]|null;fetched_at:number;expires_at:number};
-type Options={database:ProviderDatabase;key:(url:string)=>Promise<string>;dailyBudget:()=>Promise<void>;fetcher?:typeof fetch;now?:()=>number;paused?:boolean};
+/** `apiKeys` holds keys we own for a provider group (never a caller's): sent upstream, never cached or logged. */
+type Options={database:ProviderDatabase;key:(url:string)=>Promise<string>;dailyBudget:()=>Promise<void>;fetcher?:typeof fetch;now?:()=>number;paused?:boolean;apiKeys?:Partial<Record<Group,string>>;random?:()=>number};
 const MAX_BYTES=1_800_000;
 
 async function boundedBody(response:Response) {
@@ -89,32 +103,56 @@ export function createProviderClient(options:Options):typeof fetch {
       throw new RequestError(429,`${policy.label} data is already being fetched. Please retry shortly.`,2);
     }
     try{
-      // Single atomic slot: fixed minute boundaries cannot create a double burst.
-      const gateTime=clock();
-      const slot=await database.prepare(`INSERT INTO provider_pacing(provider,next_at) VALUES(?,?)
-        ON CONFLICT(provider) DO UPDATE SET next_at=excluded.next_at WHERE provider_pacing.next_at<=? RETURNING next_at`).bind(policy.provider,gateTime+policy.gap,gateTime).first();
-      if(!slot){const gate=await database.prepare('SELECT next_at FROM provider_pacing WHERE provider=?').bind(policy.provider).first<{next_at:number}>();
-        throw new RequestError(429,`${policy.label} refreshes are busy. Your saved progress is unchanged.`,Math.max(1,Math.ceil(((gate?.next_at??gateTime+1000)-clock())/1000)));
+      // Single atomic slot per lane: fixed minute boundaries cannot create a double burst. A grouped lane is taken only
+      // while the group's shared slot is free, then the shared slot is taken, so the group's total never runs over and a
+      // busy lane never wastes the group's turn. (If two lanes race between those steps, the loser only waits a lane gap.)
+      const gateTime=clock(),apiKey=policy.group?options.apiKeys?.[policy.group]:undefined;
+      const groupSlot=policy.group?'group:'+policy.group:null;
+      const busy=async(slots:string[])=>{
+        let next=gateTime+1000;
+        for(const slot of slots){const gate=await database.prepare('SELECT next_at FROM provider_pacing WHERE provider=?').bind(slot).first<{next_at:number}>();if(gate&&gate.next_at>gateTime)next=Math.max(next,gate.next_at);}
+        return new RequestError(429,`${policy.label} refreshes are busy. Your saved progress is unchanged.`,Math.max(1,Math.ceil((next-clock())/1000)));
+      };
+      const laneGap=apiKey&&policy.keyed?policy.keyed.gap:policy.gap;
+      const lane=await database.prepare(`INSERT INTO provider_pacing(provider,next_at) SELECT ?,? WHERE COALESCE((SELECT next_at FROM provider_pacing WHERE provider=?),0)<=?
+        ON CONFLICT(provider) DO UPDATE SET next_at=excluded.next_at WHERE provider_pacing.next_at<=? RETURNING next_at`).bind(policy.provider,gateTime+laneGap,groupSlot??policy.provider,gateTime,gateTime).first();
+      if(!lane)throw await busy(groupSlot?[groupSlot,policy.provider]:[policy.provider]);
+      if(policy.group&&groupSlot){
+        const groupGap=apiKey?groups[policy.group].keyed.gap:groups[policy.group].gap;
+        const shared=await database.prepare(`INSERT INTO provider_pacing(provider,next_at) VALUES(?,?)
+          ON CONFLICT(provider) DO UPDATE SET next_at=excluded.next_at WHERE provider_pacing.next_at<=? RETURNING next_at`).bind(groupSlot,gateTime+groupGap,gateTime).first();
+        if(!shared)throw await busy([groupSlot]);
       }
+      // A provider's "slow down" applies to every lane that shares its allowance.
+      const backoffSlot=groupSlot??policy.provider;
       await dailyBudget();
       await database.prepare('DELETE FROM provider_responses WHERE expires_at<=? AND lease_until<=?').bind(gateTime,gateTime).run();
       // Workers reject redirect:'error' with a TypeError. 'manual' returns any 3xx
       // unfollowed, and the status check below treats it as unavailable.
-      const response=await fetcher(url.href,{method:'GET',redirect:'manual',headers:{Accept:policy.model?'model/gltf-binary':'application/json','User-Agent':'SpoonedOSRS/1.0 (https://spoonedosrs.com; Discord: snooked)'},signal:AbortSignal.any([request.signal,AbortSignal.timeout(15_000)])});
+      const response=await fetcher(url.href,{method:'GET',redirect:'manual',headers:{Accept:'application/json','User-Agent':'SpoonedOSRS/1.0 (https://spoonedosrs.com; Discord: snooked)',...(apiKey?{'x-api-key':apiKey}:{})},signal:AbortSignal.any([request.signal,AbortSignal.timeout(15_000)])});
       const received=clock();
       const exhausted=response.headers.get('RateLimit-Remaining')==='0';
-      if(response.status===429 || response.status===503 || exhausted){
-        const wait=retryDelay(response.headers,received);
-        await database.prepare(`INSERT INTO provider_pacing(provider,next_at) VALUES(?,?) ON CONFLICT(provider) DO UPDATE SET next_at=MAX(provider_pacing.next_at,excluded.next_at)`).bind(policy.provider,received+wait).run();
-        if(response.status===429 || response.status===503){await response.body?.cancel();throw new RequestError(429,`${policy.label} has asked us to wait before refreshing. Your saved progress is unchanged.`,Math.ceil(wait/1000));}
+      const refused=response.status===429 || response.status===503;
+      if(refused || exhausted){
+        let fallback=60_000;
+        if(refused){
+          // Count consecutive refusals; with no Retry-After, each one waits longer.
+          const row=await database.prepare(`INSERT INTO provider_pacing(provider,next_at,strikes) VALUES(?,0,1)
+            ON CONFLICT(provider) DO UPDATE SET strikes=provider_pacing.strikes+1 RETURNING strikes`).bind(backoffSlot).first<{strikes:number}>();
+          fallback=backoffDelay(row?.strikes??1,options.random);
+        }
+        const wait=retryDelay(response.headers,received,fallback);
+        for(const slot of new Set([backoffSlot,policy.provider]))await database.prepare(`INSERT INTO provider_pacing(provider,next_at) VALUES(?,?) ON CONFLICT(provider) DO UPDATE SET next_at=MAX(provider_pacing.next_at,excluded.next_at)`).bind(slot,received+wait).run();
+        if(refused){await response.body?.cancel();throw new RequestError(429,`${policy.label} has asked us to wait before refreshing. Your saved progress is unchanged.`,Math.ceil(wait/1000));}
       }
+      // A good answer ends any backoff run (a no-op write when there was none).
+      if(response.status===200 || response.status===404)await database.prepare('UPDATE provider_pacing SET strikes=0 WHERE provider=? AND strikes>0').bind(backoffSlot).run();
       if(response.status!==200 && response.status!==404){await response.body?.cancel();return new Response(null,{status:response.status,headers:{'Cache-Control':'no-store'}});}
       const body=response.status===404?new ArrayBuffer(0):await boundedBody(response);
       if(response.status===404)await response.body?.cancel();
-      const type=policy.model?'model/gltf-binary':'application/json';
+      const type='application/json';
       if(response.status===200){
-        if(policy.model){if(new Uint8Array(body).slice(0,4).join(',')!=='103,108,84,70')throw new RequestError(502,'Character model unavailable.');}
-        else {try{JSON.parse(new TextDecoder().decode(body));}catch{throw new RequestError(502,'Provider returned invalid data.');}}
+        try{JSON.parse(new TextDecoder().decode(body));}catch{throw new RequestError(502,'Provider returned invalid data.');}
       }
       // Do not persist private/no-store responses or upstream cookies.
       const noStore=/\b(no-store|private)\b/i.test(response.headers.get('Cache-Control')??'') || response.headers.has('Set-Cookie');

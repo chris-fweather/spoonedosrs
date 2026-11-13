@@ -8,8 +8,8 @@ const pixel={fontFamily:'Pixel'};
 /** Achievement titles in the colours the site gives each rarity (app/title-rarities.css); legendary titles use the
  * gradient's first colours as a glow, since a link preview is a still image. */
 const TITLE_INK:Record<string,{color:string;glow?:string}>={'title-common':{color:'#bcb5a5'},'title-uncommon':{color:'#81cc91'},'title-rare':{color:'#86c7f3',glow:'#428fbd'},
- 'title-epic':{color:'#ff7373',glow:'#d42828'},'title-maxed':{color:'#ff7373',glow:'#d42828'},'title-supporter':{color:'#dfbe79',glow:'#aa8435'},'title-one-only':{color:'#ffd98a',glow:'#f5a1ea'},
- 'title-pet-master':{color:'#c9eeff',glow:'#8ed9ff'},'title-log-master':{color:'#c9eeff',glow:'#8ed9ff'},'title-hiscore-champion':{color:'#ffd98a',glow:'#ca642a'}};
+ 'title-epic':{color:'#ff7373',glow:'#d42828'},'title-epic-glow':{color:'#ff8080',glow:'#ff3b3b'},'title-maxed':{color:'#ff7373',glow:'#d42828'},'title-supporter':{color:'#dfbe79',glow:'#aa8435'},'title-one-only':{color:'#ffd98a',glow:'#f5a1ea'},
+ 'title-legendary':{color:'#c9eeff',glow:'#8ed9ff'}};
 /** Name colours by staff rank, as on the site (--rank-*). */
 export const RANK_INK:Record<string,string>={helper:'#74d16a',moderator:'#6eaaf2',admin:'#f0675c',owner:'#f0675c'};
 const gold='#ffd36b',orange='#ff981f',muted='#cfc4a8',line='#c9a24a66';
@@ -48,7 +48,7 @@ export function ShareCard({profile,art,character,pet,badge,mode,prefix,nameColor
     <div style={{display:'flex',alignItems:'center',gap:14,height:nameSize+8}}>
      {badge&&<img alt="" src={badge} width={44} height={nameSize} style={{objectFit:'contain'}}/>}
      {mode&&<img alt="" src={mode} width={30} height={38} style={{objectFit:'contain'}}/>}
-     {prefix&&<span style={{display:'flex',...pixel,fontSize:nameSize,lineHeight:1,color:prefix==='Squire'?'#a9bccf':'#ffcf3f',textShadow:'0 3px 0 #000'}}>{prefix}</span>}
+     {prefix&&<span style={{display:'flex',...pixel,fontSize:nameSize,lineHeight:1,color:prefix==='Squire'?'#c0662e':'#ffcf3f',textShadow:'0 3px 0 #000'}}>{prefix}</span>}
      <span style={{display:'flex',...pixel,fontSize:nameSize,lineHeight:1,color:nameColor??'#f6f1e4',textShadow:'0 3px 0 #000'}}>{profile.name}</span>
      {profile.title&&<span style={{display:'flex',...pixel,fontSize:30,lineHeight:1,color:'#ffcf3f',textShadow:'0 2px 0 #000',paddingTop:Math.round(nameSize*0.3)}}>{profile.title}</span>}
     </div>

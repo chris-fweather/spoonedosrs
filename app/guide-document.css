@@ -21,7 +21,7 @@
 .guide-tones{display:inline-flex;gap:2px}
 .guide-tone{display:inline-grid;place-items:center;width:30px;height:34px;border-radius:7px}
 .guide-tone>i{width:16px;height:16px;border-radius:50%;border:2px solid #0006;box-shadow:0 0 0 1px #ffffff22}
-.guide-tone.tone-default>i{background:#ede6d4}.guide-tone.tone-gold>i{background:#e5c375}.guide-tone.tone-orange>i{background:#f1a14b}.guide-tone.tone-green>i{background:#9ac47c}
+.guide-tone.tone-default>i{background:#ede6d4}.guide-tone.tone-gold>i{background:#e5c375}.guide-tone.tone-orange>i{background:#f1a14b}.guide-tone.tone-green>i{background:#9ac47c}.guide-tone.tone-red>i{background:#e8735f}.guide-tone.tone-blue>i{background:#7fb0ea}
 .guide-tone[aria-pressed=true]>i{box-shadow:0 0 0 2px var(--gold)}
 .guide-menu{position:relative}
 .guide-insert-trigger{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:5px 12px 5px 9px;border-radius:7px;font-size:13px;font-weight:650;color:#ffd08a;background:#6a451340;border:1px solid #a8661a88}
@@ -40,7 +40,7 @@
 .guide-emoji{display:inline-block;width:1.3em;height:1.3em;margin:0 .1em;vertical-align:-.28em;object-fit:contain;image-rendering:pixelated}
 /* Rocky (the site mascot) is a painted image, not pixel art. */
 .guide-emoji-menu img[src$='.webp'],.guide-emoji[src$='.webp']{image-rendering:auto}
-.guide-ink.ink-default{color:var(--text)}.guide-ink.ink-gold{color:#e5c375}.guide-ink.ink-orange{color:#f1a14b}.guide-ink.ink-green{color:#9ac47c}
+.guide-ink.ink-default{color:var(--text)}.guide-ink.ink-gold{color:#e5c375}.guide-ink.ink-orange{color:#f1a14b}.guide-ink.ink-green{color:#9ac47c}.guide-ink.ink-red{color:#e8735f}.guide-ink.ink-blue{color:#7fb0ea}
 .guide-insert-menu b{display:block;font-size:13px;font-weight:650}
 .guide-insert-menu small{display:block;font-size:11.5px;color:var(--muted)}
 .guide-doc-state{margin-left:auto;padding:0 6px;font-size:11.5px;color:var(--dim)}
@@ -87,7 +87,7 @@
 .doc-list .guide-document-text p,.doc-list .guide-prose p{display:list-item;margin-left:22px;list-style:disc}
 .doc-numbered .guide-document-text,.doc-numbered .guide-prose{counter-reset:list-item}
 .doc-numbered .guide-document-text p,.doc-numbered .guide-prose p{display:list-item;margin-left:24px;list-style:decimal}
-.tone-gold .guide-document-text,.tone-gold .guide-prose{color:#e5c375}.tone-orange .guide-document-text,.tone-orange .guide-prose{color:#f1a14b}.tone-green .guide-document-text,.tone-green .guide-prose{color:#9ac47c}
+.tone-gold .guide-document-text,.tone-gold .guide-prose{color:#e5c375}.tone-orange .guide-document-text,.tone-orange .guide-prose{color:#f1a14b}.tone-green .guide-document-text,.tone-green .guide-prose{color:#9ac47c}.tone-red .guide-document-text,.tone-red .guide-prose{color:#e8735f}.tone-blue .guide-document-text,.tone-blue .guide-prose{color:#7fb0ea}
 .guide-add-paragraph{display:flex;align-items:center;gap:8px;width:100%;margin-top:14px;padding:12px 0 2px;color:var(--dim);font-size:13px;border-top:1px dashed #3a362d}
 .guide-add-paragraph:hover:not(:disabled){color:var(--gold)}
 
@@ -95,6 +95,9 @@
 .guide-insert-requirements h3,.guide-odds h3{font:22px var(--rs);margin:4px 0 10px}
 .guide-doc-paper hr,.guide-document-published hr{border:0;border-top:1px solid #5d5038;margin:22px 0}
 .guide-document-published>section{margin:22px 0}
+/* A step's heading sits close above its map. */
+.guide-document-published>section.doc-heading:has(+section>.guide-map){margin-bottom:8px}
+.guide-document-published>section.doc-heading+section:has(>.guide-map){margin-top:8px}
 .guide-odds{display:flex;flex-direction:column;padding:16px 18px;border:1px solid #37332a;border-radius:8px;background:#1b1a15}
 /* The plot keeps the chart's shape on its own and grows with a stretched card; GuideOdds redraws the curve to its height. */
 .guide-odds-plot{position:relative;flex:1 0 auto;width:100%}
@@ -183,9 +186,8 @@
 /* Game terms: icon and name, opening the OSRS Wiki. */
 .guide-ref{display:inline-flex;align-items:baseline;gap:4px;color:#e9c97a;text-decoration:none;border-bottom:1px dotted #e9c97a66;white-space:nowrap}
 .guide-ref:hover{color:#ffd98f;border-bottom-color:#ffd98f}
-/* A mention's icon follows the text size. Item sprites carry their own margin, so an item's is drawn larger to read the same size. */
+/* A mention's icon follows the text size. Item sprites are scaled to fill it like the other icons (app/sprite-fit.ts). */
 .guide-ref img{width:1.25em;height:1.25em;object-fit:contain;image-rendering:pixelated;align-self:center;flex:none}
-.guide-ref.ref-item img{width:1.6em;height:1.6em;margin:-.2em 0}
 /* "3 [[Plank]]s": the quantity is part of the item's chip, "3 × Planks". */
 .guide-ref-qty{font-weight:700;font-variant-numeric:tabular-nums}
 .guide-ref-qty i{font-style:normal;font-weight:500;margin-left:3px;opacity:.75}
@@ -252,8 +254,9 @@
 .guide-costs td{display:flex;align-items:center;min-height:44px;padding:0 14px 0 0;border-top:1px solid #ffffff0d;white-space:nowrap}
 .guide-costs tr:first-child td{border-top:0}
 .guide-costs td.guide-cost-item{padding-right:20px;font-weight:600}
-.guide-cost-part>span{display:inline-flex;align-items:center;gap:5px;color:var(--text);font-variant-numeric:tabular-nums}
-.guide-cost-part img{width:22px;height:22px;object-fit:contain;image-rendering:pixelated;flex:none}
+/* Part icons are the inventory's icon size (GuideKit: 74% of a 46px slot), each with its price card. */
+.guide-cost-part>.guide-cost-card{display:inline-flex;align-items:center;gap:4px;color:var(--text);font-variant-numeric:tabular-nums;border-radius:4px;cursor:help}
+.guide-cost-part img{width:34px;height:34px;object-fit:contain;image-rendering:pixelated;flex:none}
 .guide-cost-label{display:inline-flex;align-items:center;gap:8px}
 .guide-costs td.guide-cost-total{justify-content:flex-end;gap:4px;padding-right:4px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .guide-cost-total b{font-size:14px;font-weight:700;color:var(--gold)}
@@ -336,6 +339,7 @@
 /* Gear tiers dialog: rename a tier, edit its gear or inventory, or add one. */
 /* Prayers and spells: a row of icons with names, each opening the Wiki. */
 .guide-casts h3{margin:0 0 10px}
+.guide-prayer-hide{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px;color:var(--muted)}
 .guide-casts ul{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
 .guide-casts a{display:inline-flex;align-items:center;gap:8px;padding:7px 12px 7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--sunk);color:var(--text);font-size:13px;text-decoration:none}
 .guide-casts a:hover{border-color:var(--orange)}
@@ -510,8 +514,9 @@
 .guide-kit-tabs button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:4px}
 .guide-kit-box{display:flex;margin-top:8px}
 .guide-kit .guide-worn,.guide-kit .guide-bag{width:calc(var(--grid-w) + 22px);height:calc(var(--grid-h) + 22px);padding:10px;border:1px solid #544937;border-radius:6px;background:radial-gradient(ellipse at center,#4a402e,#282219);box-shadow:inset 0 0 20px #0005}
-/* Worn slots are square and a little larger than inventory slots, centred in a box the same size as the inventory's. */
-.guide-kit .guide-worn{--wslot:calc(var(--slot)*1.13);grid-template-columns:repeat(3,var(--wslot));grid-template-rows:repeat(5,var(--wslot));gap:calc(var(--slot)*.35);place-content:center}
+/* Worn slots and their icons are the inventory's size, like the game's two tabs; the gaps grow so the 3 by 5 grid fills a box
+   the same size as the inventory's ((slot + 3 gaps) / 2 across and down). */
+.guide-kit .guide-worn{--wslot:var(--slot);grid-template-columns:repeat(3,var(--wslot));grid-template-rows:repeat(5,var(--wslot));gap:calc((var(--slot) + 3*var(--gap))/2);place-content:center}
 .guide-kit .guide-inventory{grid-template-columns:repeat(4,var(--slot));grid-template-rows:repeat(7,var(--slot));gap:var(--gap)}
 .guide-kit .guide-worn .guide-slot{padding:0}
 .guide-kit .guide-slot small{display:none}
@@ -573,3 +578,8 @@
 .guide-stack-fields label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
 .guide-stack-fields input[type=number]{width:140px}
 .guide-stack-fields .guide-stack-noted{flex-direction:row;align-items:center;gap:7px;min-height:36px;color:inherit;font-size:13px;white-space:nowrap}
+/* Who can read a guide: two equal options beside the publishing buttons, the same height. */
+.guide-visibility{display:inline-grid;grid-template-columns:1fr 1fr;align-items:stretch;min-height:38px;box-sizing:border-box}
+.guide-visibility>button{justify-content:center}
+.guide-visibility>button[aria-checked=true]{background:var(--panel-3);color:var(--orange);box-shadow:0 0 0 1px var(--line-3) inset}
+@media(max-width:700px){.guide-workshop-actions{flex-wrap:wrap}.guide-visibility{flex:1 1 100%;min-height:42px}}

@@ -1,7 +1,7 @@
 'use client';
 import {useEffect, useState} from 'react';
 import {ThumbsUp} from 'lucide-react';
-import {reputationHint, type Reputation} from '@/lib/reputation';
+import {canGiveRespect, reputationHint, reputationSummary, type Reputation} from '@/lib/reputation';
 import {num} from '@/lib/ui';
 
 export function ReputationButton({username, viewerKey, previewCount}: {username:string; viewerKey:string; previewCount?:number}) {
@@ -35,17 +35,20 @@ export function ReputationButton({username, viewerKey, previewCount}: {username:
     finally {setBusy(false);}
   }
 
-  const disabled = previewCount!==undefined || busy || !rep || (!rep.given && (!rep.available || rep.ownProfile || rep.canVote===false || rep.networkUsed===true));
+  const disabled = previewCount!==undefined || busy || !rep || (!rep.given && !canGiveRespect(rep));
   const hint = previewCount!==undefined?'Sample reputation · no real votes':rep ? reputationHint(rep) : 'Loading respect…';
+  // Thumbs up on this player's guides count towards the total. No hover: the count is all a visitor needs.
+  const summary = rep ? reputationSummary(rep, n => num(n, 0)) : '';
   return <div className="profile-reputation" onPointerDown={e=>e.stopPropagation()}>
     <button type="button" className={'rep-button' + (rep?.given ? ' given' : '')} disabled={disabled}
-      aria-label={`${rep?.given ? 'Undo your respect' : 'Give +1 respect'} to ${username}${rep ? `; ${rep.count} total` : ''}`}
-      aria-pressed={rep?.given ?? false} title={hint} onClick={()=>void vote()}>
+      aria-label={`${rep?.given ? 'Undo your respect' : 'Give +1 respect'} to ${username}${rep ? `; ${summary}` : ''}`}
+      aria-pressed={rep?.given ?? false} onClick={()=>void vote()}>
       <ThumbsUp size={20} fill={rep?.given ? 'currentColor' : 'none'}/>
       <b>{rep ? num(rep.count,0) : '—'}</b>
     </button>
     <span className="rep-hint" aria-hidden="true">{hint}</span>
     <span className="sr-only" role="status">{notice}</span>
-    {error && <div className="rep-error" role="alert">{error}<button type="button" onClick={()=>setRetry(n=>n+1)}>Retry</button></div>}
+    {/* A failed load says only that respect is unavailable; a refused vote keeps its reason (signed out, daily limit). */}
+    {error && <div className={'rep-error'+(rep?'':' short')} role="alert">{rep?error:'Respect unavailable'}<button type="button" onClick={()=>setRetry(n=>n+1)}>Retry</button></div>}
   </div>;
 }

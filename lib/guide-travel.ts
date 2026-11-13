@@ -3,6 +3,8 @@
  * tree]]). Where each lands and what it needs come from the world map's travel data, gathered into lib/guide-travel.json
  * by scripts/build-guide-travel.mjs. */
 import data from './guide-travel.json' with {type: 'json'};
+import {tileUrl, TILE_VERSION} from './map-tile-source';
+import type {GameMap} from './world-maps';
 import type {TravelRequirement} from './world-map-routing';
 import {ITEM_ICON, TELEPORT_ITEM, TRAVEL_ICON, placeIcon, spellIcon, tabletIcon, teleportGroupIcon} from './world-map-places';
 
@@ -91,12 +93,13 @@ export const travelMapHref = (t: Pick<GuideTravel, 'x' | 'y' | 'plane'>) => `/ma
 
 /** Map tiles (/api/map-tile, lib/map-tile.ts) for a small view centred on a tile: at tile zoom z each game tile is 2^z
  * pixels and a square is 256 pixels, the world map's own layout (app/map-canvas.ts). Each tile has its offset from the
- * view's top left. */
-export function travelSnippetTiles(at: {x: number; y: number; plane: number}, width: number, height: number, z = 2) {
-  const scale = 2 ** z, cx = (at.x + .5) * scale, cy = -(at.y + .5) * scale, left = cx - width / 2, top = cy - height / 2;
+ * view's top left. With `map`, the game's map that shows the tile (lib/world-maps.ts), the view is that map's. */
+export function travelSnippetTiles(at: {x: number; y: number; plane: number}, width: number, height: number, z = 2, map?: GameMap | null) {
+  const shown = map?.toDisplay(at) ?? at, id = map?.ownTiles ? map.id : undefined;
+  const scale = 2 ** z, cx = (shown.x + .5) * scale, cy = -(shown.y + .5) * scale, left = cx - width / 2, top = cy - height / 2;
   const tiles: {src: string; left: number; top: number}[] = [];
   for (let col = Math.floor(left / 256); col * 256 < left + width; col++) for (let row = Math.floor(top / 256); row * 256 < top + height; row++) {
-    tiles.push({src: `/api/map-tile?z=${z}&p=${at.plane}&x=${col}&y=${-1 - row}`, left: Math.round(col * 256 - left), top: Math.round(row * 256 - top)});
+    tiles.push({src: tileUrl(z, shown.plane, col, -1 - row, TILE_VERSION, id), left: Math.round(col * 256 - left), top: Math.round(row * 256 - top)});
   }
   return tiles;
 }

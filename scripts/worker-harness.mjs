@@ -30,7 +30,8 @@ async function assets(request){
 }
 
 /** Starts one isolated Worker. `outbound` receives every upstream Request; by default they get a 503. */
-export async function startWorker({outbound,bindings={},r2=false}={}){
+/** `queue`: bind the sync queue (SYNC_QUEUE) to a local queue the same Worker consumes, as deploys do (vite.config.ts). */
+export async function startWorker({outbound,bindings={},r2=false,queue=false}={}){
  const config=JSON.parse(readFileSync('dist/server/wrangler.json','utf8'));
  const secret=randomBytes(32).toString('base64'),upstream=[];
  const mf=new Miniflare(convertV4MiniflareOptions({
@@ -40,7 +41,9 @@ export async function startWorker({outbound,bindings={},r2=false}={}){
   compatibilityDate:config.compatibility_date,compatibilityFlags:config.compatibility_flags,
   d1Databases:['DB'],serviceBindings:{ASSETS:assets},
   // Guide uploads: an in-memory R2 bucket when a check asks for one (deploys bind it only once the bucket exists).
-  ...(r2?{r2Buckets:['UPLOADS']}:{}),
+  // A list names the buckets instead (MAP_TILES for the map tile check).
+  ...(r2?{r2Buckets:Array.isArray(r2)?r2:['UPLOADS']}:{}),
+  ...(queue?{queueProducers:{SYNC_QUEUE:{queueName:'spoonedosrs-sync'}},queueConsumers:{'spoonedosrs-sync':{maxBatchSize:5,maxBatchTimeout:1,maxRetries:5,retryDelay:1,deadLetterQueue:'spoonedosrs-sync-dlq'}}}:{}),
   bindings:{...config.vars,SESSION_SECRET:secret,...bindings},
   outboundService:async request=>{upstream.push(request.url);return outbound?await outbound(request):new Response('Upstream requests are blocked in tests.',{status:503});},
  }));

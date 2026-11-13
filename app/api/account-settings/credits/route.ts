@@ -3,7 +3,7 @@ import {db,sameOrigin} from '@/lib/storage';
 import {requestJson,RequestError} from '@/lib/request-body';
 const headers={'Cache-Control':'private, no-store',Vary:'Cookie'};
 /** Guide writers and current or former staff are the people the Credits page can list. */
-const ELIGIBLE=`(EXISTS(SELECT 1 FROM community_guides WHERE author_id=?1 AND published IS NOT NULL) OR EXISTS(SELECT 1 FROM staff_members WHERE discord_id=?1) OR EXISTS(SELECT 1 FROM staff_audit WHERE target_id=?1 AND action IN ('grant','revoke')))`;
+const ELIGIBLE=`(EXISTS(SELECT 1 FROM community_guides WHERE author_id=?1 AND published IS NOT NULL AND visibility='public') OR EXISTS(SELECT 1 FROM staff_members WHERE discord_id=?1) OR EXISTS(SELECT 1 FROM staff_audit WHERE target_id=?1 AND action IN ('grant','revoke')))`;
 function failure(e:unknown){
  const known=e instanceof HttpError||e instanceof RequestError;
  return Response.json({error:known?e.message:'Account settings are unavailable.'},{status:known?(e as HttpError).status:503,headers});

@@ -3,15 +3,21 @@ import type {ReactNode} from 'react';
 import {ExternalLink,Map as MapIcon} from 'lucide-react';
 import {HoverTip} from './HoverTip';
 import {ItemHover} from './ItemPriceCard';
+import {useSpriteFit} from './sprite-fit';
 import {hoverCard,type HoverTarget} from '@/lib/guide-hovers';
-import {SKILL_MAX_LEVEL,skillInfo} from '@/lib/skill-info';
+import {SKILL_MAX_LEVEL,officialSkillIcon,skillInfo} from '@/lib/skill-info';
 import {wiki} from '@/lib/ui';
 import {SPELLBOOK_NAMES,guideMagic,magicNeeds,magicRunes,type GuideMagic} from '@/lib/guide-magic';
 import {guideReference} from '@/lib/guide-references';
+import {questInfo,type QuestInfo} from '@/lib/quest-info';
 import {WORLD_MAP_PAGE} from '@/lib/features';
+import {useWorldMaps} from './world-maps';
 import {travelIcon,travelMapHref,travelSnippetTiles,travelSpot,travelTitle,travelWhat,type GuideTravel} from '@/lib/guide-travel';
 import './entity-hover.css';
 
+/** A fact's icon, grown to its visible pixels (app/sprite-fit.ts): seeds and other item sprites are small in their 36 by 32
+ * image, so without this they read much smaller than the spell and prayer icons beside them. */
+function FactIcon({src}:{src:string}){return <img src={src} alt="" width={28} height={28} style={useSpriteFit(src,.9,4)}/>;}
 /** A skill's card, in the item price card's family (same tooltip, same label/value cells): the skill's icon and name
  * with pills for free-to-play or members and its type, what it does in one line, its key facts as a two-column grid
  * (max level first; a fact naming a spell, prayer, item or boss shows its game icon) and a link to its OSRS Wiki page. */
@@ -23,7 +29,7 @@ export function SkillCard({name}:{name:string}){
    <span className="skc-title"><b>{info.name}</b><span className="skc-pills"><small className={'skc-pill'+(info.members?' is-members':'')}>{info.members?'Members':'Free-to-play'}</small>{info.category&&<small className="skc-pill">{info.category}</small>}</span></span>
   </span>
   <span className="skc-summary">{info.summary}</span>
-  <span className="skc-grid">{facts.map(f=><span key={f.label} className={'skc-cell'+(f.icon?' has-icon':'')}>{f.icon&&<img src={f.icon} alt="" width={24} height={24}/>}<small>{f.label}</small><b>{f.value}</b></span>)}</span>
+  <span className="skc-grid">{facts.map(f=><span key={f.label} className={'skc-cell'+(f.icon?' has-icon':'')}>{f.icon&&<FactIcon src={f.icon}/>}<small>{f.label}</small><b>{f.value}</b></span>)}</span>
   <span className="skc-foot"><a href={wiki(info.name)} target="_blank" rel="noreferrer">OSRS Wiki<ExternalLink size={11} aria-hidden="true"/></a></span>
  </span>;
 }
@@ -35,7 +41,7 @@ const SNIPPET={width:296,height:160,scale:.7};
  * Squares that fail to load (offline, or open sea) leave the map's dark background, so the marker and the caption
  * (the area's name and the tile) still say where it is. */
 function TravelSnippet({spot}:{spot:GuideTravel}){
- const {width,height,scale}=SNIPPET,tiles=travelSnippetTiles({x:spot.x,y:spot.y,plane:spot.plane},width/scale,height/scale);
+ const worlds=useWorldMaps(),at={x:spot.x,y:spot.y,plane:spot.plane},{width,height,scale}=SNIPPET,tiles=worlds?travelSnippetTiles(at,width/scale,height/scale,2,worlds.mapOf(at)):[];
  const tile=`${spot.x}, ${spot.y}${spot.plane?` · floor ${spot.plane}`:''}`;
  return <span className="trc-map" aria-hidden="true">
   {tiles.map(t=><img key={t.src} src={t.src} alt="" width={256} height={256} loading="lazy" decoding="async" style={{left:Math.floor(t.left*scale),top:Math.floor(t.top*scale),width:Math.ceil(256*scale)+1,height:Math.ceil(256*scale)+1}} onError={e=>{e.currentTarget.style.visibility='hidden';}}/>)}
@@ -49,7 +55,7 @@ function TravelSnippet({spot}:{spot:GuideTravel}){
 export function TravelCard({spot,href}:{spot:GuideTravel;href:string}){
  // What it needs, one per line like a guide's requirements: "37 Magic", the quest's name, "1,000 coins".
  const needs=[
-  ...(spot.req.s??[]).map(([skill,level])=>({key:'s'+skill,icon:`/icons/skills/${skill.toLowerCase()}.png`,text:`${level} ${skill}`})),
+  ...(spot.req.s??[]).map(([skill,level])=>({key:'s'+skill,icon:officialSkillIcon(skill),text:`${level} ${skill}`})),
   ...(spot.req.q??[]).filter((q,i,all)=>all.indexOf(q)===i).map(q=>({key:'q'+q,icon:'/ui/quest-point-icon.png',text:q})),
   ...(spot.req.c?[{key:'c',icon:'/items/995.png',text:`${spot.req.c.toLocaleString('en-US')} coins`}]:[]),
  ];
@@ -78,16 +84,33 @@ export function MagicCard({magic,href}:{magic:GuideMagic;href:string}){
  </span>;
 }
 
+/** A quest's card, in the magic card's family: its difficulty orb, name, difficulty and length, where it starts, the skills
+ * and quests it needs as a plain list, and a link to its OSRS Wiki page. */
+export function QuestCard({quest,href}:{quest:QuestInfo;href:string}){
+ const needs=[...quest.skills.map(s=>({key:'s'+s.skill,icon:officialSkillIcon(s.skill),text:`${s.level} ${s.skill}`})),...quest.quests.map(q=>({key:'q'+q,icon:'/ui/quest-point-icon.png',text:q}))];
+ return <span className="skc trc qsc">
+  <span className="skc-head"><img src={quest.icon} alt="" width={30} height={30}/>
+   <span className="skc-title"><b>{quest.name}</b><span className="skc-pills">{quest.difficulty&&<small className="skc-pill">{quest.difficulty}</small>}{quest.length&&<small className="skc-pill">{quest.length}</small>}</span></span>
+  </span>
+  {quest.start&&<span className="qsc-start">{quest.start}</span>}
+  {needs.length>0?<span className="trc-needs">{needs.map(n=><span key={n.key}><img src={n.icon} alt="" width={20} height={20}/><b>{n.text}</b></span>)}</span>:<span className="qsc-start">No skill or quest requirements.</span>}
+  <span className="skc-foot"><a href={href} target="_blank" rel="noreferrer">OSRS Wiki<ExternalLink size={11} aria-hidden="true"/></a></span>
+ </span>;
+}
+
 /** Hover, focus or tap a game thing for its card (lib/guide-hovers decides which): an item's price, a skill's rundown,
- * where a teleport or transport lands, what a prayer or spell does and needs. Things without a card render as they are. The skill, travel and magic cards hold links,
+ * where a teleport or transport lands, what a prayer or spell does and needs, a quest's difficulty and requirements. Things without a card render as they are. The skill, travel and magic cards hold links,
  * so they stay open while the pointer moves onto them. */
 export function EntityHover({target,name,quantity,href,children,className='',focusable=false}:{target:HoverTarget|null;name?:string;quantity?:number;/** The Wiki page a travel card links to. */href?:string;children:ReactNode;className?:string;focusable?:boolean}){
  const card=target&&hoverCard(target);
- if(card==='price'&&target?.kind==='item')return <ItemHover id={target.id} name={name} quantity={quantity} className={className} focusable={focusable}>{children}</ItemHover>;
+ const item=card==='price'?target?.kind==='item'?target.id:target?.kind==='other-requirement'?target.iconItem:null:null;
+ if(item)return <ItemHover id={item} name={name} quantity={quantity} className={className} focusable={focusable}>{children}</ItemHover>;
  if(card==='skill'&&target?.kind==='skill'&&skillInfo(target.name))return <HoverTip label={target.name} className={'skc-trigger '+className} tipClass="skc-tip" tabIndex={focusable?0:-1} interactive content={<SkillCard name={target.name}/>}>{children}</HoverTip>;
  const spot=card==='travel'&&target?.kind==='travel'?travelSpot(target.travel,target.name):null;
  if(spot)return <HoverTip label={name??travelTitle(spot)} className={'skc-trigger '+className} tipClass="skc-tip" tabIndex={focusable?0:-1} interactive content={<TravelCard spot={spot} href={href??wiki(spot.name)}/>}>{children}</HoverTip>;
  const magic=card==='magic'&&(target?.kind==='prayer'||target?.kind==='spell')?guideMagic(target.kind,target.name):null;
  if(magic)return <HoverTip label={name??magic.name} className={'skc-trigger '+className} tipClass="skc-tip" tabIndex={focusable?0:-1} interactive content={<MagicCard magic={magic} href={href??wiki(magic.name)}/>}>{children}</HoverTip>;
+ const quest=card==='quest'&&target?.kind==='quest'?questInfo(target.name):null;
+ if(quest)return <HoverTip label={name??quest.name} className={'skc-trigger '+className} tipClass="skc-tip" tabIndex={focusable?0:-1} interactive content={<QuestCard quest={quest} href={href??wiki(quest.name)}/>}>{children}</HoverTip>;
  return <>{children}</>;
 }

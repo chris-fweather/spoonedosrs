@@ -5,6 +5,14 @@ import {DONATOR_TITLE, type BoardRow} from './flair';
 export const COMMUNITY_NAME = 'SpoonedOSRS';
 /** Home boards: the API sends each board's top HOME_BOARD_ROWS, shown HOME_BOARD_PAGE at a time. */
 export const HOME_BOARD_PAGE = 10, HOME_BOARD_ROWS = 30;
+/** Players per page a leaderboard can show; the first is the default. */
+/** Players per board page; 40 is the most a page shows. */
+export const BOARD_PAGE_SIZES = [10, 15, 20, 25, 35, 40] as const;
+export type BoardPageSize = (typeof BOARD_PAGE_SIZES)[number];
+/** The page size a board opens with until the visitor picks another (remembered in their browser). */
+export const DEFAULT_BOARD_PAGE_SIZE: BoardPageSize = 20;
+/** A page size from a request or a saved choice, or null when it is not one of BOARD_PAGE_SIZES. */
+export function boardPageSize(value: unknown): BoardPageSize | null {const n = Number(value); return (BOARD_PAGE_SIZES as readonly number[]).includes(n) ? n as BoardPageSize : null;}
 export type CommunityStats = {skillXp?:Record<string,number>;hidden?:string[];petsKnown?:boolean;petTotal: number; logTotal: number | null; questPoints: number | null; questTotal: number | null; combat: number | null; combatTotal: number | null; diaries: number | null; diaryTotal: number | null; xp: number | null; syncedAt: string | null};
 export function journalStats(j: Journal): CommunityStats {
   const quests = j.details?.quests===false?undefined:j.profile?.quests;

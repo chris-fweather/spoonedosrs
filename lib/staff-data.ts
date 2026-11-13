@@ -7,7 +7,7 @@ export async function guideWriters(ids?:string[]):Promise<Set<string>> {
  if(!SQUIRE_PREFIX||ids?.length===0)return new Set();
  try {
   const where=ids?` AND author_id IN (${ids.map(()=>'?').join(',')})`:'';
-  const rows=await env.DB!.prepare(`SELECT DISTINCT author_id FROM community_guides WHERE published IS NOT NULL${where}`).bind(...(ids??[])).all<{author_id:string}>();
+  const rows=await env.DB!.prepare(`SELECT DISTINCT author_id FROM community_guides WHERE published IS NOT NULL AND visibility='public'${where}`).bind(...(ids??[])).all<{author_id:string}>();
   return new Set(rows.results.map(r=>r.author_id));
  }catch(error){if(String(error).includes('no such table'))return new Set();throw error;}
 }

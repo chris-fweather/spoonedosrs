@@ -32,7 +32,7 @@ flowchart LR
 | Public reads | Summary tables and privacy filtering bound leaderboard work and prevent private journal fields reaching anonymous clients. |
 | Upstream reads | `lib/provider-client.ts` is the shared, read-only request boundary. It coordinates cache fills and provider pacing through D1. |
 | Identity | Discord OAuth establishes site identity. Linked RuneScape names are site claims, not independent proof of game-account ownership. |
-| Guides | Restricted document blocks and setup references are validated on the server. Publishing and editing are separate permissions. |
+| Guides | Restricted document blocks and setup references are validated on the server. Publishing and editing are separate permissions. Every guide read filters on visibility (`lib/guide-access.ts`): a staff-only guide is listed, counted and found only for signed-in staff, and is a 404 for everyone else. |
 | Discord | The gateway bot is a separate process. It consumes a signed role endpoint and does not receive a D1 binding or website session secret. |
 
 ## Data and trust

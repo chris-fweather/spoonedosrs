@@ -1,6 +1,7 @@
 import type {Journal,Pet} from './model';
 import {likelihood} from './model';
-import {countedMethods,oddsMethod,selectedMethod,usesAcquisition} from './estimates';
+import {countedMethods,countsForExpectedHours,oddsMethod,selectedMethod,usesAcquisition} from './estimates';
+import {petChartRecord} from './odds-chart';
 import {acquisitionEffort,otherMethods} from './hunt-history';
 
 /** Pet luck in hours, the way PetCord's pet hours sheet (Koekenpan, edited by Ptfo) works it out:
@@ -11,15 +12,17 @@ import {acquisitionEffort,otherMethods} from './hunt-history';
  * - luck = expected hours of the pets you have − efficient hours spent on every pet (above zero is lucky). */
 export type PetLuck={expected:number|null;spent:number|null;luck:number|null;chance:number|null};
 
-/** Expected hours on the pet's fastest method with a rate and a pace. */
-export function petExpectedHours(p:Pet):number|null {
- const hours=p.methods.filter(m=>m.rate&&m.kph).map(m=>m.rate!/m.kph!);
+/** Expected hours on the pet's fastest method with a rate and a pace that the player can use now: a 200M-only
+ * method (the 200 million XP methods) counts only with 200 million XP in that skill on the synced hiscores, and a
+ * Tangleroot tree with only a few patches counts only at a pace the player set (`countsForExpectedHours`). */
+export function petExpectedHours(p:Pet,j?:Journal):number|null {
+ const hours=p.methods.filter(m=>m.rate&&m.kph&&countsForExpectedHours(p,m,j)).map(m=>m.rate!/m.kph!);
  return hours.length?Math.min(...hours):null;
 }
 
 /** Efficient hours spent on a pet, or null when its count is unknown. Pets not yet hunted have spent 0. */
-export function petEfficientHours(p:Pet):number|null {
- const ref=petExpectedHours(p);
+export function petEfficientHours(p:Pet,j?:Journal):number|null {
+ const ref=petExpectedHours(p,j);
  if(ref===null)return null;
  // Hours already spent, when entered, replace count ÷ pace, converted to hours of the fastest method.
  if(p.recordedHours!=null){
@@ -32,15 +35,18 @@ export function petEfficientHours(p:Pet):number|null {
   if(usesAcquisition(p)&&m?.rate&&m.kc!=null)return ref*(m.kc/m.rate+extra);
   const effort=acquisitionEffort(p).hours;
   if(effort!==null)return effort;
-  // Like the sheet: with no count recorded at the drop, use the current count on each method.
+  // Like the sheet: with no count recorded at the drop, use the current count. When the player chose the method they
+  // got it from, that method's count is the one their graph shows (lifetime XP for a skilling method counted in XP).
+  if(j){const chart=petChartRecord(p,j);if(chart.chosen&&chart.method?.rate&&chart.method.kc!=null)return ref*chart.method.kc/chart.method.rate;}
+  // Otherwise the current count on each method, as the graph names it (Tangleroot at its Hespori kills).
   const counted=countedMethods(p).filter(m=>m.rate&&m.kc);
   return counted.length?ref*counted.reduce((sum,m)=>sum+m.kc!/m.rate!,0):null;
  }
  return ref*countedMethods(p).reduce((sum,m)=>sum+(m.rate&&m.kc?m.kc/m.rate:0),0);
 }
 
-export function petLuck(p:Pet):PetLuck {
- const expected=petExpectedHours(p),spent=petEfficientHours(p);
+export function petLuck(p:Pet,j?:Journal):PetLuck {
+ const expected=petExpectedHours(p,j),spent=petEfficientHours(p,j);
  return {expected,spent,luck:expected===null||spent===null?null:(p.obtained?expected:0)-spent,chance:likelihood(p)};
 }
 
@@ -50,7 +56,7 @@ export type PetSummary={pets:number;obtained:number;luck:number;luckPets:number;
 export function petSummary(j:Journal):PetSummary {
  let luck=0,luckPets=0,missingCounts=0,totalHours=0,hoursGained=0,hoursLeft=0,obtained=0;
  for(const p of j.pets){
-  const r=petLuck(p);
+  const r=petLuck(p,j);
   if(p.obtained)obtained++;
   if(r.expected!==null){if(p.obtained)hoursGained+=r.expected;else hoursLeft+=r.expected;}
   if(r.luck===null){if(p.obtained&&r.expected!==null)missingCounts++;continue;}
@@ -61,5 +67,5 @@ export function petSummary(j:Journal):PetSummary {
 
 /** Obtained pets with a known count, luckiest first. */
 export function luckRanking(j:Journal){
- return j.pets.filter(p=>p.obtained).map(p=>({pet:p,...petLuck(p)})).filter(r=>r.luck!==null).sort((a,b)=>b.luck!-a.luck!);
+ return j.pets.filter(p=>p.obtained).map(p=>({pet:p,...petLuck(p,j)})).filter(r=>r.luck!==null).sort((a,b)=>b.luck!-a.luck!);
 }

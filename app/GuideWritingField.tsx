@@ -9,7 +9,7 @@ export type GuideWritingCommand =
   | { kind: "emoji"; name: string; id: number }
   | { kind: "ref"; name: string; suffix?: string; id: number };
 /** Text colours the colour dots apply. The browser writes them as <font color>; they are stored as {tone}…{/tone}. */
-export const GUIDE_INK: Record<GuideTone, string> = { default: "#e6dfcd", gold: "#e5c375", orange: "#f1a14b", green: "#9ac47c" };
+export const GUIDE_INK: Record<GuideTone, string> = { default: "#e6dfcd", gold: "#e5c375", orange: "#f1a14b", green: "#9ac47c", red: "#e8735f", blue: "#7fb0ea" };
 function emojiNode(name: string) {
   const img = document.createElement("img");
   img.src = GUIDE_EMOJIS[name];

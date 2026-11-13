@@ -2,7 +2,7 @@ import {existsSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {emptyGuide,parseGuide} from './guides';
-import {MAP_LEG_COLOURS,MAP_PIN_GROUPS,MAP_PIN_HINT,MAP_PIN_ICON,MAP_PIN_KINDS,isFightKind,stopIcon,guideMapExits,guideMapFocus,guideMapLegs,guideMapStopColours,hasStopDetails,hasStopText,parseGuideMap,tidyStop,type GuideMapPinKind} from './guide-map';
+import {MAP_LEG_COLOURS,MAP_PIN_GROUPS,MAP_PIN_HINT,MAP_PIN_ICON,MAP_PIN_KINDS,isFightKind,stopIcon,guideMapExits,routeExits,guideMapFocus,guideMapLegs,guideMapStopColours,hasStopDetails,hasStopText,parseGuideMap,tidyStop,type GuideMapPinKind} from './guide-map';
 
 const map={title:' The Restless Ghost ',x:3222,y:3218,plane:0,zoom:8,pins:[{x:3243,y:3210,plane:0,label:' Father Aereck ',kind:'start'},{x:3147,y:3175,plane:0,label:'Father Urhney',kind:'npc'}]};
 test('map sections keep the view and trimmed stops',()=>{
@@ -148,4 +148,17 @@ test('an item stop that lists items shows its first item as its icon',()=>{
  // Other kinds keep their own icon even with items (the magic door's four items).
  assert.equal(stopIcon({kind:'stop',items:[{id:'301',quantity:1}]},image),MAP_PIN_ICON.stop);
  assert.equal(stopIcon({kind:'item',items:[{id:'0',quantity:1}]},()=>null),MAP_PIN_ICON.item);
+});
+
+test('readers see only the exits the route uses: none on a surface-only route, the ways between the surface and a dungeon with a stop', () => {
+  const surface = {x: 3000, y: 3376, plane: 0}, lair = {x: 1760, y: 5184, plane: 0}, other = {x: 2880, y: 9800, plane: 0};
+  const areas = [{x0: 1728, y0: 5120, x1: 1792, y1: 5248}, {x0: 2816, y0: 9728, x1: 2944, y1: 9856}];
+  const known = [
+    {from: surface, to: lair, name: 'Mole hill', dir: 'down' as const},
+    {from: lair, to: surface, name: 'Rope', dir: 'up' as const},
+    {from: {x: 2884, y: 3397, plane: 0}, to: other, name: 'Ladder', dir: 'down' as const},
+  ];
+  const stop = (t: {x: number; y: number; plane: number}) => ({...t, kind: 'stop', label: 'Stop'}) as GuideMapPin;
+  assert.deepEqual(routeExits([stop({x: 2998, y: 3373, plane: 0}), stop({x: 3004, y: 3373, plane: 0})], known, areas), []);
+  assert.deepEqual(routeExits([stop(surface), stop({x: 1765, y: 5190, plane: 0})], known, areas).map(e => e.name), ['Mole hill', 'Rope']);
 });

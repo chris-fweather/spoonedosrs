@@ -2,6 +2,7 @@ import {env} from 'cloudflare:workers';
 import {HttpError,readSession} from './auth';
 import {accountName,db,sameOrigin} from './storage';
 import type {Reputation} from './reputation';
+import {AUTHOR_THUMBS_SQL} from './guide-access';
 function target(request:Request){const value=new URL(request.url).searchParams.get('username');if(!value)throw new HttpError(400,'Choose a player.');try{return accountName(value).toLowerCase();}catch{throw new HttpError(400,'Enter a valid RuneScape name.');}}
 async function identity(request:Request,rsn:string){
  const ip=request.headers.get('CF-Connecting-IP')?.trim().toLowerCase();
@@ -18,11 +19,13 @@ export async function readReputation(request:Request):Promise<Reputation>{
  EXISTS(SELECT 1 FROM profile_commendations WHERE rsn=? AND (voter_id=? OR (voter_id IS NULL AND ip_key=?))) AS given,
  EXISTS(SELECT 1 FROM profile_commendations WHERE rsn=? AND ip_key=?) AS networkUsed,
  EXISTS(SELECT 1 FROM claimed_names WHERE rsn=? AND discord_id=?) AS ownProfile,
- EXISTS(SELECT 1 FROM journals WHERE id=?) AS available`)
- .bind(rsn,rsn,user?.id??'',network?.ipKey??'',rsn,network?.ipKey??'',rsn,user?.id??'',rsn)
- .first<{count:number;given:number;networkUsed:number;ownProfile:number;available:number}>();
+ EXISTS(SELECT 1 FROM journals WHERE id=?) AS available,
+ (${AUTHOR_THUMBS_SQL}) AS guideCount`)
+ .bind(rsn,rsn,user?.id??'',network?.ipKey??'',rsn,network?.ipKey??'',rsn,user?.id??'',rsn,rsn)
+ .first<{count:number;given:number;networkUsed:number;ownProfile:number;available:number;guideCount:number}>();
  if(!result)throw Error('Reputation unavailable.');
- return {count:result.count,given:!!result.given,signedIn:!!user,ownProfile:!!result.ownProfile,available:!!result.available,networkUsed:!!result.networkUsed,canVote:!!network};
+ // The figure shown is respect from visitors plus thumbs up on the guides this player wrote, with the guide part alongside.
+ return {count:result.count+Number(result.guideCount),guideCount:Number(result.guideCount),given:!!result.given,signedIn:!!user,ownProfile:!!result.ownProfile,available:!!result.available,networkUsed:!!result.networkUsed,canVote:!!network};
 }
 export async function writeReputation(request:Request):Promise<Reputation>{
  try{sameOrigin(request);}catch{throw new HttpError(403,'Give respect from the player profile.');}
@@ -37,12 +40,11 @@ export async function writeReputation(request:Request):Promise<Reputation>{
  if(request.method==='DELETE'){
   await db().prepare('DELETE FROM profile_commendations WHERE rsn=? AND (voter_id=? OR (voter_id IS NULL AND ip_key=?))').bind(rsn,user?.id??'',network.ipKey).run();
  }else{
-  if(current.ownProfile)throw new HttpError(403,'You cannot give respect to your own linked profile.');
+  // Owners may commend their own linked names too; UNIQUE(rsn,voter_id) keeps that to one each.
   // Unique constraints enforce both limits even when requests arrive together.
   const writes=[db().prepare(`INSERT INTO profile_commendations(rsn,voter_id,ip_key,created_at)
    SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM journals WHERE id=?)
-   AND NOT EXISTS(SELECT 1 FROM claimed_names WHERE rsn=? AND discord_id=?)
-   ON CONFLICT DO NOTHING`).bind(rsn,user?.id??null,network.ipKey,new Date().toISOString(),rsn,rsn,user?.id??'')];
+   ON CONFLICT DO NOTHING`).bind(rsn,user?.id??null,network.ipKey,new Date().toISOString(),rsn)];
   // Signing in after a guest vote preserves one endorsement instead of creating another.
   if(user)writes.push(db().prepare(`UPDATE profile_commendations SET voter_id=? WHERE rsn=? AND ip_key=? AND voter_id IS NULL
    AND NOT EXISTS(SELECT 1 FROM profile_commendations WHERE rsn=? AND voter_id=?)`).bind(user.id,rsn,network.ipKey,rsn,user.id));

@@ -9,7 +9,7 @@ const name='DS '+Date.now().toString().slice(-8),rsn=name.toLowerCase(),owner='9
 async function headers(id){return {'Content-Type':'application/json',Origin:base,Cookie:`${SESSION_COOKIE}=${await seal(secret,{id,username:'Private identity',globalName:'Secret Discord',avatar:null,exp:Math.floor(Date.now()/1000)+300})}`};}
 async function api(path,init={},status=200){const r=await fetch(base+path,init);assert.equal(r.status,status,await r.clone().text());return r.json();}
 let budgetId=null;
-const h=await headers(owner),h2=await headers(other),journal=JSON.parse(readFileSync('lib/seed.json','utf8'));
+const h=await headers(owner),h2=await headers(other),journal=JSON.parse(readFileSync('lib/seed.json','utf8')),catalogue=JSON.parse(readFileSync('lib/catalogue.json','utf8'));
 journal.username=name;journal.log=null;journal.logSyncedAt=null;journal.profile=undefined;journal.statsSyncedAt=new Date().toISOString();journal.hiscores={skills:[{name:'Overall',xp:300000000,level:2277,rank:5}],activities:[]};journal.pets=journal.pets.map(p=>({...p,obtained:false,notes:'Saved private note',methods:p.methods.map(m=>({...m,kc:null}))}));
 await api('/api/auth/session'); // Ensure runtime tables exist.
 try{
@@ -24,7 +24,7 @@ try{
  const board=(await api('/api/leaderboard')).rows.find(r=>r.name===name);assert.ok(board);assert.equal(board.stats.xp,300000000);assert.equal(board.stats.petsKnown,false);
  assert.ok((await api('/api/accounts')).accounts.includes(name));
  await api('/api/accounts',{method:'POST',headers:h,body:JSON.stringify({username:name})});
- const hydrated=await api('/api/journal?username='+encodeURIComponent(name),{headers:h});assert.equal(hydrated.pets.length,journal.pets.length);assert.ok(hydrated.pets.every(p=>!p.obtained&&!p.notes));
+ const hydrated=await api('/api/journal?username='+encodeURIComponent(name),{headers:h});assert.equal(hydrated.pets.length,catalogue.pets.length); // Rebuilt from the current catalogue, which can hold pets newer than the seed journal.assert.ok(hydrated.pets.every(p=>!p.obtained&&!p.notes));
  assert.ok((await api('/api/account-menu',{headers:h})).accounts.some(a=>a.name===name));
  await sql('UPDATE journals SET data=? WHERE id=?',[JSON.stringify(journal),rsn]); // Existing owner progress must survive unlink/relink.
  await api('/api/profile',{method:'POST',headers:h,body:JSON.stringify({username:name,visibility:'private',details:{skills:false}})});

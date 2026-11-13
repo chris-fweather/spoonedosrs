@@ -1,9 +1,9 @@
 /** Floors and areas on the game maps. The world map opens on the surface's ground floor; players go underground (and
  * back out) by clicking the way in they would use in the game (cave entrances, tunnels, trapdoors, holes, a ladder down
- * into a dungeon), and the view stays inside the area they are in. Like the game's own world map, the maps offer no
- * floor changes: stairs and ladders that only go up or down a floor are not drawn (a guide map still opens on its own
- * floor, and a link with a floor shows it). The game keeps dungeons and instances in blocks north of the surface world, so the
- * surface view must never show them. Exits come from Shortest Path's travel data (BSD-2-Clause, see
+ * into a dungeon), which opens the game's map that has it (lib/world-maps.ts). Like the game's own world map, the maps
+ * offer no floor changes: stairs and ladders that only go up or down a floor are not drawn (a guide map still opens on its
+ * own floor, and a link with a floor shows it). The game keeps dungeons and instances in blocks north of the surface world;
+ * the areas here (each underground area's walkable box) only find the way back out. Exits come from Shortest Path's travel data (BSD-2-Clause, see
  * public/world-map/NOTICE.txt), built into public/world-map/exits.json by scripts/build-map-exits.mjs. */
 import type {Tile, TravelData} from './world-map-routing';
 
@@ -146,6 +146,16 @@ export function areaFor(t: {x: number; y: number}, areas: Box[] = []): Box {
   return {x0, y0, x1, y1};
 }
 
+/** The farthest out a map framed on an area may zoom: where the whole area just fits, but never past `floor`. Leaflet's
+ * getBoundsZoom never answers below the map's current minimum, so the last area's limit is lifted while it is asked;
+ * otherwise a small underground area's close minimum stayed on the surface and the map could not zoom out. */
+export function areaMinZoom<B>(m: {options: {minZoom?: number}; getBoundsZoom(b: B, inside?: boolean): number; getMaxZoom(): number}, floor: number, bounds: B): number {
+  const before = m.options.minZoom;
+  m.options.minZoom = floor;
+  try {return Math.min(m.getMaxZoom(), Math.max(floor, m.getBoundsZoom(bounds, false)));}
+  finally {m.options.minZoom = before;}
+}
+
 /** An underground area grown to hold other tiles in it (a guide map's stops around the saved view); tiles on the surface
  * or over 200 tiles away belong elsewhere and are left out. */
 export function areaWith(area: Box, tiles: {x: number; y: number}[]): Box {
@@ -175,21 +185,22 @@ export function wayOut(exits: MapExit[], area: Box, near: {x: number; y: number}
 
 /** Where a map is: the floor shown and the tile its area is worked out from. */
 export type MapPlace = {plane: number; at: {x: number; y: number}};
-/** The label of the control that takes the reader back to the surface's ground floor, or null on the ground floor. */
-export function backLabel(place: MapPlace): string | null {
-  if (!onSurface(place.at)) return 'Back to the surface';
-  return place.plane > 0 ? 'Down to the ground floor' : null;
+/** The label of the control that takes the reader back to the surface's ground floor, or null on the ground floor:
+ * `surface` is whether the map shown is the surface (lib/world-maps.ts), `plane` the floor shown on it. */
+export function backLabel(surface: boolean, plane: number): string | null {
+  if (!surface) return 'Back to the surface';
+  return plane > 0 ? 'Down to the ground floor' : null;
 }
 
 /** How near a map icon a way into another area must start for the icon to stand for it, in tiles. */
 export const ICON_EXIT_RANGE = 5;
-/** The way into another area a map icon (the game's Dungeon or Map link icon) stands for: the nearest one on this floor,
- * inside the area shown, starting within `range` tiles of the icon. Null where the travel data knows none (a quest
- * dungeon it lacks), so the map offers no way in there. */
-export function exitNear(exits: MapExit[], t: Tile, area: Box, range = ICON_EXIT_RANGE): MapExit | null {
+/** The way into another area a map icon (the game's Dungeon or Map link icon) stands for: the nearest one on this floor
+ * (inside `area` when given; the world map passes only the exits on the map shown), starting within `range` tiles of the
+ * icon. Null where the travel data knows none (a quest dungeon it lacks), so the map offers no way in there. */
+export function exitNear(exits: MapExit[], t: Tile, area?: Box | null, range = ICON_EXIT_RANGE): MapExit | null {
   let best: MapExit | null = null;
   for (const e of exits) {
-    if (e.from.plane !== t.plane || !exitChangesArea(e) || !inBox(area, e.from.x, e.from.y)) continue;
+    if (e.from.plane !== t.plane || !exitChangesArea(e) || (area && !inBox(area, e.from.x, e.from.y))) continue;
     const d = far(e.from, t);
     if (d <= range && (!best || d < far(best.from, t))) best = e;
   }

@@ -459,3 +459,11 @@ button.staff-stat:hover>span{color:var(--text)}
 /* A published guide in the feed opens the guide: the row is a link styled like the other rows. */
 a.ws-row-head{color:var(--text);text-decoration:none}
 a.ws-row-head:hover b{text-decoration:underline;text-underline-offset:3px}
+/* Other names always take their own line under the other facts, a dash when there are none. */
+.player-facts>.player-other-names{grid-column:1/-1}
+
+/* Other names on the same Discord account: their own line under the handle, one name after another, so a long list
+   or a donation chip never pushes them beside the stats. */
+.player-row .player-also{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+.player-also-label{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.player-also-name{padding:1px 7px;border:1px solid var(--line-2);border-radius:999px;color:var(--text);font-size:11.5px;line-height:1.5}

@@ -1,10 +1,11 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
 import L from 'leaflet';
-import {GAME_CRS, areaFrame, canHover, drawExits, escapeHtml, latLngTile, stepWheelZoom, terrainLayer, tileLatLng, tipHtml} from './map-canvas';
+import {GAME_CRS, boxBounds, canHover, drawExits, escapeHtml, latLngTile, placeOn, showMap, stepWheelZoom, terrainLayer, tileLatLng, tipHtml} from './map-canvas';
 import {KIND_LABEL, ROUTE_COLOUR, markerIcon, townNear, type MapPlace} from '@/lib/world-map-places';
 import type {Route, Tile} from '@/lib/world-map-routing';
-import {EXIT_AREA_ZOOM, areaExits, exitDetail, exitLabel, exitNear, exitWhere, exitsIn, inBox, type Box, type MapExit, type PlaceNames} from '@/lib/world-map-exits';
+import {EXIT_AREA_ZOOM, areaExits, exitDetail, exitLabel, exitNear, exitWhere, type Box, type MapExit, type PlaceNames} from '@/lib/world-map-exits';
+import {displayRuns, type GameMap} from '@/lib/world-maps';
 import {MARKER_PRIORITY, declutter, markerSize, type Footprint} from '@/lib/world-map-markers';
 import {undergroundName} from '@/lib/world-map-underground';
 import {GAME_ICON, GAME_SPRITE, LABEL_MAX_ZOOM, LABEL_ZOOM, gameIconTip, gameIconPriority, gameIconZoom, gameSpriteSize, sameGameIcon, type GameIcon, type GameIconTip, type GameLabel, type IconDetails} from '@/lib/world-map-game-icons';
@@ -15,8 +16,9 @@ const MIN_ZOOM: Record<string, number> = {town: 5, quest: 7, bank: 7, teleport: 
 /** The most teleports a marker's hover card lists before "and N more". */
 const TIP_LINES = 8;
 
-/** Where the view goes: a tile, at `zoom` or at least `min` (default: the current zoom, at least 8). */
-export type MapFocus = {x: number; y: number; plane: number; zoom?: number; min?: number; key: number};
+/** Where the view goes: a game tile, at `zoom` or at least `min` (default: the current zoom, at least 8); or with
+ * `whole`, the whole map shown (a map picked from the list). */
+export type MapFocus = {x: number; y: number; plane: number; zoom?: number; min?: number; whole?: boolean; key: number};
 /** One leg of a trip: its routes and the chosen one, drawn in the leg's colour on a trip with stops. */
 /** A leg of the trip on the map: its routes, the chosen one, its colour (trips with stops), whether another leg is
  * highlighted (hovered in Directions), which fades this one, and the chosen route's teleport or transport landings
@@ -25,9 +27,13 @@ export type MapLeg = {routes: Route[]; active: number; colour?: string; faded?: 
 /** A trip pin: A (start), B (destination) or a stop's number, in its leg colour. */
 export type MapPin = Tile & {mark: string; colour?: string};
 type Props = {
-  plane: number; area: Box; areas: Box[]; exits: MapExit[]; onExit: (e: MapExit) => void; places: MapPlace[];
+  /** The map shown (lib/world-maps.ts) and its display floor; everything else is in game tiles. */
+  map: GameMap; plane: number; areas: Box[]; exits: MapExit[]; onExit: (e: MapExit) => void; places: MapPlace[];
   /** The selected spot: a place's marker is highlighted where it is; any other spot gets a pin. */
-  selected: {x: number; y: number; plane: number; icon?: string; place?: MapPlace} | null;
+  /** `isIcon`: one of the game's icons was clicked; it glows where it is, like a selected place, instead of getting a pin. */
+  selected: {x: number; y: number; plane: number; icon?: string; place?: MapPlace; isIcon?: boolean} | null;
+  /** The spot a click opened the map's menu at: a small dot marks it until the menu closes. */
+  spot?: Tile | null;
   pins: MapPin[]; legs: MapLeg[]; focus: MapFocus | null; picking: boolean;
   onTile: (t: Tile) => void; onPlace: (p: MapPlace) => void; onZoom?: (z: number) => void;
   /** The game's own map icons and area names, drawn under our markers (null until they load). */
@@ -72,16 +78,18 @@ function gameTip(t: GameIconTip) {
   return `<b>${escapeHtml(t.title)}</b><ul>${t.rows.map(r => `<li><span>${escapeHtml(r.text)}</span>${r.level ? `<small>${escapeHtml(r.level)}</small>` : ''}</li>`).join('')}</ul>`;
 }
 
-/** The world map canvas: terrain for one floor of one area (the surface or an underground area), place markers and
- * exits for the current view, route lines and the trip's ends. Markers grow with the zoom; where they would overlap,
+/** The world map canvas: terrain for one floor of one of the game's maps (the surface, Misthalin Underground, …), and
+ * the place markers and exits on it in the current view, route lines and the trip's ends. Markers grow with the zoom; where they would overlap,
  * exits win, then transport, banks, teleports and quest starts. Changing floor or area pans to the exit and fades. */
 export default function WorldMapView(props: Props) {
-  const {plane, area, exits, places, selected, pins, legs, focus, picking} = props;
+  const {map: shownMap, plane, exits, places, selected, pins, legs, focus, picking} = props;
   const el = useRef<HTMLDivElement>(null), map = useRef<L.Map | null>(null), veil = useRef<HTMLDivElement | null>(null), leaving = useRef(false);
   const [zoom, setZoom] = useState(0);
-  const layers = useRef<{terrain?: L.TileLayer; places: L.LayerGroup; route: L.LayerGroup; pins: L.LayerGroup; exits: L.LayerGroup; frame: ReturnType<typeof areaFrame>} | null>(null);
+  const layers = useRef<{terrain?: L.TileLayer; places: L.LayerGroup; route: L.LayerGroup; pins: L.LayerGroup; exits: L.LayerGroup} | null>(null);
   const latest = useRef(props);
   latest.current = props;
+  /** Where a game tile is on the map and floor shown, or null when they do not show it. */
+  const spot = (t: {x: number; y: number; plane: number}) => placeOn(latest.current.map, latest.current.plane)(t);
 
   /** Exits name the town or underground area they lead to. */
   function names(): PlaceNames {
@@ -95,59 +103,64 @@ export default function WorldMapView(props: Props) {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {latest.current.onExit(e); return;}
     leaving.current = true;
     veil.current?.classList.add('is-on');
-    m.panTo(tileLatLng(e.from.x, e.from.y), {animate: true, duration: .22});
+    const at = spot(e.from);
+    if (at) m.panTo(at, {animate: true, duration: .22});
     window.setTimeout(() => {leaving.current = false; latest.current.onExit(e);}, 230);
   }
 
   function draw() {
     const m = map.current, l = layers.current;
     if (!m || !l) return;
-    const {exits, plane, area} = latest.current, labels = names();
-    const shownExits = exitsIn(areaExits(exits), plane, area);
-    const doors = drawExits(m, l.exits, shownExits, leave, {label: e => exitLabel(e, labels), minZoom: () => EXIT_AREA_ZOOM, onPick: e => picked(e.from, GAME_ICON(e.dir === 'up' ? GAME_SPRITE.mapLink : GAME_SPRITE.dungeon), undefined, e)});
+    const {exits} = latest.current, labels = names();
+    const shownExits = areaExits(exits).filter(e => spot(e.from));
+    const doors = drawExits(m, l.exits, shownExits, leave, {at: spot, label: e => exitLabel(e, labels), minZoom: () => EXIT_AREA_ZOOM, onPick: e => picked(e.from, GAME_ICON(e.dir === 'up' ? GAME_SPRITE.mapLink : GAME_SPRITE.dungeon), undefined, e)});
     drawPlaces(doors, m.getZoom() >= EXIT_AREA_ZOOM ? shownExits : []);
   }
   function drawPlaces(taken: Footprint[], doors: MapExit[]) {
     const m = map.current, group = layers.current?.places;
     if (!m || !group) return;
-    const {places, plane, area, onPlace, game, selected} = latest.current, zoom = m.getZoom(), view = m.getBounds().pad(.25), size = markerSize(zoom), hover = canHover();
+    const {places, onPlace, game, selected} = latest.current, zoom = m.getZoom(), view = m.getBounds().pad(.25), size = markerSize(zoom), hover = canHover();
     group.clearLayers();
     if (game) drawGameLabels(group, game.labels);
     // Town names that would overlap an earlier one are left out (rough text boxes in screen pixels).
-    const labels: [number, number, number, number][] = [], spots: MapPlace[] = [], marks: Footprint[] = [];
+    const labels: [number, number, number, number][] = [], spots: MapPlace[] = [], at: L.LatLng[] = [], marks: Footprint[] = [];
     for (const p of places) {
-      if (p.plane !== plane || !inBox(area, p.x, p.y) || zoom < (MIN_ZOOM[p.kind] ?? 7) || !view.contains(tileLatLng(p.x, p.y))) continue;
-      const c = m.latLngToContainerPoint(tileLatLng(p.x, p.y));
+      const ll = zoom < (MIN_ZOOM[p.kind] ?? 7) ? null : spot(p);
+      if (!ll || !view.contains(ll)) continue;
+      const c = m.latLngToContainerPoint(ll);
       if (p.kind === 'town') {
         if (game) continue;// the game's own area names stand in for ours (ours only if they could not load)
         const w = p.name.length * (zoom >= 8 ? 8.5 : 7.5) / 2 + 4, box: [number, number, number, number] = [c.x - w, c.y - 10, c.x + w, c.y + 10];
         if (labels.some(b => b[0] < box[2] && box[0] < b[2] && b[1] < box[3] && box[1] < b[3])) continue;
         labels.push(box);
-        L.marker(tileLatLng(p.x, p.y), {icon: icon(`<span>${escapeHtml(p.name)}</span>`, [0, 0], [0, 0], 'wm-label' + (zoom >= 8 ? ' is-near' : '')), keyboard: false, interactive: false, zIndexOffset: 500}).addTo(group);
+        L.marker(ll, {icon: icon(`<span>${escapeHtml(p.name)}</span>`, [0, 0], [0, 0], 'wm-label' + (zoom >= 8 ? ' is-near' : '')), keyboard: false, interactive: false, zIndexOffset: 500}).addTo(group);
         continue;
       }
       spots.push(p);
+      at.push(ll);
       marks.push({x: c.x, y: c.y, size, priority: isPlace(p, selected) ? SELECTED_PRIORITY : priority(p)});
     }
     // The game's own icons: the map functions on this floor in view that this zoom shows (gameIconZoom: the key ones
     // first, everyday services and then common resources closer in), except where one of our markers (or a way into an
     // area) already shows the same icon nearby. They yield to all of ours where they would overlap.
-    const games: GameIcon[] = [];
+    const games: GameIcon[] = [], gameAt: L.LatLng[] = [];
     if (game) {
       const ours = spots.map(p => ({x: p.x, y: p.y, sprite: spriteOf(markerIcon(p))})).filter(o => o.sprite !== null);
       for (const e of doors) ours.push({x: e.from.x, y: e.from.y, sprite: GAME_SPRITE.dungeon});
       for (const g of game.icons) {
-        if (g.plane !== plane || zoom < gameIconZoom(g.sprite) || !inBox(area, g.x, g.y) || !view.contains(tileLatLng(g.x, g.y))) continue;
+        const ll = zoom < gameIconZoom(g.sprite) ? null : spot(g);
+        if (!ll || !view.contains(ll)) continue;
         if (ours.some(o => sameGameIcon(o.sprite!, g.sprite) && Math.abs(o.x - g.x) <= SAME_SPOT && Math.abs(o.y - g.y) <= SAME_SPOT)) continue;
-        const c = m.latLngToContainerPoint(tileLatLng(g.x, g.y));
+        const c = m.latLngToContainerPoint(ll);
         games.push(g);
+        gameAt.push(ll);
         marks.push({x: c.x, y: c.y, size: gameSpriteSize(size), priority: gameIconPriority(g.sprite)});
       }
     }
     for (const i of declutter(marks, .25, taken)) {
-      if (i >= spots.length) {drawGameIcon(group, games[i - spots.length], size, hover); continue;}
+      if (i >= spots.length) {drawGameIcon(group, games[i - spots.length], gameAt[i - spots.length], size, hover); continue;}
       const p = spots[i], count = p.teleports && p.teleports.length > 1 ? p.teleports.length : 0, url = markerIcon(p), pixel = spriteOf(url) !== null, s = pixel ? gameSpriteSize(size) : size, on = isPlace(p, selected);
-      const marker = L.marker(tileLatLng(p.x, p.y), {
+      const marker = L.marker(at[i], {
         icon: icon(`<img src="${url}" alt=""${pixel ? ' class="is-pixel"' : ''}>${count ? `<b class="wm-count">${count}</b>` : ''}`, [s, s], [s / 2, s / 2], 'wm-marker kind-' + p.kind + (p.off ? ' is-off' : '') + (count ? ' is-group' : '') + (pixel ? ' is-game' : '') + (on ? ' is-selected' : '')),
         keyboard: true, riseOnHover: true, zIndexOffset: on ? 800 : p.off ? -50 : 0,
       });
@@ -159,16 +172,17 @@ export default function WorldMapView(props: Props) {
   }
 
   /** One of the game's own icons: its name on hover; a click opens the map's menu there (or picks the tile). */
-  function drawGameIcon(group: L.LayerGroup, g: GameIcon, size: number, hover: boolean) {
+  function drawGameIcon(group: L.LayerGroup, g: GameIcon, ll: L.LatLng, size: number, hover: boolean) {
     const s = gameSpriteSize(size), tip = gameIconTip(g, latest.current.game?.details);
-    const marker = L.marker(tileLatLng(g.x, g.y), {icon: icon(`<img src="${GAME_ICON(g.sprite)}" alt="" class="is-pixel">`, [s, s], [s / 2, s / 2], 'wm-marker is-game kind-game'), keyboard: false, zIndexOffset: -100});
+    const sel = latest.current.selected, on = !!sel?.isIcon && sel.x === g.x && sel.y === g.y && sel.plane === g.plane && sel.icon === GAME_ICON(g.sprite);
+    const marker = L.marker(ll, {icon: icon(`<img src="${GAME_ICON(g.sprite)}" alt="" class="is-pixel">`, [s, s], [s / 2, s / 2], 'wm-marker is-game kind-game' + (on ? ' is-selected' : '')), keyboard: false, zIndexOffset: on ? 800 : -100});
     const said = [tip.title, tip.detail, ...tip.rows.map(r => [r.text, r.level].filter(Boolean).join(' '))].filter(Boolean).join(': ');
     marker.on('add', () => marker.getElement()?.setAttribute('aria-label', said));
     if (hover) marker.bindTooltip(gameTip(tip), {direction: 'top', offset: [0, -s / 2], className: 'map-tip', opacity: 1});
     marker.on('click', e => {
       L.DomEvent.stopPropagation(e);
-      const {exits, area} = latest.current, tile = {x: g.x, y: g.y, plane: g.plane};
-      picked(tile, GAME_ICON(g.sprite), tip, WAY_IN.has(g.sprite) ? exitNear(exits, tile, area) ?? undefined : undefined);
+      const {exits} = latest.current, tile = {x: g.x, y: g.y, plane: g.plane};
+      picked(tile, GAME_ICON(g.sprite), tip, WAY_IN.has(g.sprite) ? exitNear(exits.filter(e => spot(e.from)), tile) ?? undefined : undefined);
     });
     marker.addTo(group);
   }
@@ -177,22 +191,23 @@ export default function WorldMapView(props: Props) {
   function drawGameLabels(group: L.LayerGroup, labels: GameLabel[]) {
     const m = map.current;
     if (!m) return;
-    const {plane, area} = latest.current, zoom = m.getZoom(), view = m.getBounds().pad(.1), boxes: [number, number, number, number][] = [];
-    const list = labels.filter(l => l.plane === plane && zoom >= LABEL_ZOOM[l.size] && zoom <= LABEL_MAX_ZOOM[l.size] && inBox(area, l.x, l.y) && view.contains(tileLatLng(l.x, l.y))).sort((a, b) => b.size - a.size);
-    for (const l of list) {
-      const c = m.latLngToContainerPoint(tileLatLng(l.x, l.y)), font = LABEL_FONT[l.size];
+    const zoom = m.getZoom(), view = m.getBounds().pad(.1), boxes: [number, number, number, number][] = [];
+    const list = labels.filter(l => zoom >= LABEL_ZOOM[l.size] && zoom <= LABEL_MAX_ZOOM[l.size]).map(l => ({l, ll: spot(l)})).filter((x): x is {l: GameLabel; ll: L.LatLng} => !!x.ll && view.contains(x.ll)).sort((a, b) => b.l.size - a.l.size);
+    for (const {l, ll} of list) {
+      const c = m.latLngToContainerPoint(ll), font = LABEL_FONT[l.size];
       const w = Math.max(...l.lines.map(t => t.length)) * font * .3 + 2, h = l.lines.length * font * .6 + 1, box: [number, number, number, number] = [c.x - w, c.y - h, c.x + w, c.y + h];
       if (boxes.some(b => b[0] < box[2] && box[0] < b[2] && b[1] < box[3] && box[1] < b[3])) continue;
       boxes.push(box);
       const colour = l.colour ? `color:#${l.colour.toString(16).padStart(6, '0')};` : '';
-      L.marker(tileLatLng(l.x, l.y), {icon: icon(`<span class="size-${l.size}" style="${colour}">${l.lines.map(escapeHtml).join('<br>')}</span>`, [0, 0], [0, 0], 'wm-label is-game'), keyboard: false, interactive: false, zIndexOffset: 500}).addTo(group);
+      L.marker(ll, {icon: icon(`<span class="size-${l.size}" style="${colour}">${l.lines.map(escapeHtml).join('<br>')}</span>`, [0, 0], [0, 0], 'wm-label is-game'), keyboard: false, interactive: false, zIndexOffset: 500}).addTo(group);
     }
   }
 
   /** A click on the map: while a trip row is being picked it sets that row, otherwise the map's menu opens there. */
-  function clicked(tile: Tile, at: L.Point) {
-    const m = map.current;
-    if (!m || !inBox(latest.current.area, tile.x, tile.y)) return;
+  function clicked(shown: Tile, at: L.Point) {
+    const m = map.current, tile = latest.current.map.toGame(shown);
+    // Black, where the map shows nothing.
+    if (!m || !tile) return;
     if (latest.current.picking) {latest.current.onTile(tile); return;}
     const size = m.getSize();
     latest.current.onMenu?.({tile, x: at.x, y: at.y, width: size.x, height: size.y});
@@ -200,7 +215,7 @@ export default function WorldMapView(props: Props) {
   /** A click on an icon: while a trip row is being picked it sets that row, otherwise the icon's card opens. A way into
    * another area (an exit, or a dungeon icon the travel data knows the way in at) names where it leads. */
   function picked(tile: Tile, src: string, info?: GameIconTip, exit?: MapExit) {
-    if (!inBox(latest.current.area, tile.x, tile.y)) return;
+    if (!spot(tile)) return;
     if (latest.current.picking) {latest.current.onTile(tile); return;}
     if (exit) {const where = exitWhere(exit, names()); info = {title: where.charAt(0).toUpperCase() + where.slice(1), detail: exitDetail(exit), rows: []};}
     if (info) latest.current.onIcon?.({tile, icon: src, info, exit});
@@ -214,7 +229,7 @@ export default function WorldMapView(props: Props) {
     m.setView(tileLatLng(3222, 3300), WORLD_ZOOM.initial, {animate: false});
     // The trip draws over the map's icons: its lines in one pane, its pins and arrowheads above them.
     for (const [name, z] of [['tripLines', '620'], ['tripPins', '640']] as const) {const pane = m.createPane(name); pane.style.zIndex = z; pane.style.pointerEvents = 'none';}
-    layers.current = {route: L.layerGroup().addTo(m), exits: L.layerGroup().addTo(m), places: L.layerGroup().addTo(m), pins: L.layerGroup().addTo(m), frame: areaFrame(m, WORLD_ZOOM.min)};
+    layers.current = {route: L.layerGroup().addTo(m), exits: L.layerGroup().addTo(m), places: L.layerGroup().addTo(m), pins: L.layerGroup().addTo(m)};
     veil.current = L.DomUtil.create('div', 'wm-veil', el.current!) as HTMLDivElement;
     m.on('click', e => {const t = latLngTile(e.latlng); clicked({...t, plane: latest.current.plane}, e.containerPoint);});
     // From the keyboard: Enter (or the menu key) on the focused map opens the menu at its centre.
@@ -236,13 +251,13 @@ export default function WorldMapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The view stays inside the area; terrain loads for this floor of it. Runs before the focus below moves the view.
+  // The map shown, with terrain for its floor. Runs before the focus below moves the view.
   useEffect(() => {
     const m = map.current, l = layers.current;
     if (!m || !l) return;
-    l.frame.set(area);
+    showMap(m, shownMap, WORLD_ZOOM.min);
     l.terrain?.remove();
-    l.terrain = terrainLayer(plane, WORLD_ZOOM.min, WORLD_ZOOM.max, area).addTo(m);
+    l.terrain = terrainLayer(shownMap, plane, WORLD_ZOOM.min, WORLD_ZOOM.max).addTo(m);
     l.terrain.bringToBack();
     // The new floor or area fades in (from the dark an exit faded to, or straight away after a search).
     const v = veil.current;
@@ -250,71 +265,81 @@ export default function WorldMapView(props: Props) {
       if (!v.classList.contains('is-on')) v.classList.add('is-on', 'is-instant');
       requestAnimationFrame(() => {v.classList.remove('is-instant'); window.setTimeout(() => v.classList.remove('is-on'), 60);});
     }
-  }, [plane, area]);
+  }, [plane, shownMap]);
 
   // draw reads the latest props through a ref.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(draw, [places, exits, plane, area, props.game, selected?.place]);
+  useEffect(draw, [places, exits, plane, shownMap, props.game, selected?.place, selected?.isIcon, selected?.x, selected?.y, selected?.icon]);
 
   useEffect(() => {
     const group = layers.current?.pins;
     if (!group) return;
     group.clearLayers();
-    const here = (t: {x: number; y: number; plane: number} | null) => !!t && t.plane === plane && inBox(area, t.x, t.y);
-    // A place is highlighted on its own marker (drawPlaces); only a spot with no marker gets the selection pin.
-    if (selected && !selected.place && here(selected)) L.marker(tileLatLng(selected.x, selected.y), {icon: icon(`<span class="wm-pin is-selected">${selected.icon ? `<img src="${selected.icon}" alt="">` : ''}</span>`, [28, 36], [14, 34]), interactive: false, zIndexOffset: 900}).addTo(group);
-    for (const p of pins) if (here(p)) L.marker(tileLatLng(p.x, p.y), {icon: pin(p.mark, p.mark === 'A' ? 'is-from' : p.mark === 'B' ? 'is-to' : 'is-stop', p.colour), interactive: false, zIndexOffset: 1000, pane: 'tripPins'}).addTo(group);
-  }, [selected, pins, plane, area]);
+    const here = placeOn(shownMap, plane);
+    // A place or game icon is highlighted on its own marker (drawPlaces, drawGameIcon); only a spot with no marker gets the
+    // selection pin.
+    const chosen = selected && !selected.place && !selected.isIcon ? here(selected) : null;
+    if (chosen && selected) L.marker(chosen, {icon: icon(`<span class="wm-pin is-selected">${selected.icon ? `<img src="${selected.icon}" alt="">` : ''}</span>`, [28, 36], [14, 34]), interactive: false, zIndexOffset: 900}).addTo(group);
+    for (const p of pins) {const at = here(p); if (at) L.marker(at, {icon: pin(p.mark, p.mark === 'A' ? 'is-from' : p.mark === 'B' ? 'is-to' : 'is-stop', p.colour), interactive: false, zIndexOffset: 1000, pane: 'tripPins'}).addTo(group);}
+    const dot = props.spot && here(props.spot);
+    if (dot) L.marker(dot, {icon: icon('<span class="wm-spot-dot"></span>', [14, 14], [7, 7]), interactive: false, zIndexOffset: 1100}).addTo(group);
+  }, [selected, pins, plane, shownMap, props.spot]);
 
   useEffect(() => {
     const m = map.current, group = layers.current?.route;
     if (!m || !group) return;
     group.clearLayers();
-    const shown = (leg: Route['legs'][number]) => leg.plane === plane && leg.points.length > 0 && inBox(area, leg.points[0][0], leg.points[0][1]);
+    // A leg in game tiles as the lines the map shown draws on this floor (it may leave the map, or cross zones placed
+    // apart).
+    const runs = (leg: Route['legs'][number]) => displayRuns(shownMap, plane, leg.points, leg.plane).map(run => run.map(([x, y]) => tileLatLng(x, y)));
+    const at = placeOn(shownMap, plane);
     // Other routes faintly underneath (a trip with one leg), each leg's chosen route on top with a dark edge so it
     // reads on any terrain: in the travel colours, or with stops in the leg's own colour (dashed off foot).
     if (legs.length === 1) legs[0].routes.forEach((r, i) => {
       if (i === legs[0].active) return;
-      for (const leg of r.legs) if (shown(leg) && leg.mode === 'walk') L.polyline(leg.points.map(([x, y]) => tileLatLng(x, y)), {color: '#d9cfb8', weight: 3, opacity: .45, interactive: false}).addTo(group);
+      for (const leg of r.legs) if (leg.mode === 'walk') for (const line of runs(leg)) L.polyline(line, {color: '#d9cfb8', weight: 3, opacity: .45, interactive: false}).addTo(group);
     });
     for (const trip of legs) {
       const r = trip.routes[trip.active];
       if (!r) continue;
       const fade = trip.faded ? .3 : 1;
       for (const leg of r.legs) {
-        if (!shown(leg)) continue;
-        const walk = leg.mode === 'walk', [end, before] = [leg.points[leg.points.length - 1], leg.points[leg.points.length - 2]];
-        // A teleport or transport hop is a straight dashed line from where it starts to where it lands, with an
-        // arrowhead at the landing; one that starts in another area (a dungeon, say) is left out.
-        if (!walk && !inBox(area, end[0], end[1])) continue;
-        const line = leg.points.map(([x, y]) => tileLatLng(x, y)), colour = trip.colour ?? ROUTE_COLOUR[leg.mode] ?? '#9fd7ff';
-        if (walk) {
-          L.polyline(line, {pane: 'tripLines', color: '#1a1206', weight: 8, opacity: .75 * fade, interactive: false}).addTo(group);
-          L.polyline(line, {pane: 'tripLines', color: colour, weight: 5, opacity: fade, interactive: false}).addTo(group);
+        if (!leg.points.length) continue;
+        const colour = trip.colour ?? ROUTE_COLOUR[leg.mode] ?? '#9fd7ff';
+        if (leg.mode === 'walk') {
+          for (const line of runs(leg)) {
+            L.polyline(line, {pane: 'tripLines', color: '#1a1206', weight: 8, opacity: .75 * fade, interactive: false}).addTo(group);
+            L.polyline(line, {pane: 'tripLines', color: colour, weight: 5, opacity: fade, interactive: false}).addTo(group);
+          }
           continue;
         }
+        // A teleport or transport hop is a straight dashed line from where it starts to where it lands, with an
+        // arrowhead at the landing; one that starts or lands off the map shown (a dungeon, say) is left out.
+        const ends = leg.points.map(([x, y]) => at({x, y, plane: leg.plane}));
+        if (ends.some(p => !p)) continue;
+        const line = ends as L.LatLng[], end = line[line.length - 1], before = line[line.length - 2], [ex, ey] = leg.points[leg.points.length - 1];
         L.polyline(line, {pane: 'tripLines', color: '#1a1206', weight: 7, opacity: .8 * fade, dashArray: '10 9', lineCap: 'butt', interactive: false}).addTo(group);
         L.polyline(line, {pane: 'tripLines', color: colour, weight: 3.5, opacity: fade, dashArray: '10 9', lineCap: 'butt', interactive: false}).addTo(group);
         if (before) {
           // The landing: a badge with the way's icon (or a dot) where you arrive, and an arrowhead on the hop before it.
-          const a = m.latLngToLayerPoint(tileLatLng(before[0], before[1])), b = m.latLngToLayerPoint(tileLatLng(end[0], end[1])), length = a.distanceTo(b);
+          const a = m.latLngToLayerPoint(before), b = m.latLngToLayerPoint(end), length = a.distanceTo(b);
           const angle = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI, back = (p: number) => m.layerPointToLatLng(b.subtract(b.subtract(a).multiplyBy(p / length)));
-          const landing = trip.landings?.find(l => l.plane === leg.plane && Math.max(Math.abs(l.x - end[0]), Math.abs(l.y - end[1])) <= 1);
-          if (landing) L.marker(tileLatLng(end[0], end[1]), {pane: 'tripPins', interactive: false, opacity: fade, icon: icon(`<span class="wm-landing" style="border-color:${escapeHtml(colour)}"><img src="${escapeHtml(landing.icon)}" alt=""></span>`, [26, 26], [13, 13], 'wm-landing-mark')}).addTo(group);
-          else L.circleMarker(tileLatLng(end[0], end[1]), {pane: 'tripLines', radius: 4.5, color: '#1a1206', weight: 2, fillColor: colour, fillOpacity: fade, opacity: fade, interactive: false}).addTo(group);
+          const landing = trip.landings?.find(l => l.plane === leg.plane && Math.max(Math.abs(l.x - ex), Math.abs(l.y - ey)) <= 1);
+          if (landing) L.marker(end, {pane: 'tripPins', interactive: false, opacity: fade, icon: icon(`<span class="wm-landing" style="border-color:${escapeHtml(colour)}"><img src="${escapeHtml(landing.icon)}" alt=""></span>`, [26, 26], [13, 13], 'wm-landing-mark')}).addTo(group);
+          else L.circleMarker(end, {pane: 'tripLines', radius: 4.5, color: '#1a1206', weight: 2, fillColor: colour, fillOpacity: fade, opacity: fade, interactive: false}).addTo(group);
           if (length > 48) L.marker(back(landing ? 22 : 16), {pane: 'tripPins', interactive: false, opacity: fade, icon: icon(`<svg class="wm-arrow" viewBox="0 0 20 20" style="transform:rotate(${angle.toFixed(1)}deg)"><path d="M17 10 4 3.5 7.5 10 4 16.5Z" fill="${escapeHtml(colour)}" stroke="#1a1206" stroke-width="1.6" stroke-linejoin="round"/></svg>`, [20, 20], [10, 10], 'wm-arrow-mark')}).addTo(group);
         }
       }
     }
-  }, [legs, plane, area, zoom]);
+  }, [legs, plane, shownMap, zoom]);
 
   // Frame a new trip: its pins and the chosen routes on this floor.
   const chosen = legs.map(l => {const r = l.routes[l.active]; return r ? r.signature + r.ticks : '';}).join(';');
   useEffect(() => {
     const m = map.current;
     if (!m || !chosen) return;
-    const points = legs.flatMap(l => (l.routes[l.active]?.legs ?? []).filter(x => x.plane === plane).flatMap(x => x.points.filter(([x, y]) => inBox(area, x, y)).map(([x, y]) => tileLatLng(x, y))));
-    for (const t of pins) if (t.plane === plane && inBox(area, t.x, t.y)) points.push(tileLatLng(t.x, t.y));
+    const points = legs.flatMap(l => (l.routes[l.active]?.legs ?? []).flatMap(x => displayRuns(shownMap, plane, x.points, x.plane).flat().map(([x, y]) => tileLatLng(x, y))));
+    for (const t of pins) {const at = spot(t); if (at) points.push(at);}
     if (points.length) m.fitBounds(L.latLngBounds(points), {padding: [40, 40], maxZoom: 9});
     // Only when the chosen routes change, not when the floor or the pins move.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -322,7 +347,10 @@ export default function WorldMapView(props: Props) {
 
   useEffect(() => {
     const m = map.current;
-    if (focus && m) m.setView(tileLatLng(focus.x, focus.y), focus.zoom ?? Math.max(m.getZoom(), focus.min ?? 8));
+    if (!focus || !m) return;
+    if (focus.whole) {m.fitBounds(boxBounds(latest.current.map.bounds), {animate: false}); return;}
+    const at = spot(focus) ?? (() => {const d = latest.current.map.toDisplay(focus); return d && tileLatLng(d.x, d.y);})();
+    if (at) m.setView(at, focus.zoom ?? Math.max(m.getZoom(), focus.min ?? 8));
   }, [focus]);
 
   // The selected spot stays in sight: once the view settles, if the spot's card (over the map's top left, or along the
@@ -332,8 +360,9 @@ export default function WorldMapView(props: Props) {
     if (!shownSpot) return;
     const timer = window.setTimeout(() => {
       const m = map.current, box = el.current, card = box?.parentElement?.querySelector<HTMLElement>('.wm-card'), selected = latest.current.selected;
-      if (!m || !box || !card || !selected || selected.plane !== latest.current.plane) return;
-      const b = box.getBoundingClientRect(), c = card.getBoundingClientRect(), at = m.latLngToContainerPoint(tileLatLng(selected.x, selected.y));
+      const shown = selected && spot(selected);
+      if (!m || !box || !card || !shown) return;
+      const b = box.getBoundingClientRect(), c = card.getBoundingClientRect(), at = m.latLngToContainerPoint(shown);
       const left = c.left - b.left, top = c.top - b.top, right = c.right - b.left, bottom = c.bottom - b.top, margin = 24;
       if (at.x < left - margin || at.x > right + margin || at.y < top - margin || at.y > bottom + margin) return;
       if (c.width > b.width * .8) m.panBy([0, at.y - top / 2]);

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync,existsSync} from 'node:fs';
 import {OWNER_LAVA_MASK,RANK_STYLE,hasGildedSupporter} from './staff-appearance.ts';
+import {MAX_CAPE_VARIANTS} from './item-variants.ts';
 
 test('infernal cape exports retain animated surfaces without the opaque upper-back triangle',()=>{
  for(const id of [21295,23622,24224]){
@@ -25,7 +26,7 @@ test('infernal cape exports retain animated surfaces without the opaque upper-ba
     assert.notDeepEqual(corners,['-33,158,-15','33,158,-15','-33,118,-21'].sort());
    }
   }
-  assert.equal(animatedFaces,id===24224?0:30); // Locked variant is a static palette export.
+  assert.equal(animatedFaces,30);
  }
 });
 test('every staff rank has its own icon-pack scimitar, and the Owner blade has a lava mask',()=>{
@@ -59,4 +60,26 @@ test('all male and female Fire/Infernal cape variants omit cache hidden faces an
   }
   assert.ok(faces>30,file+' visible cape geometry retained');
  }
+});
+
+test('the Fire and Infernal capes, and their max and completionist versions, have moving lava on both bodies',()=>{
+ const wear=JSON.parse(readFileSync('lib/wearables.json','utf8')),appearance=JSON.parse(readFileSync('lib/appearance-models.json','utf8'));
+ const lava=(file:string)=>{
+  const g=JSON.parse(readFileSync('public/models/look/'+file,'utf8'));let faces=0;
+  for(const p of g.meshes[0].primitives){
+   const speed=/^flow:(-?[\d.]+),(-?[\d.]+)$/.exec(g.materials[p.material].name??'');
+   if(!speed||(+speed[1]===0&&+speed[2]===0))continue;
+   assert.ok(g.materials[p.material].pbrMetallicRoughness.baseColorTexture,file);assert.ok(p.attributes.TEXCOORD_0!==undefined,file);
+   faces+=g.accessors[p.indices??p.attributes.POSITION].count/3;
+  }
+  return faces;
+ };
+ const variant=(label:string)=>MAX_CAPE_VARIANTS.find(v=>v.label===label)!.id;
+ // Fire cape, Infernal cape, Fire max cape and the Infernal max cape players wear (the completionist versions use these models).
+ for(const id of ['6570','21295',variant('Fire'),variant('Infernal')]){
+  const male=lava(wear.items[id].file),female=lava(appearance.femaleItems[id]);
+  assert.ok(male>=24,`${id} male lava`);assert.equal(male,female,`${id}: the same faces move on both bodies`);
+ }
+ // The male max capes were once exported with their lava painted flat white (scripts/repair-male-textures.mjs).
+ assert.equal(variant('Infernal'),'21285');
 });

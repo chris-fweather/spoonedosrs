@@ -21,10 +21,24 @@ test('Add a stop goes just before the destination, or becomes the destination wh
   assert.deepEqual(points(trip), ['Lumbridge', 'Port Sarim', 'Draynor']);
   trip = applyTripAction(trip, 'stop', 'Rimmington');
   assert.deepEqual(points(trip), ['Lumbridge', 'Port Sarim', 'Rimmington', 'Draynor']);
-  // Directions to here keeps the stops and replaces the destination.
+  // Directions to here keeps every stop: Draynor was added as a stop, so it stays one and Falador follows it.
   trip = applyTripAction(trip, 'to', 'Falador');
-  assert.deepEqual(points(trip), ['Lumbridge', 'Port Sarim', 'Rimmington', 'Falador']);
-  assert.equal(stopCount(trip), 2);
+  assert.deepEqual(points(trip), ['Lumbridge', 'Port Sarim', 'Rimmington', 'Draynor', 'Falador']);
+  assert.equal(stopCount(trip), 3);
+  // A destination set with Directions to here is replaced by the next one.
+  trip = applyTripAction(trip, 'to', 'Varrock');
+  assert.deepEqual(points(trip), ['Lumbridge', 'Port Sarim', 'Rimmington', 'Draynor', 'Varrock']);
+});
+
+test('Start here, Add a stop, then Directions to here keeps the stop', () => {
+  let trip = applyTripAction(emptyTrip<string>(), 'from', 'Lumbridge');
+  trip = applyTripAction(trip, 'stop', 'Draynor');
+  assert.deepEqual(points(trip), ['Lumbridge', 'Draynor']);
+  trip = applyTripAction(trip, 'to', 'Falador');
+  assert.deepEqual(points(trip), ['Lumbridge', 'Draynor', 'Falador']);
+  // Choosing the destination by hand drops the mark, so the next Directions to here replaces it.
+  trip = applyTripAction(setEnd(applyTripAction(emptyTrip<string>(), 'stop', 'Draynor'), 'to', 'Rimmington'), 'to', 'Falador');
+  assert.deepEqual(points(trip), [null, 'Falador']);
 });
 
 test('multi-stop trips are planned leg by leg, in order', () => {

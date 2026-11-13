@@ -18,8 +18,8 @@ import './insights.css';
 import {PlayerStatus} from './PlayerStatus';
 import type {PlayerLookup} from '@/lib/player-lookup';
 import {progressAvailability} from '@/lib/progress-availability';
-import {acquisitionUnit,acquisitionMethod,acquisitionLabel} from '@/lib/pet-record';
-import {hoursToMilestone, petRateLines} from '@/lib/pet-rates';
+import {acquisitionUnit,acquisitionMethod,acquisitionLabel,countUnit} from '@/lib/pet-record';
+import {hoursToMilestone, petProgress, petRateLines} from '@/lib/pet-rates';
 import {PetDialog} from './PetDialog';
 import {PetPanel} from './PetPanel';
 import {Quests, Diaries, Combat} from './AccountProgress';
@@ -32,6 +32,7 @@ import {PopShell, type PopApi, type PopNode} from './Pop';
 import {phoenixShownCount, selectedMethod, normalizeRates} from '@/lib/estimates';
 import {initial, type Journal, type Pet, expectedHours, likelihood} from '@/lib/model';
 import {profileSaveBody} from '@/lib/flair';
+import {SyncQueuedNotice, useQueuedSync} from './SyncQueued';
 import {compact, num} from '@/lib/ui';
 
 const CATS = ['All', 'Bosses', 'Skilling', 'Minigames', 'Raids', 'Clues'];
@@ -44,13 +45,14 @@ export default function Tracker({username}: {username: string}) {
   const [contentHeight, setContentHeight] = useState(0);
   const leftSize = useRef<HTMLElement>(null);
   const chatSize = useRef<HTMLDivElement>(null);
+  const queued=useQueuedSync(username,()=>void refreshJournal(username));
   const [lookup,setLookup]=useState<PlayerLookup|null>(null);
   const [lookupAttempt,setLookupAttempt]=useState(0);
   useEffect(()=>{
     const controller=new AbortController();setLookup(null);
     void fetch('/api/player-status?username='+encodeURIComponent(username),{signal:controller.signal})
       .then(async r=>{if(!r.ok)throw Error('Lookup unavailable');return await r.json() as PlayerLookup;})
-      .then(async result=>{if(controller.signal.aborted)return;setLookup(result);if(result.persisted)await load(username);})
+      .then(async result=>{if(controller.signal.aborted)return;setLookup(result);if(result.persisted)await load(username);if(result.status==='sync_queued')queued.follow(['runeprofile','temple']);})
       .catch(()=>{if(!controller.signal.aborted)setLookup({username,state:'unavailable',hiscores:'unavailable',runeprofile:'unavailable',skills:[],checkedAt:new Date().toISOString()});});
     return ()=>controller.abort();
   },[username,lookupAttempt]);
@@ -67,6 +69,8 @@ export default function Tracker({username}: {username: string}) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  /** The address holds a name RuneScape could never have: say so, with nothing to retry. */
+  const [badName, setBadName] = useState(false);
   const auth = useSiteSession();
   const [flair, setFlair] = useState<ProfileFlair>(emptyFlair);
   const [pop, setPop] = useState<{key: string; node: PopNode} | null>(null);
@@ -82,9 +86,10 @@ export default function Tracker({username}: {username: string}) {
   async function load(username = 'Obifloat') {
     setReady(false); setJ({...structuredClone(initial),username,restricted:true}); setFlair(emptyFlair); setPet(null); setPop(null); setMessage('');
     try {
-      setError('');
+      setError(''); setBadName(false);
       const r = await fetch('/api/journal?username=' + encodeURIComponent(username));
       const d = await r.json() as Journal & {error?: string};
+      if (r.status === 400) { setBadName(true); return; }
       if (!r.ok) throw Error(d.error || 'Request failed.');
       if(usernameRef.current.toLowerCase()!==username.toLowerCase())return;
       setJ(d); usernameRef.current = d.username;
@@ -92,6 +97,14 @@ export default function Tracker({username}: {username: string}) {
       await loadProfile(d.username);
       if(usernameRef.current.toLowerCase()===username.toLowerCase())setReady(true);
     } catch (e) { setError((e as Error).message); }
+  }
+  // Reloads the journal in place when a queued source lands, without the loading screen.
+  async function refreshJournal(username: string) {
+    try {
+      const r = await fetch('/api/journal?username=' + encodeURIComponent(username), {cache: 'no-store'});
+      if (!r.ok || usernameRef.current.toLowerCase() !== username.toLowerCase()) return;
+      setJ(await r.json() as Journal);
+    } catch { /* The next landed source tries again. */ }
   }
   async function addAccount(username: string) {
     setBusy(true);
@@ -114,7 +127,7 @@ export default function Tracker({username}: {username: string}) {
   }
   async function updateFlair(next: ProfileFlair): Promise<boolean> {
     if (!flair.canEdit || !auth.user) return false;
-    const clean = profileSaveBody(j, next, flair.staff?.role==='owner');
+    const clean = profileSaveBody(j, next, flair.staff?.role==='owner', {staffRole: flair.staff?.role});
     try {
       const r = await fetch('/api/profile', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: j.username, ...clean})});
       const saved = await r.json() as ProfileFlair & {error?: string};
@@ -163,8 +176,14 @@ export default function Tracker({username}: {username: string}) {
     try {
       const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...payload as Record<string, unknown>, username: j.username})});
       const d = await r.json() as Journal & {error?: string;syncReport?:{status:string}[]};
+      // A refresh pressed again during its one-minute cooldown is not an error: say when it can run.
+      if (url === '/api/sync' && r.status === 429) { setMessage(queued.pending.length ? 'Already syncing. New data appears as each source finishes.' : 'Refreshed a moment ago. You can refresh again in a minute.'); return false; }
       if (!r.ok) throw Error(d.error || 'Request failed.');
-      setJ(d); setMessage(d.syncReport?.length?'Refresh complete. See Connections for each source’s result.':'Saved.'); return true;
+      setJ(d);
+      const waiting=(d.syncReport??[]).filter(r=>r.status==='queued').map(r=>(r as {source?:string}).source??'');
+      if(waiting.length){queued.follow(waiting);setMessage('Sync queued. New data appears as each source finishes.');}
+      else setMessage(d.syncReport?.length?'Refresh complete. See Connections for each source’s result.':'Saved.');
+      return true;
     } catch (e) { setError((e as Error).message); return false; } finally { setBusy(false); }
   }
   const openFull = (p: Pet,edit=false) => { if (j.restricted) return; setEditPetProgress(edit);setPet({...structuredClone(p),obtainedUnit:acquisitionUnit(p),obtainedMethod:acquisitionMethod(p)}); setError(''); };
@@ -253,8 +272,9 @@ export default function Tracker({username}: {username: string}) {
       {message && <div role="status" className="notice ok"><Check size={15}/>{message}</div>}
     </div>}
 
-    {ready&&lookup&&lookup.state==='not_found'&&<PlayerStatus lookup={lookup} username={j.username} saved={!!j.restricted||available.pets||available.log||available.quests||available.diaries||available.combat} onRetry={()=>setLookupAttempt(n=>n+1)}/>}
-    {!ready ? <JournalLoading username={j.username} failed={!!error} owner={!!auth.user&&auth.names.some(n=>n.toLowerCase()===j.username.toLowerCase())}/> : <div className="frame has-pop profile-banner-layout" style={{'--profile-content-h': `${contentHeight}px`} as CSSProperties}>
+    {ready&&<SyncQueuedNotice pending={queued.pending} landed={queued.landed}/>}
+    {ready&&lookup&&lookup.state==='not_found'&&<PlayerStatus lookup={lookup} username={j.username} saved={!!j.restricted||available.pets||available.log||available.quests||available.diaries||available.combat||!!j.statsSyncedAt} savedAt={j.statsSyncedAt??j.logSyncedAt} onRetry={()=>setLookupAttempt(n=>n+1)}/>}
+    {!ready ? <JournalLoading username={j.username} failed={!!error} invalid={badName} owner={!!auth.user&&auth.names.some(n=>n.toLowerCase()===j.username.toLowerCase())}/> : <div className="frame has-pop profile-banner-layout" style={{'--profile-content-h': `${contentHeight}px`} as CSSProperties}>
       <aside ref={leftSize} className="col-left">
         <PlayerCard journal={displayJournal} flair={flair} onFlair={updateFlair} viewerKey={auth.user?.id ?? 'guest'}/>
         {(!displayJournal.restricted&&(owner||displayJournal.details?.skills!==false))&&<SkillsPanel journal={displayJournal} pop={popApi}/>}
@@ -282,16 +302,18 @@ export default function Tracker({username}: {username: string}) {
               return {id: c, label: c, count: `${g}/${n.length}`, pressed: cat === c, onClick: () => setCat(c)};})}/>
             <div ref={petResults} className="pets-scroll" role="region" aria-label="Pet results" tabIndex={0}>
               <div className="pet-grid">{pets.map(p => {
-                const m = selectedMethod(p), c = likelihood(p), h = expectedHours(p);
+                const m = selectedMethod(p);
                 const sub = p.methods.find(x => x.activity)?.activity || m?.name || p.category;
                 const outlook = petRateLines(p, j);
-                const shownChance = outlook.chance ?? c;
-                const shownHours = outlook.hours ?? h;
+                // The same chance, hours and count the pet's pop-out shows (lib/pet-rates.ts, petProgress).
+                const progress = petProgress(p, j);
+                const shownChance = progress.chance;
+                const shownHours = progress.hours;
                 const rateText = outlook.averageXp != null ? `~${compact(outlook.averageXp)} XP mean`
                   : outlook.lines.find(line => line.label === 'Drop rate' || line.label.startsWith('Drop rate at'))?.value
                   ?? (m?.rate ? m.unit==='XP'?`~${compact(m.rate)} XP estimate`:`1/${num(m.rate, 0)}` : 'Rate unavailable');
                 const phoenix = p.name === 'Phoenix' ? phoenixShownCount(p.crateRolls, j.hiscores.activities.find(a => a.name === 'Wintertodt')?.score) : null;
-                const count = (n: number) => n >= 10_000 ? compact(n) : n >= 1000 ? `${num(n / 1000, 1)}K` : num(n, 0), countText = phoenix ? `${count(phoenix.value)} ${phoenix.unit}` : m?.kc != null ? `${count(m.kc)} ${m.unit}` : null;
+                const count = (n: number) => n >= 10_000 ? compact(n) : n >= 1000 ? `${num(n / 1000, 1)}K` : num(n, 0), countText = phoenix ? `${count(phoenix.value)} ${countUnit(phoenix.value, phoenix.unit)}` : progress.count ? `${count(progress.count.value)} ${countUnit(progress.count.value, progress.count.unit)}` : null;
                 const next = hoursToMilestone(shownHours, shownChance), left = p.obtained ? 'Collected' : next ? `~${num(Math.max(1, next.hours), 0)} h to ${next.percent}%` : shownHours !== null ? 'Past 95%' : null;
                 // Laid out like a collection-log activity tile: icon, name, progress, then one small line of kills and time left.
                 return <button className={`pet cl-activity pet-tile ${p.obtained ? 'owned' : ''} ${pop?.key === 'pet:' + p.id ? 'sel' : ''}`} onClick={() => openPet(p)} key={p.id} title={`${p.name} · ${sub} · ${rateText}${p.obtained&&p.obtainedCount!=null?` · Obtained: ${acquisitionLabel(p)}`:''}`}>
@@ -303,12 +325,12 @@ export default function Tracker({username}: {username: string}) {
               })}</div>
               {!pets.length && <div className="empty"><Target size={32}/><h3>{hunt ? 'Your hunt list is empty' : 'No matching pets'}</h3><p className="muted">{hunt ? 'Click a pet and choose “Add to hunt list”.' : 'Try another search or filter.'}</p></div>}
             </div>
-          </div> : <ProfileEmpty section="Pets" icon="/brand/rocky-mascot.webp" canEdit={owner} busy={busy} onSync={syncProfile}/>)}
+          </div> : <ProfileEmpty section="Pets" icon="/brand/rocky-mascot.webp" canEdit={owner} busy={busy||queued.pending.length>0} onSync={syncProfile}/>)}
 
-          {activeView === 'Collection log' && <CollectionLog journal={j} log={j.log} canEdit={owner} onConnect={syncProfile} busy={busy} pop={popApi} onSaveDate={(itemId,date)=>action('/api/collection-date',{itemId,date,revision:journalRef.current.revision})}/>}
-          {activeView === 'Quests' && <Quests journal={j} pop={popApi} onSync={syncProfile} canEdit={owner} busy={busy}/>}
-          {activeView === 'Diaries' && <Diaries journal={j} pop={popApi} onSync={syncProfile} canEdit={owner} busy={busy}/>}
-          {activeView === 'Combat' && <Combat journal={j} pop={popApi} onSync={syncProfile} canEdit={owner} busy={busy}/>}
+          {activeView === 'Collection log' && <CollectionLog journal={j} log={j.log} canEdit={owner} onConnect={syncProfile} busy={busy||queued.pending.length>0} pop={popApi} onSaveDate={(itemId,date)=>action('/api/collection-date',{itemId,date,revision:journalRef.current.revision})}/>}
+          {activeView === 'Quests' && <Quests journal={j} pop={popApi} onSync={syncProfile} canEdit={owner} busy={busy||queued.pending.length>0}/>}
+          {activeView === 'Diaries' && <Diaries journal={j} pop={popApi} onSync={syncProfile} canEdit={owner} busy={busy||queued.pending.length>0}/>}
+          {activeView === 'Combat' && <Combat journal={j} pop={popApi} onSync={syncProfile} canEdit={owner} busy={busy||queued.pending.length>0}/>}
 
           {owner && activeView === 'Insights' && <div className="insights">
             <div className="insights-grid">
@@ -317,7 +339,7 @@ export default function Tracker({username}: {username: string}) {
               <CollectionTimeline journal={j}/>
             </div>
           </div>}
-          {owner && <div ref={connectionsSize} className="profile-sizing-pane stack" hidden={activeView !== 'Connections'} inert={activeView !== 'Connections'}><Connections journal={j} busy={busy || !flair.canEdit} ready={ready && flair.canEdit} onSync={source => void action('/api/sync', {source})} onImport={data => void action('/api/sync', {source: 'import', data})} onError={setError}/></div>}
+          {owner && <div ref={connectionsSize} className="profile-sizing-pane stack" hidden={activeView !== 'Connections'} inert={activeView !== 'Connections'}><Connections journal={j} busy={busy || !flair.canEdit} ready={ready && flair.canEdit} syncing={queued.pending.length>0} onSync={source => void action('/api/sync', {source})} onImport={data => void action('/api/sync', {source: 'import', data})} onError={setError}/></div>}
         </div></>}
       </section>
 

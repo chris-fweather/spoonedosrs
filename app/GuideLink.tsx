@@ -1,9 +1,10 @@
 "use client";
 import {useEffect,useState} from 'react';
-type Listed={id:string;guide:{title:string;activity:string}};
+type Listed={id:string;guide:{title:string;activity:string};visibility?:'public'|'staff'};
 let cache:Promise<Listed[]>|null=null;
-/** Published guides, fetched once per page view and shared by every link. */
-function publishedGuides(){return cache??=fetch('/api/guides').then(r=>r.ok?r.json() as Promise<{guides:Listed[]}>:{guides:[]}).then(d=>d.guides).catch(()=>[]);}
+/** Published guides this visitor may read (the server leaves out staff-only guides for everyone but staff), fetched once per
+ * page view and shared by every link. Public guides come first, so staff are sent to the guide everyone else sees. */
+function publishedGuides(){return cache??=fetch('/api/guides').then(r=>r.ok?r.json() as Promise<{guides:Listed[]}>:{guides:[]}).then(d=>[...d.guides].sort((a,b)=>+(a.visibility==='staff')-+(b.visibility==='staff'))).catch(()=>[]);}
 /** The published guide for the first of these activities that has one (a quest, a boss, "Ardougne Diary"…), or null. */
 export function usePublishedGuide(...activities:(string|null|undefined)[]){
  const [found,setFound]=useState<{key:string;guide:Listed|null}|null>(null);

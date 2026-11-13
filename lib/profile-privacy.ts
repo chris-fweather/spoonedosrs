@@ -1,6 +1,7 @@
 import type {Journal,Pet,Method} from './model';
 import {validCollectionDate} from './collection-history';
 import {validMilestones} from './skill-milestones';
+import {raidInputs} from './raid-rates';
 export type Visibility = 'public' | 'private';
 export function journalForViewer(j:Journal, visibility:Visibility, owner:boolean,details:ProfileDetails=DEFAULT_DETAILS):Journal {
   if (owner) return {...j,visibility,restricted:false};
@@ -32,7 +33,8 @@ export function parseDetails(value:unknown):ProfileDetails {
 function publicMethod(m:Method):Method {
  return {name:m.name,kc:m.kc,rate:m.rate,kph:m.kph,activity:m.activity,unit:m.unit,source:m.source,
   farmingRun:m.farmingRun?.map(({crop,count})=>({crop,count})),farmingRunsPerDay:m.farmingRunsPerDay,observedAverageXp:m.observedAverageXp,
-  rateOverride:m.rateOverride,rateConfirmed:m.rateConfirmed,paceConfirmed:m.paceConfirmed};
+  rateOverride:m.rateOverride,rateConfirmed:m.rateConfirmed,paceConfirmed:m.paceConfirmed,
+  ...(m.raid?{raid:raidInputs(m.raid)}:{}),...(m.xp200m?{xp200m:true}:{})};
 }
 function publicPet(p:Pet):Pet {
  return {id:p.id,name:p.name,category:p.category,obtained:p.obtained,date:p.date,

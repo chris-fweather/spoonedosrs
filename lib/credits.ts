@@ -27,8 +27,8 @@ export const CREDIT_PEOPLE_SQL=`SELECT u.discord_id AS id,COALESCE(u.credits_lis
  (SELECT c.display_name FROM claimed_names c LEFT JOIN profile_visibility v ON v.rsn=c.rsn WHERE c.discord_id=u.discord_id AND COALESCE(v.visibility,'public')='public' ORDER BY c.claimed_at,c.rsn LIMIT 1) AS name,
  (SELECT p.staff_badge FROM claimed_names c JOIN profile_presentation p ON p.rsn=c.rsn LEFT JOIN profile_visibility v ON v.rsn=c.rsn WHERE c.discord_id=u.discord_id AND COALESCE(v.visibility,'public')='public' ORDER BY c.claimed_at,c.rsn LIMIT 1) AS badge
  FROM users u LEFT JOIN staff_members s ON s.discord_id=u.discord_id
- WHERE u.discord_id IN (SELECT author_id FROM community_guides WHERE published IS NOT NULL UNION SELECT discord_id FROM staff_members UNION SELECT target_id FROM staff_audit WHERE action IN ('grant','revoke'))`;
-export const CREDIT_GUIDES_SQL=`SELECT author_id,id,COALESCE(json_extract(published,'$.title'),title) AS title,json_extract(published,'$.activity') AS activity FROM community_guides WHERE published IS NOT NULL ORDER BY published_at,id`;
+ WHERE u.discord_id IN (SELECT author_id FROM community_guides WHERE published IS NOT NULL AND visibility='public' UNION SELECT discord_id FROM staff_members UNION SELECT target_id FROM staff_audit WHERE action IN ('grant','revoke'))`;
+export const CREDIT_GUIDES_SQL=`SELECT author_id,id,COALESCE(json_extract(published,'$.title'),title) AS title,json_extract(published,'$.activity') AS activity FROM community_guides WHERE published IS NOT NULL AND visibility='public' ORDER BY published_at,id`;
 export const CREDIT_RANKS_SQL=`SELECT id,target_id,action,detail,created_at FROM staff_audit WHERE action IN ('grant','revoke') ORDER BY id`;
 
 type PersonRow={id:string;listed:number;role:string|null;name:string|null;badge:string|null};

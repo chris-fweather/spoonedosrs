@@ -4,6 +4,7 @@
  * (lib/guide-travel); every other prayer and spell a guide can name (lib/guide-references) is described here. */
 import data from './guide-magic.json';
 import {guideItemImage,guideItems} from './guides';
+import {officialSkillIcon} from './skill-info';
 
 export type Spellbook = 'standard' | 'ancient' | 'lunar' | 'arceuus';
 type Entry = {level: number; effect: string; book?: string; runes?: (string | number)[][]; skills?: (string | number)[][]; quests?: string[]; items?: string[]; unlock?: string};
@@ -52,8 +53,8 @@ export type MagicNeed = {key: string; icon: string; text: string};
 export function magicNeeds(m: GuideMagic): MagicNeed[] {
   const skill = m.kind === 'prayer' ? 'Prayer' : 'Magic';
   return [
-    {key: 'level', icon: `/icons/skills/${skill.toLowerCase()}.png`, text: `${m.level} ${skill}`},
-    ...(m.skills ?? []).map(([s, l]) => ({key: 's' + s, icon: `/icons/skills/${s.toLowerCase()}.png`, text: `${l} ${s}`})),
+    {key: 'level', icon: officialSkillIcon(skill), text: `${m.level} ${skill}`},
+    ...(m.skills ?? []).map(([s, l]) => ({key: 's' + s, icon: officialSkillIcon(s), text: `${l} ${s}`})),
     ...(m.book && m.book !== 'standard' ? [{key: 'book', icon: `/icons/game/spellbook-${m.book}.png`, text: SPELLBOOK_NAMES[m.book]}] : []),
     ...(m.quests ?? []).map(q => ({key: 'q' + q, icon: '/ui/quest-point-icon.png', text: q})),
     ...(m.items ?? []).map(id => ({key: 'i' + id, icon: guideItemImage(id) ?? '/ui/collection-log-icon.png', text: guideItems[id] ?? 'Unknown item'})),

@@ -7,9 +7,10 @@ import {HoverTip} from './HoverTip';
 import {Check, ExternalLink, Info, Maximize2, Pencil, Target} from 'lucide-react';
 import {petUnitLabel,acquisitionMethod,acquisitionLabel} from '@/lib/pet-record';
 import {petSkill, selectedMethod, oddsMethod, usesAcquisition} from '@/lib/estimates';
-import {type Journal, type Pet, budgetHours, expectedHours, hoursSpent, likelihood} from '@/lib/model';
+import {petChartRecord} from '@/lib/odds-chart';
+import {type Journal, type Pet, budgetHours, hoursSpent} from '@/lib/model';
 import {templeBenchmarks, templeChecked, templeNotes} from '@/lib/temple-benchmarks';
-import {hoursToMilestone, petRateLines} from '@/lib/pet-rates';
+import {hoursToMilestone, petProgress, petRateLines} from '@/lib/pet-rates';
 import {chanceTone, logPageForPet, num, pct, wiki} from '@/lib/ui';
 import {DriestRecord} from './DriestRecord';
 import {Meter} from './Meter';
@@ -37,11 +38,14 @@ export function RateBasis({journal, pet}: {journal: Journal; pet: Pet}) {
 export function PetPanel({journal, pet, busy, canEdit, onEdit, onFull, onHunt}: {journal: Journal; pet: Pet; busy: boolean; canEdit:boolean; onEdit:()=>void; onFull: () => void; onHunt: () => void}) {
   const m = oddsMethod(pet);
   const received=usesAcquisition(pet);
+  const chart=petChartRecord(pet, journal), current=received?m?.kc:chart.method?.kc;
   const unit=petUnitLabel(pet,m?.unit??'count');
   const outlook = petRateLines(pet, journal);
   const mixed = otherMethods(pet).some(x => x.rate);
-  const chance = pet.obtained?likelihood(pet):outlook.chance ?? likelihood(pet);
-  const mean = outlook.hours ?? expectedHours(pet);
+  // Before the pet is obtained with no count on its method, the chance is read at lifetime XP, as the graph marks it;
+  // the pet's card reads the same (lib/pet-rates.ts, petProgress).
+  const {chance, hours: mean, byXp, count} = petProgress(pet, journal);
+  const shownCount = current ?? (pet.obtained || byXp ? null : count?.value);
   const next = hoursToMilestone(mean, chance);
   const budget = budgetHours(pet), spent = hoursSpent(pet, journal);
   const effortLabel=pet.recordedHours!=null?'Recorded time':pet.obtained?'Estimated time to pet':'Estimated effort';
@@ -58,9 +62,10 @@ export function PetPanel({journal, pet, busy, canEdit, onEdit, onFull, onHunt}: 
     <Stats rows={[
       [m?.rateOverride?'Personal estimate':m?.rateConfirmed ? 'Drop rate' : 'Planning rate', rate, 'y'],
       ...(outlook.averageXp != null ? [['Average XP', num(outlook.averageXp, 0), 'y'] as [string, string, string]] : []),
-      [mixed?'Chance across your methods':received?'Chance by obtained count':'Chance by this count', chance === null ? '—' : pct(chance), chanceTone(chance)],
+      [mixed?'Chance across your methods':received?'Chance by obtained count':byXp?'Chance by lifetime XP':'Chance by this count', chance === null ? '—' : pct(chance), chanceTone(chance)],
       ...(skill && !received && m?.kc!=null ? [[`Recorded ${m.unit}`,num(m.kc,0)] as [string,string]] : []),
-      [skill ? 'Lifetime XP' : received?`Count used (${unit})`:`Your ${unit}`, skill ? num(skill.xp, 0) : (m?.kc != null ? num(m.kc, 0) : '—')],
+      // Without an obtained count, the row shows the same current count the graph marks.
+      [skill ? 'Lifetime XP' : received?`Count used (${unit})`:pet.obtained?`Current ${unit}`:`Your ${unit}`, skill ? num(skill.xp, 0) : (shownCount != null ? num(shownCount, 0) : '—')],
       ...(pet.obtainedCount != null ? [['Obtained', acquisitionLabel(pet)] as [string, string]] : []),
 
       ...(pet.obtainedCount!=null&&acquisitionMethod(pet)?[['Received from',acquisitionMethod(pet)] as [string,string]]:[]),
@@ -70,12 +75,12 @@ export function PetPanel({journal, pet, busy, canEdit, onEdit, onFull, onHunt}: 
       ['Method',m?.name??'Not set','stat-single-line'],
       ...(releaseLabel(pet.name,'pets')?[["Pet released",releaseLabel(pet.name,'pets')!] as [string,string]]:[]),
       ['Mean hunt', mean === null ? '—' : `~${num(mean, 0)} h`, 'y'],
-      ...(!pet.obtained && next ? [[`Time to ${next.percent}%`, `~${num(Math.max(1, next.hours), 0)} h`] as [string, string]] : []),
+      ...(!pet.obtained && next ? [[`Your time to ${next.percent}%`, `~${num(Math.max(1, next.hours), 0)} h`] as [string, string]] : []),
       ...(!pet.obtained && budget !== null ? [['95% budget', `${num(budget)} h`] as [string, string]] : []),
       [effortHelp?<HoverTip className="effort-stat-help" placement="right" label={`${effortLabel}: ${effortHelp}`} content={<span className="effort-tooltip"><strong>{effortLabel}</strong><span>{effortHelp}</span></span>}>{effortLabel}<Info size={12} aria-hidden="true"/></HoverTip>:effortLabel, spent === null ? '—' : `${num(spent)} h`],
     ]}/>
     {chance !== null && <div className="pop-block"><Meter done={chance} total={1}/><small className="muted">{pct(chance)} {received?'by your obtained record':'at your recorded effort'}{m?.rateOverride?' · estimate':''}</small></div>}
-    <OddsMini pet={pet}/>
+    <OddsMini pet={pet} journal={journal}/>
     <DriestRecord name={pet.name} activity={petSkill[pet.name] || m?.activity || page?.name}/>
     <details key={pet.id} className="rate-explanation"><summary>Method &amp; calculation details</summary><RateBasis journal={journal} pet={pet}/><EffortBasis pet={pet}/></details>
     <div className="pop-links">

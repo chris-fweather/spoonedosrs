@@ -7,7 +7,7 @@ import {potionEffect} from '@/lib/potion-effects';
 import {itemSource} from '@/lib/item-sources';
 import './item-price-card.css';
 
-type ItemPrices={tradeable:false;highAlch?:number|null;quests?:string[]}|{tradeable:true;name:string;members:boolean;limit:number|null;high:number|null;highTime:number|null;low:number|null;lowTime:number|null;highAlch:number|null;lowAlch:number|null};
+type ItemPrices={tradeable:false;highAlch?:number|null;quests?:string[]}|{tradeable:true;pricedAs?:string;name:string;members:boolean;limit:number|null;high:number|null;highTime:number|null;low:number|null;lowTime:number|null;highAlch:number|null;lowAlch:number|null};
 const cache=new Map<string,Promise<ItemPrices|null>>();
 function load(id:string){
  let p=cache.get(id);
@@ -40,6 +40,7 @@ export function ItemPriceCard({id,name,quantity=1}:{id:string;name?:string;quant
     {row('High alch',data.highAlch,'/icons/spells/high-level-alchemy.png')}
     {row('Low alch',data.lowAlch,'/icons/spells/low-level-alchemy.png')}
    </span>
+   {data.pricedAs&&<span className="ipc-note">Priced as {data.pricedAs}, which is what trades on the Grand Exchange.</span>}
    <span className="ipc-foot">{data.limit?`Buy limit ${data.limit.toLocaleString('en-US')} · `:''}Latest GE trades · OSRS Wiki</span>
   </>}
  </span>;

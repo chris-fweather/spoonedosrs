@@ -25,7 +25,7 @@ import {LookStage} from './Look';
 import type {Journal, Pet} from '@/lib/model';
 import {progressAvailability} from '@/lib/progress-availability';
 import {petSkill} from '@/lib/estimates';
-import {bossArtwork} from '@/lib/artwork';
+import {bossArtwork,hiscoreIcon} from '@/lib/artwork';
 import {DryMeter, QuickestHunts} from './ProgressCharts';
 import {LuckHunts, PetSummary, luckHours} from './PetSummary';
 import {petLuck} from '@/lib/pet-luck';
@@ -116,7 +116,7 @@ export function ActivityRanks({journal}:{journal:Journal}){
  if(journal.restricted||journal.details?.petRecords===false)return null;
  return <section className={`osrs-panel activity-ranks ${unknown?'activity-ranks-unknown':''}`} aria-label="Boss and activity hiscores"><div className="activity-rank-heading"><button type="button" aria-pressed={group==='bosses'} onClick={()=>setGroup('bosses')}>Boss ranks</button><button type="button" aria-pressed={group==='activities'} onClick={()=>setGroup('activities')}>Activities</button><span className="activity-rank-count" aria-label={unknown?`${group}: not yet synced`:`${rows.filter(a=>a.rank>0).length} of ${rows.length} ${group} ranked`} title={unknown?'Not yet synced':'Ranked on the hiscores'}><b>{unknown?'—':rows.filter(a=>a.rank>0).length}</b>/{rows.length}</span></div><div className="activity-rank-grid">{rows.map(a=>{
  const label=unknown?`${a.name} · Not yet synced`:`${a.name} · ${a.score>=0?num(a.score,0)+' '+(group==='bosses'?'KC':'score'):'Count not recorded'} · ${a.rank>0?'Hiscores rank #'+num(a.rank,0):'Unranked'}`;
- const art=bossArtwork(a.name)??(a.name.startsWith('Clue Scrolls')?bossArtwork('Clue Scrolls (all)'):'/icons/navigation/combat-achievements-icon.png');
+ const art=hiscoreIcon(a.name)??bossArtwork(a.name)??(a.name.startsWith('Clue Scrolls')?bossArtwork('Clue Scrolls (all)'):'/icons/navigation/combat-achievements-icon.png');
  return <HoverTip key={a.name} className={`activity-rank-icon ${a.rank>0?'ranked':'unranked'} ${rankTier(a.rank)?'rank-glow-'+rankTier(a.rank):''}`} label={label} content={<span className="activity-rank-tip"><strong>{a.name}</strong><ReleaseStamp name={a.name} kind="bosses"/><span className="activity-hover-data">{unknown?<span>Not yet synced</span>:<><span>{a.score>=0?`${group==='bosses'?'KC':'Score'}: ${num(a.score,0)}`:'Count not recorded'}</span><span>{a.rank>0?`Hiscores rank: #${num(a.rank,0)}`:'Hiscores: unranked'}</span></>}</span>{rankTier(a.rank)&&<small>{a.rank===1?'Champion title unlocked':'Top 1,000 title unlocked'}</small>}</span>}><img src={art} alt=""/></HoverTip>;
  })}</div></section>;
 }
@@ -174,9 +174,9 @@ function SkillMethods({journal: j, skill, level, open, setOpen}: {journal: Journ
 /** The Overview's progress rows, shared with the loading skeleton so both show the same labels and art. */
 export const OVERVIEW_PROGRESS = [
   {k: 'Pets', img: '/brand/rocky-mascot.webp', view: 'Pets'},
-  {k: 'Collection log', img: '/ui/collection-log-icon.png', view: 'Collection log'},
-  {k: 'Quest points', img: '/ui/quest-point-icon.png', view: 'Quests'},
-  {k: 'Diary tasks', img: '/ui/achievement-diaries-icon.png', view: 'Diaries'},
+  {k: 'Collection log', img: '/icons/navigation/collection-log-icon.png', view: 'Collection log'},
+  {k: 'Quest points', img: '/icons/navigation/quest-point-icon.png', view: 'Quests'},
+  {k: 'Diary tasks', img: '/icons/navigation/achievement-diaries-icon.png', view: 'Diaries'},
   {k: 'Combat achievements', img: '/icons/navigation/combat-achievements.png', view: 'Combat'},
 ] as const;
 
@@ -213,7 +213,7 @@ export function Overview({journal: j, go, onOpen}: {journal: Journal; go: (view:
         const status=!available.pets?'Not synced':collected?`Obtained${x.date?' · '+collectedDate(x.date):''}`:'Not collected yet';
         const record=petHoverLines(j,x),details=[available.pets?record.obtained:null,record.current].filter((line):line is string=>!!line);
         // Luck as in the Pet summary: expected hours minus the hours the pet took (or has taken so far).
-        const luck=available.pets?petLuck(x).luck:null,luckLine=luck!==null&&luck!==0?`${luckHours(luck)} ${luck>0?'lucky':'unlucky'}`:null;
+        const luck=available.pets?petLuck(x,j).luck:null,luckLine=luck!==null&&luck!==0?`${luckHours(luck)} ${luck>0?'lucky':'unlucky'}`:null;
         const label=[x.name,x.category,status,...details,...(luckLine?[luckLine]:[])].join(' · ');
         return <HoverTip key={x.id} tabIndex={-1} className="overview-pet-trigger" label={label} content={<span className="overview-pet-tip">
           <strong>{x.name}</strong><small>{x.category}</small><ReleaseStamp name={x.name} kind="pets"/><b className={collected?'good':'muted'}>{status}</b>

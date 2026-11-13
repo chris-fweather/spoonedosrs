@@ -2,11 +2,13 @@
 import {ItemHover} from './ItemPriceCard';
 import {guideItemImage} from '@/lib/guides';
 import {wiki} from '@/lib/ui';
+import {useSpriteFit} from './sprite-fit';
 import './adventure-requirements.css';
 
 const FALLBACK='/ui/collection-log-icon.png';
-/** An item's official inventory icon, falling back to the collection log mark when the game has none we can use. */
-export function RequirementItemIcon({id}:{id:string}){return <img className="req-item-icon" src={guideItemImage(id)??`/items/${id}.png`} alt="" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=FALLBACK;}}/>;}
+/** An item's official inventory icon, falling back to the collection log mark when the game has none we can use. The sprite
+ * is scaled to fill its square like the skill and quest icons beside it (app/sprite-fit.ts). */
+export function RequirementItemIcon({id}:{id:string}){const src=guideItemImage(id)??`/items/${id}.png`,fit=useSpriteFit(src);return <img className="req-item-icon" src={src} style={fit} alt="" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=FALLBACK;}}/>;}
 type Item={id:string;name:string};
 /** One required item, the same tile in quest and diary panels and guides: icon, name (to the OSRS Wiki), a short note
  * and the amount before the name, with the price card (stack total included) on hover, focus or tap. Alternatives share one tile and

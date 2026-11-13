@@ -22,4 +22,8 @@ export function displayedBadgeLabel(staff?:PublicStaff|null,donation?:Donation):
 }
 
 /** Server-side eligibility; do not send hidden totals to the browser. */
-export function supporterTitle(amount:number|null|undefined,currency:string|null|undefined){return currency==='USD'&&amount!=null&&amount>=1000?'the Generous':null;}
+/** "the Generous" comes with supporter status: any donation, in any currency, or a supporter grant. `supporter` is the
+ * profile_support view's flag (1 when supporting and not hidden by the name's owner), or a boolean. */
+export function supporterTitle(supporter:boolean|number|null|undefined){return supporter===true||supporter===1?'the Generous':null;}
+/** The title as visitors see it: earned, and not hidden by the name's owner (profile_presentation.show_title = 0). */
+export function shownSupporterTitle(supporter:boolean|number|null|undefined,showTitle:number|null|undefined){return showTitle===0?null:supporterTitle(supporter);}

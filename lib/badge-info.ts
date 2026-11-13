@@ -53,7 +53,7 @@ export function accountModeInfo(mode:AccountMode):BadgeInfo|null{
 /** The supporter title after a name. */
 export function supporterTitleInfo(title:string,donation?:Donation):BadgeInfo{
  const amount=shownAmount(donation);
- return {name:title,description:title===DONATOR_TITLE?'Donated $10 or more to Spooned OSRS.':'Supports Spooned OSRS.',details:amount?[['Donated',amount]]:[]};
+ return {name:title,description:title===DONATOR_TITLE?'Supports Spooned OSRS with a donation.':'Supports Spooned OSRS.',details:amount?[['Donated',amount]]:[]};
 }
 
 /** An achievement title under a name, with its rarity. */

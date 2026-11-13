@@ -6,9 +6,12 @@ import {GuideLink} from './GuideLink';
 import {TravelOptions, travelSummary, type TravelOptionsFile, type TravelTab} from './TravelOptions';
 import type {MapFocus, MapIconPick, MapLeg, MapMenuAt, MapPin as MapTripPin} from './WorldMapView';
 import {useMapExits} from './map-exits';
+import {MapPicker} from './MapPicker';
+import {useWorldMaps} from './world-maps';
 import type {PlanInput, PlanReply, PlanRequest} from './world-map-route.worker';
 import {DEFAULT_LAYERS, KIND_ICON, KIND_LABEL, difficultyIcon, LAYERS, ROUTE_COLOUR, TRAVEL_ICON, groupTeleports, listIcon, nearestPlace, readPlaces, searchPlaces, teleportIcon, townNear, type LayerId, type MapPlace, type PlacesFile} from '@/lib/world-map-places';
 import {areaFor, backLabel, exitAction, onSurface, wayOut, type MapExit, type MapPlace as MapSpot} from '@/lib/world-map-exits';
+import type {GameMap} from '@/lib/world-maps';
 import {undergroundName} from '@/lib/world-map-underground';
 import {travelTime, type Route, type RouteStep, type Tile} from '@/lib/world-map-routing';
 import {GAME_ICON, GAME_SPRITE, gameIconLayer, readGameIcons, readIconDetails, type GameIcon, type GameIconTip, type GameIconsFile, type GameLabel, type IconDetails, type IconDetailsFile} from '@/lib/world-map-game-icons';
@@ -16,6 +19,7 @@ import {DEFAULT_TRAVEL, KIND_NETWORK, parseTravelSettings, type TravelSettings} 
 import {MAX_STOPS, applyTripAction, canAddStop, emptyTrip, legKey, moveRow, parseStops, removeRow, reverseTrip, rowMark, setEnd, stopCount, tripLegs, tripOf, tripTime, type TripAction, type TripRow} from '@/lib/world-map-trip';
 import {MAP_LEG_COLOURS} from '@/lib/guide-map';
 import './world-map.css';
+import {worldMapData} from '@/lib/world-map-data';
 
 // Leaflet and the map canvas load only on this page, in the browser.
 const WorldMapView = lazy(() => import('./WorldMapView'));
@@ -244,7 +248,7 @@ function TimelineLeg({plan, colour, name, places, groups, onSelect, onHover}: {p
  * stops to a destination. */
 export function WorldMap() {
   const [error, setError] = useState(''), [places, setPlaces] = useState<MapPlace[] | null>(null), [mounted, setMounted] = useState(false);
-  const [tab, setTab] = useState<'explore' | 'route'>('explore'), [spot, setSpot] = useState<MapSpot>({plane: 0, at: START}), [layers, setLayers] = useState<LayerId[]>(DEFAULT_LAYERS);
+  const [tab, setTab] = useState<'explore' | 'route'>('explore'), [spot, setSpot] = useState<MapSpot & {map?: number}>({plane: 0, at: START}), [layers, setLayers] = useState<LayerId[]>(DEFAULT_LAYERS);
   const [selected, setSelected] = useState<Point | null>(null), [focus, setFocus] = useState<MapFocus | null>(null);
   const [trip, setTrip] = useState<TripRow<Point>[]>(() => emptyTrip<Point>()), [pick, setPick] = useState<number | null>(null);
   const [plans, setPlans] = useState<Record<string, Route[]>>({}), [actives, setActives] = useState<Record<string, number>>({}), [status, setStatus] = useState<{state: 'idle' | 'busy' | 'error'; message?: string}>({state: 'idle'});
@@ -258,11 +262,20 @@ export function WorldMap() {
   const dismissMenu = useCallback(() => {dismissed.current = Date.now(); setMenu(null);}, []);
   const plan = usePlanner(), request = useRef(0), cache = useRef(new Map<string, Route[]>()), page = useRef<HTMLElement>(null), entrance = useRef<{x: number; y: number} | null>(null);
   const from = trip[0].point, to = trip[trip.length - 1].point;
-  // Every visit starts on the surface's ground floor. Exits (cave entrances, trapdoors, ladders into a dungeon) change
-  // the area; as on the game's world map there are no floor changes, but a link with a floor (?at= or ?to=) shows it.
-  const doors = useMapExits(), plane = spot.plane, box = areaFor(spot.at, doors?.areas);
+  // Every visit starts on the surface's ground floor. Exits (cave entrances, trapdoors, ladders into a dungeon), search
+  // results and links lead to other maps of the game (Misthalin Underground, Ardent Ocean Underground, …), and the list over
+  // the map picks one; as on the game's world map there are no floor changes, but a link with a floor (?at=) shows it.
+  // The spot is a game tile; the map shown is the one that has it (the map picked, while it still has it).
+  const doors = useMapExits(), worlds = useWorldMaps(), shownMap = useRef<GameMap | null>(null);
+  const tile = {x: spot.at.x, y: spot.at.y, plane: spot.plane};
+  const map = worlds ? worlds.mapOf(tile, (spot.map !== undefined ? worlds.byId(spot.map) : null) ?? shownMap.current) ?? (spot.map !== undefined ? worlds.byId(spot.map) : null) ?? shownMap.current ?? worlds.surface : null;
+  useEffect(() => {shownMap.current = map;}, [map]);
+  const plane = map?.toDisplay(tile)?.plane ?? 0, above = map ? map.surface : onSurface(spot.at);
+  const box = areaFor(spot.at, doors?.areas);
   const area = useMemo(() => ({x0: box.x0, y0: box.y0, x1: box.x1, y1: box.y1}), [box.x0, box.y0, box.x1, box.y1]);
   const go = useCallback((t: Tile, zoom?: number, min?: number) => {setSpot({plane: t.plane, at: {x: t.x, y: t.y}}); setFocus({...t, zoom, min, key: Date.now()});}, []);
+  /** A map picked from the list: the whole of it, from where it opens. */
+  const pickMap = (m: GameMap) => {entrance.current = null; setSpot({plane: m.home.plane, at: {x: m.home.x, y: m.home.y}, map: m.id}); setFocus({...m.home, whole: true, key: Date.now()});};
 
   // The page fits the window exactly (no page scroll, so the wheel always zooms the map): the map fills what is left
   // below the site header and the dev environment's banner, whatever height they wrap to, and the side panel scrolls
@@ -293,23 +306,23 @@ export function WorldMap() {
     if (target) {setTab('route'); go(target, 9);}
     else if (at) go(at, zoom >= WORLD_ZOOM_MIN && zoom <= 11 ? zoom : 9);
     if (target || start || stops.length) setTrip(tripOf(start ? {tile: start, label: 'Start'} : target && saved ? saved : null, stops, target ? {tile: target, label: (params.get('name') ?? 'Destination').slice(0, 80)} : null));
-    fetch('/world-map/places.json').then(r => {if (!r.ok) throw Error(); return r.json() as Promise<PlacesFile>;}).then(f => setPlaces(readPlaces(f))).catch(() => setError('The map places could not be loaded. Try again in a moment.'));
+    fetch(worldMapData('places.json')).then(r => {if (!r.ok) throw Error(); return r.json() as Promise<PlacesFile>;}).then(f => setPlaces(readPlaces(f))).catch(() => setError('The map places could not be loaded. Try again in a moment.'));
     // The game's own map icons and area names (lib/world-map-game-icons).
-    fetch('/world-map/game-icons.json').then(r => r.ok ? r.json() as Promise<GameIconsFile> : null).then(f => f && setGame(readGameIcons(f))).catch(() => {});
+    fetch(worldMapData('game-icons.json')).then(r => r.ok ? r.json() as Promise<GameIconsFile> : null).then(f => f && setGame(readGameIcons(f))).catch(() => {});
     // What the shortcut and fishing spot icons stand for, for their hover cards (they keep their plain names without it).
-    fetch('/world-map/icon-details.json').then(r => r.ok ? r.json() as Promise<IconDetailsFile> : null).then(f => f && setDetails(readIconDetails(f))).catch(() => {});
+    fetch(worldMapData('icon-details.json')).then(r => r.ok ? r.json() as Promise<IconDetailsFile> : null).then(f => f && setDetails(readIconDetails(f))).catch(() => {});
   }, [go]);
   // A floor or area other than the surface's ground floor is kept in the address, so the link opens there.
   useEffect(() => {
     if (!mounted) return;
-    const url = new URL(window.location.href), away = spot.plane > 0 || !onSurface(spot.at);
+    const url = new URL(window.location.href), away = spot.plane > 0 || !above;
     if (away) url.searchParams.set('at', `${spot.at.x},${spot.at.y},${spot.plane}`); else {url.searchParams.delete('at'); url.searchParams.delete('zoom');}
     if (url.href !== window.location.href) window.history.replaceState(window.history.state, '', url);
-  }, [spot, mounted]);
+  }, [spot, mounted, above]);
   // The travel options list loads when routes are first wanted.
   useEffect(() => {
     if ((tab !== 'route' && !optionsOpen) || options) return;
-    fetch('/world-map/travel-options.json').then(r => r.ok ? r.json() as Promise<TravelOptionsFile> : null).then(setOptions).catch(() => {});
+    fetch(worldMapData('travel-options.json')).then(r => r.ok ? r.json() as Promise<TravelOptionsFile> : null).then(setOptions).catch(() => {});
   }, [tab, optionsOpen, options]);
   useEffect(() => {if (tab === 'route') void plan({type: 'load'});}, [tab, plan]);
   // The Teleports layer: every teleport's landing spot, grouped, with the ones outside the travel options dimmed.
@@ -382,18 +395,18 @@ export function WorldMap() {
   const show = (p: Point) => {setSelected(p); go(p.tile);};
   const onExit = (e: MapExit) => {if (onSurface(e.from) && !onSurface(e.to)) entrance.current = e.from; go(e.to, undefined, 9);};
   const back = () => {
-    if (onSurface(spot.at)) {setSpot({plane: 0, at: spot.at}); return;}
+    if (above) {setSpot({plane: 0, at: spot.at}); return;}
     const out = entrance.current ?? wayOut(doors?.exits ?? [], area, spot.at, doors?.areas) ?? START;
     entrance.current = null;
     go({x: out.x, y: out.y, plane: 0});
   };
-  const backText = backLabel(spot);
-  // Where the map is, beside the way back: the underground area, or the town and floor.
-  const town = places && spot.plane > 0 ? townNear(places, spot.at) : null;
-  const where = !onSurface(spot.at) ? undergroundName(spot.at, doors?.areas) ?? 'Underground' : spot.plane > 0 ? (town ? town + ' · ' : '') + FLOORS[spot.plane] + ' floor' : null;
+  const backText = backLabel(above, plane);
+  // Where the map is, under the list of maps: the town and floor upstairs, the area in a single underground sheet.
+  const town = places && above && plane > 0 ? townNear(places, spot.at) : null;
+  const where = !above ? (map && !map.ownTiles ? undergroundName(spot.at, doors?.areas) : null) : plane > 0 ? (town ? town + ' · ' : '') + FLOORS[plane] + ' floor' : null;
   const describe = (t: Tile, name?: string): Point => {const near = places && nearestPlace(places, t.x, t.y, t.plane); return {tile: t, label: name ?? (near ? `Near ${near.name}` : `Tile ${t.x}, ${t.y}`)};};
   const pointOf = (p: MapPlace): Point => ({tile: {x: p.x, y: p.y, plane: p.plane}, label: p.name, icon: listIcon(p), place: p});
-  const setRowPoint = (id: number, p: Point) => setTrip(t => t.map(r => r.id === id ? {...r, point: p} : r));
+  const setRowPoint = (id: number, p: Point) => setTrip(t => t.map(r => r.id === id ? {id: r.id, point: p} : r));
   // With a row's pick button on, a click on the map (or a place) fills that row.
   const onTile = (t: Tile) => {if (pick !== null) {setRowPoint(pick, describe(t)); setPick(null);}};
   const onPlace = (p: MapPlace) => {
@@ -474,10 +487,12 @@ export function WorldMap() {
         </div>
       </aside>
       <section className="wm-map" aria-label="Map">
-        {mounted ? <Suspense fallback={<div className="wm-canvas wm-loading" role="status">Loading the map…</div>}><WorldMapView plane={plane} area={area} areas={doors?.areas ?? []} exits={doors?.exits ?? []} onExit={onExit} places={shown} selected={selected ? {...selected.tile, icon: selected.icon, place: selected.place} : null} pins={pins} legs={mapLegs} focus={focus} picking={pick !== null} onTile={onTile} onPlace={onPlace} game={gameShown} onMenu={onMenu} onMenuClose={closeMenu} onIcon={onIcon}/></Suspense> : <div className="wm-canvas wm-loading" role="status">Loading the map…</div>}
-        {backText && <div className="wm-where">
+        {mounted ? <Suspense fallback={<div className="wm-canvas wm-loading" role="status">Loading the map…</div>}>{map ? <WorldMapView map={map} plane={plane} areas={doors?.areas ?? []} exits={doors?.exits ?? []} onExit={onExit} places={shown} selected={selected ? {...selected.tile, icon: selected.icon, place: selected.place, isIcon: !!selected.info} : null} spot={menu?.tile ?? null} pins={pins} legs={mapLegs} focus={focus} picking={pick !== null} onTile={onTile} onPlace={onPlace} game={gameShown} onMenu={onMenu} onMenuClose={closeMenu} onIcon={onIcon}/> : <div className="wm-canvas wm-loading" role="status">Loading the map…</div>}</Suspense> : <div className="wm-canvas wm-loading" role="status">Loading the map…</div>}
+        {/* The game's maps, top right beside + and − and the teleports button, like the game's own list. */}
+        {worlds && map && <div className="wm-picker"><MapPicker maps={worlds.choices} value={map} onChange={pickMap}/></div>}
+        {worlds && map && <div className="wm-where">
           {where && <span className="wm-where-name">{where}</span>}
-          <button type="button" className="map-back wm-back" onClick={back}>{onSurface(spot.at) ? <ArrowDown size={16} aria-hidden="true"/> : <ArrowUp size={16} aria-hidden="true"/>}{backText}</button>
+          {backText && <button type="button" className="map-back wm-back" onClick={back}>{above ? <ArrowDown size={16} aria-hidden="true"/> : <ArrowUp size={16} aria-hidden="true"/>}{backText}</button>}
         </div>}
         {menu && <MapMenu at={menu} canStop={canAddStop(trip)} onChoose={fromMenu} onClose={closeMenu} onDismiss={dismissMenu}/>}
         <button type="button" className="wm-quick-teleports" onClick={quickTeleports} aria-haspopup="dialog" aria-label="Teleports" title="Teleports"><img src={LAYER_ICON.teleport} alt=""/></button>

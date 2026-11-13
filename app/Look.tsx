@@ -141,6 +141,8 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
       renderer.domElement.addEventListener('webglcontextlost',lost);
       cleanup=()=>{renderer.domElement.removeEventListener('webglcontextlost',lost);release();};
       const flowing: {map: Tex; du: number; dv: number}[] = [];
+      // Site-made item effects (app/cape-embers.ts), moved on each frame.
+      const effects: {update: (dt: number) => void}[] = [];
       const failed: string[] = [];
       const covered = new Set<number>();
       const bodyKits=bodyLook.body==='female'?appearanceModels.femaleKits:wearables.kits;
@@ -179,7 +181,8 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
         if (!item?.file) continue;
         const file=equipmentModel(id,item.file,bodyLook);
         if(!file){failed.push(item.name+' (female model unavailable)');continue;}
-        await add('/models/look/' + file, item.name, actor);
+        const worn = await add('/models/look/' + file, item.name, actor);
+        if (worn && item.effect === 'embers') {const {capeEmbers} = await import('./cape-embers'); const fx = capeEmbers(THREE, worn as never, reducedMotion.matches); if (fx) effects.push(fx);}
       }
 
       const petFile = petId ? wearables.pets[petId]?.file : undefined;
@@ -272,6 +275,7 @@ export function LookStage({appearance:bodyLook=DEFAULT_APPEARANCE,equipped, petI
         const dt = Math.min(0.05, (now - last) / 1000);
         last = now;
         if(!reducedMotion.matches)scenery?.update(now/1000);
+        for (const fx of effects) fx.update(dt);
         for (const flow of reducedMotion.matches?[]:flowing) {
           flow.map.offset.x = (flow.map.offset.x + flow.du * dt) % 1;
           flow.map.offset.y = (flow.map.offset.y + flow.dv * dt) % 1;

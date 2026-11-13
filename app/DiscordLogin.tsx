@@ -7,6 +7,7 @@ import type {LinkedMenuAccount} from '@/lib/account-menu';
 import {PrefixWord} from './StaffBadge';
 import {HoverTip} from './HoverTip';
 import {DiscordAvatar} from './DiscordAvatar';
+import {CharacterHead} from './CharacterHead';
 import './account-release.css';
 
 export type DiscordUser = {
@@ -71,7 +72,7 @@ export function DiscordLogin({user, pending = false, names, viewing, disabled, o
         <div className="acct-list">{names.map(linked => {const account=accounts.find(a=>a.name.toLowerCase()===linked.toLowerCase());const donated=account?.donation.amountMinor;return (
           <div className={'acct-row'+(linked.toLowerCase()===viewing.toLowerCase()?' is-viewing':'')} key={linked}>
             <button type="button" className="acct-profile" disabled={disabled} aria-current={linked.toLowerCase()===viewing.toLowerCase()?'page':undefined} onClick={() => { onSelect(linked); close(); }}>
-              <img className="acct-portrait" src={account?.portrait??'/portraits/male-brown-default.svg'} alt=""/>
+              <CharacterHead className="acct-portrait" portrait={account?.portrait??'/portraits/male-brown-default.svg'} head={account?.head}/>
               <span className="acct-identity"><b className="acct-name"><PrefixWord prefix={account?.prefix} space/><span className={rankNameClass(staff)}>{linked}</span>{account?.title&&<span className="linked-supporter-title"> {account.title}</span>}</b>{(account?.achievementTitle||donated!==null&&donated!==undefined||account?.donation.hidden)&&<span className="linked-title-line">{account?.achievementTitle&&<AchievementTitle label={account.achievementTitle} showHelp={false}/>} {donated!==null&&donated!==undefined&&<small className="linked-donation">{new Intl.NumberFormat('en-US',{style:'currency',currency:account?.donation.currency??'USD',maximumFractionDigits:0}).format(donated/100)}<span> {account?.donation.currency}</span></small>}{account?.donation.hidden&&<small className="linked-donation is-hidden" title="Your donation amount is hidden on your profile"><EyeOff size={11} aria-hidden="true"/> Hidden</small>}</span>}</span>
             </button>
           </div>

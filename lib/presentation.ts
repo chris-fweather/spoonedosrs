@@ -1,10 +1,13 @@
-import {rankTitles} from './rank-rewards';
+import {SQUIRE_PREFIX} from './features';
+import {currentRankChoice,rankTitleRequirement,rankTitles,RANK_TITLE_TIERS} from './rank-rewards';
+import {devPreviewsAll} from './environment';
 import {hasGildedSupporter} from './staff-appearance';
 import {achievementTitle, earnedMarks, badgeCatalogue} from './flair';
 import type {Journal} from './model';
 import type {PublicStaff, StaffRole} from './staff-policy';
 import {earnedPrefix,NAME_PREFIXES,type NamePrefix} from './name-prefix';
-export type Presentation = {staffBadge:StaffRole|'gilded'|null;staffPrefix:NamePrefix|null;titleChoice:string;showDonation:boolean};
+/** showTitle: whether "the Generous" shows after the name, when it is earned (on by default). */
+export type Presentation = {staffBadge:StaffRole|'gilded'|null;staffPrefix:NamePrefix|null;titleChoice:string;showDonation:boolean;showTitle:boolean};
 export type Donation = {amountMinor:number|null;currency:string;hidden:boolean;badge?:'gilded'|null;supporter?:boolean};
 export function signatureTitle(name:string){return name.toLowerCase()==='spoonedosrs'?'the One and Only':null;}
 export function titleChoices(j:Journal,supporter=false,role?:StaffRole|null) {
@@ -15,6 +18,11 @@ export function titleChoices(j:Journal,supporter=false,role?:StaffRole|null) {
   {id:'staff-moderator',label:'the Moderator',unlocked:!!role&&role!=='helper',requirement:'Become a community moderator'},
   {id:'staff-admin',label:'the Administrator',unlocked:role==='admin'||role==='owner',requirement:'Become a community admin'},
   ...rankTitles(j),
+  // The owner on dev previews every title: the signature title and each rank tier (on Giant Mole) without the rank.
+  ...(devPreviewsAll(role)?[
+   ...(!signatureTitle(j.username)?[{id:'one-and-only',label:'the One and Only',unlocked:true,requirement:'Exclusive to SpoonedOSRS (dev preview)'}]:[]),
+   ...RANK_TITLE_TIERS.filter(t=>!rankTitles(j).some(r=>r.label===`the Giant Mole ${t.noun}`)).map(t=>({id:`hiscore:giant%20mole:${t.id}`,label:`the Giant Mole ${t.noun}`,unlocked:true,requirement:`${rankTitleRequirement(t.noun,'Giant Mole')} (dev preview)`})),
+  ]:[]),
   ...(signatureTitle(j.username)?[{id:'one-and-only',label:'the One and Only',unlocked:true,requirement:'Exclusive to SpoonedOSRS'}]:[]),
   {id:'pet-hunter',label:'the Pet Hunter',unlocked:marks.has('pets-1'),requirement:'Collect your first pet'},
   {id:'pet-collector',label:'the Pet Collector',unlocked:j.pets.filter(p=>p.obtained).length>=10,requirement:'Collect 10 pets'},
@@ -28,7 +36,7 @@ export function titleChoices(j:Journal,supporter=false,role?:StaffRole|null) {
   {id:'questmaster',label:'the Wise Old Man',unlocked:marks.has('quest-cape'),requirement:'Finish every synced quest'},
   {id:'achiever',label:'the Achiever',unlocked:marks.has('diary-cape'),requirement:'Complete every diary'},
   {id:'maxed',label:'the Maxed',unlocked:marks.has('max-cape'),requirement:'Reach 99 in every skill'},
- ].sort((a,b)=>['common','uncommon','rare','epic','legendary'].indexOf(titleRarity(a.label))-['common','uncommon','rare','epic','legendary'].indexOf(titleRarity(b.label)));
+ ].sort((a,b)=>TITLE_RARITIES.indexOf(titleRarity(a.label))-TITLE_RARITIES.indexOf(titleRarity(b.label)));
 }
 /** Use the same synced progress as achievement emblems. */
 export function titleProgress(j:Journal,id:string){
@@ -41,14 +49,16 @@ export function titleProgress(j:Journal,id:string){
 }
 /** Resolve legacy automatic preferences to an explicit choice when editing. */
 export function editableTitleChoice(j:Journal,choice:string,mark:string|null,owner=false,supporter=false,role?:StaffRole|null){
- if(choice!=='auto')return choice;
+ // A saved rank title opens on the tier held today, so its card shows as chosen (a saved Master is Grandmaster).
+ if(choice!=='auto')return currentRankChoice(j,choice);
  const label=selectedTitle(j,choice,mark,owner,supporter,role);
  return titleChoices(j,supporter,role??(owner?'owner':null)).find(t=>t.label===label)?.id??'none';
 }
 export function selectedTitle(j:Journal,choice:string,mark:string|null,owner=false,supporter=false,role?:StaffRole|null) {
  if(choice==='auto')return signatureTitle(j.username)??achievementTitle(j,mark)??(supporter?'Supporter':null);
  if(choice==='none')return null;
- return titleChoices(j,supporter,role??(owner?'owner':null)).find(t=>t.id===choice&&(t.unlocked||owner))?.label??(supporter?'Supporter':null);
+ const current=currentRankChoice(j,choice);
+ return titleChoices(j,supporter,role??(owner?'owner':null)).find(t=>t.id===current&&(t.unlocked||owner))?.label??(supporter?'Supporter':null);
 }
 /** guideWriter: the person has a published guide, which earns Squire (lib/name-prefix.ts). */
 export function parsePresentation(input:Partial<Presentation>,prior:Presentation,j:Journal,staff:PublicStaff|null,donation?:Donation,supporter=false,guideWriter=false,squire?:boolean):Presentation {
@@ -58,13 +68,20 @@ export function parsePresentation(input:Partial<Presentation>,prior:Presentation
  if(p.staffBadge==='gilded'&&!hasGildedSupporter(donation))throw Error('That supporter badge is not unlocked.');
  if(!owner&&p.staffBadge!==null&&p.staffBadge!=='gilded')throw Error('Only the site owner can choose alternate staff badges.');
  if(p.staffPrefix!==null){
-  // Asking for a prefix shows the one earned today; a prefix kept from before that is no longer earned just switches off.
-  if(earned)p.staffPrefix=earned;
+  // Asking for a prefix shows the one earned today, except that someone who earns Sir may ask for Squire instead. A prefix
+  // kept from before that is no longer earned just switches off.
+  if(earned)p.staffPrefix=p.staffPrefix==='Squire'&&earned==='Sir'&&(squire??SQUIRE_PREFIX)?'Squire':earned;
   else if(input.staffPrefix!=null)throw Error('That name title is not unlocked.');
   else p.staffPrefix=null;
  }
  if(typeof p.showDonation!=='boolean')throw Error('Choose whether to show your donation amount.');
- if(!['auto','none'].includes(p.titleChoice)&&!titleChoices(j,supporter,staff?.role).some(t=>t.id===p.titleChoice&&(t.unlocked||owner)))throw Error('That title is not unlocked.');
+ // Older saves and stored rows without the choice keep showing it.
+ if(p.showTitle===undefined)p.showTitle=true;
+ else if(typeof p.showTitle!=='boolean')throw Error('Choose whether to show the Generous.');
+ if(!['auto','none'].includes(p.titleChoice)){
+  p.titleChoice=currentRankChoice(j,p.titleChoice);
+  if(!titleChoices(j,supporter,staff?.role).some(t=>t.id===p.titleChoice&&(t.unlocked||owner)))throw Error('That title is not unlocked.');
+ }
  return p;
 }
 export function donationLabel(d?:Donation):string {
@@ -72,24 +89,29 @@ export function donationLabel(d?:Donation):string {
  return 'Supporter · '+(d?.amountMinor==null?'?':new Intl.NumberFormat('en-US',{style:'currency',currency:d.currency}).format(d.amountMinor/100));
 }
 
+/** Title rarities, lowest first: the order of the achievement title groups in Profile settings. */
+export const TITLE_RARITIES=['common','uncommon','rare','epic','legendary'] as const;
+export type TitleRarity=(typeof TITLE_RARITIES)[number];
 /** Visual rarity is shared by the editor, profiles and community rows. */
-export function titleRarity(label:string|null|undefined):'common'|'uncommon'|'rare'|'epic'|'legendary'{
+export function titleRarity(label:string|null|undefined):TitleRarity{
  if(['the One and Only','the Beastmaster','the Completionist'].includes(label??'')||/^the .+ Champion$/.test(label??''))return 'legendary';
- if(['the Zoo Keeper','the Maxed','the Achiever','the Administrator'].includes(label??''))return 'epic';
- if(['the Pet Tamer','the Clogger','the Wise Old Man','the Moderator'].includes(label??'')||/^the .+ Elite$/.test(label??''))return 'rare';
- return ['Supporter','the Pet Collector','the Log Collector','the Helper'].includes(label??'')?'uncommon':'common';
+ if(['the Zoo Keeper','the Maxed','the Administrator'].includes(label??'')||/^the .+ Grandmaster$/.test(label??''))return 'epic';
+ if(['the Pet Tamer','the Clogger','the Wise Old Man','the Achiever','the Moderator'].includes(label??'')||/^the .+ Expert$/.test(label??''))return 'rare';
+ return ['Supporter','the Pet Collector','the Log Collector','the Helper'].includes(label??'')||/^the .+ Elite$/.test(label??'')?'uncommon':'common';
 }
+/** Every legendary title but the signature one shares one animated prismatic treatment (app/title-rarities.css). */
 export function titleEffect(label:string|null|undefined):string {
- if(/^the .+ Champion$/.test(label??''))return 'title-hiscore-champion';
- const effects:Record<string,string>={'the One and Only':'title-one-only','the Beastmaster':'title-pet-master','the Completionist':'title-log-master','the Maxed':'title-maxed','the Zoo Keeper':'title-epic','the Achiever':'title-epic','the Pet Collector':'title-uncommon','the Pet Tamer':'title-rare','the Log Collector':'title-uncommon','the Clogger':'title-rare','the Wise Old Man':'title-rare','the Combatant':'title-common','Supporter':'title-supporter','the Helper':'title-uncommon','the Moderator':'title-rare','the Administrator':'title-epic'};
- return effects[label??'']??(/^the .+ Elite$/.test(label??'')?'title-rare':'title-common');
+ if(/^the .+ Champion$/.test(label??''))return 'title-legendary';
+ if(/^the .+ Grandmaster$/.test(label??''))return 'title-epic-glow';
+ if(/^the .+ Expert$/.test(label??''))return 'title-rare';
+ const effects:Record<string,string>={'the One and Only':'title-one-only','the Beastmaster':'title-legendary','the Completionist':'title-legendary','the Maxed':'title-maxed','the Zoo Keeper':'title-epic','the Achiever':'title-rare','the Pet Collector':'title-uncommon','the Pet Tamer':'title-rare','the Log Collector':'title-uncommon','the Clogger':'title-rare','the Wise Old Man':'title-rare','the Combatant':'title-common','Supporter':'title-uncommon','the Helper':'title-uncommon','the Moderator':'title-rare','the Administrator':'title-epic'};
+ return effects[label??'']??(/^the .+ Elite$/.test(label??'')?'title-uncommon':'title-common');
 }
 
 /** Shared descriptions for earned titles in profiles, boards and the editor. */
 export function achievementDescription(label:string):string {
- const champion=label.match(/^the (.+) Champion$/),elite=label.match(/^the (.+) Elite$/);
- if(champion)return `Rank #1 in ${champion[1]} on the latest synced hiscores`;
- if(elite)return `Top 1,000 in ${elite[1]} on the latest synced hiscores`;
+ const rank=label.match(/^the (.+) (Champion|Grandmaster|Expert|Elite)$/);
+ if(rank)return rankTitleRequirement(rank[2],rank[1])!;
  const descriptions:Record<string,string>={
   'Supporter':'Supports Spooned OSRS',
   'the Helper':'Become a community helper', 'the Moderator':'Become a community moderator', 'the Administrator':'Become a community admin',

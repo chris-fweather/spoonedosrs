@@ -18,6 +18,14 @@ Calculation corrections
 - Other directly matched pet rates retain their checked Wiki source date in the method. Unreviewed imported paces are excluded from totals; no legacy reference-hour fallback is used.
 - Phoenix: https://oldschool.runescape.wiki/w/Phoenix 1/5,000 per reward roll. Hiscores Wintertodt score is subdues, not rolls. At 200 million Firemaking XP the pet is 15 times more common.
 - Olmlet: https://oldschool.runescape.wiki/w/Olmlet 1/53 when a unique is received. Unique chance is 1% per 8,676 team points. Hiscores raid count is not a unique count.
+- Orion (checked 8 November 2026): https://oldschool.runescape.wiki/w/Chest_(The_Fractured_Archive) (revision 15392798) and https://oldschool.runescape.wiki/w/Orion (revision 15391156)
+  A flat 1/750 on every The Fractured Archive completion unless the chest is a cabbage. Example pace 3 completions/hour from https://oldschool.runescape.wiki/w/Money_making_guide/The_Fractured_Archive_(Trio) (revision 15392633).
+  The Fractured Archive collection log page (17 items) from https://oldschool.runescape.wiki/w/Collection_log (revision 15391852).
+- 200 million XP: https://oldschool.runescape.wiki/w/Pet (revision 15390112) Skilling pets, the Phoenix, Quetzin and Mr McGroot are 15 times more likely with 200 million XP in their skill.
+- Little Nightmare: https://oldschool.runescape.wiki/w/Little_Nightmare (revision 15352727) 1/800 × players in the room, 1/4,000 for five or more; Phosani's 1/1,400.
+- Dom: https://oldschool.runescape.wiki/w/Doom_of_Mokhaiotl (revision 15387556) 1/1,000 at delve 6, 1/750 at 7, 1/500 at 8, 1/250 at 9 and deeper. Example pace 6 runs to delve 8 an hour from https://oldschool.runescape.wiki/w/Money_making_guide/Killing_the_Doom_of_Mokhaiotl_(Delve_1-8) (revision 15348782).
+- Awakened DT2 bosses: https://oldschool.runescape.wiki/w/Duke_Sucellus (15385988), https://oldschool.runescape.wiki/w/Vardorvis (15385991), https://oldschool.runescape.wiki/w/The_Leviathan (15385989), https://oldschool.runescape.wiki/w/The_Whisperer (15387570): the pet roll after the drop table is the same for awakened kills; only the unique table is three times as likely.
+- Yami: https://oldschool.runescape.wiki/w/Yama (revision 15387136) 1/100 per Contract of Familiar Acquisition fight.
 - Lifetime skill XP comes from OSRS hiscores. Historical hours require measured hours or an explicit average XP/hour. Lifetime XP is not automatically treated as eligible pet effort.
 - 95% chance budgets assume independent constant-probability attempts at the selected pace. They are not guarantees.
 

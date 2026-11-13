@@ -8,7 +8,7 @@ import {oddsCurve,petChartRecord} from '@/lib/odds-chart';
 import {petUnitLabel} from '@/lib/pet-record';
 import {selectedMethod} from '@/lib/estimates';
 import {otherMethods} from '@/lib/hunt-history';
-import {expectedHours, likelihood, type Pet} from '@/lib/model';
+import {expectedHours, likelihood, type Journal, type Pet} from '@/lib/model';
 import {chanceAfter, chanceTone, num, pct, shortNumber} from '@/lib/ui';
 import {Meter} from './Meter';
 
@@ -77,8 +77,8 @@ export function QuickestHunts({pets, onOpen, limit, compact, pageSize}: {pets: P
 }
 
 /** Odds for one pet: summary line + cumulative curve + "when players get it" distribution. */
-export function PetOdds({pet}: {pet: Pet}) {
-  const {method:m,label:markerLabel} = petChartRecord(pet);
+export function PetOdds({pet, journal}: {pet: Pet; journal?: Journal}) {
+  const {method:m,label:markerLabel} = petChartRecord(pet, journal);
   const rate = m?.rate ?? 0;
   if(otherMethods(pet).some(x=>x.rate))return <p className="fine">Your chance combines several methods. A single-rate curve would misrepresent this mixed hunt.</p>;
   if (!m || !rate) return <p className="muted">Add a drop rate under Progress &amp; notes to see odds.</p>;
@@ -98,7 +98,7 @@ export function PetOdds({pet}: {pet: Pet}) {
       <div><span>50% at</span><b>{num(at(.5), 0)}</b><small>{unit}</small></div>
       <div><span>90% at</span><b>{num(at(.9), 0)}</b><small>{unit}</small></div>
       <div><span>95% at</span><b>{num(at(.95), 0)}</b><small>{unit}</small></div>
-      <div><span>To 90% from here</span><b>{num(at(.9), 0)}</b><small>additional {unit}</small></div>
+      <div><span>To 90% from here</span><b>{num(at(.9), 0)}</b><small>more {unit}</small></div>
     </div>
     <p className="fine">Independent rolls do not become more likely after a dry streak. These are modelled probabilities, not observed player averages. Conditions and pace must match the selected method.</p>
     <div className="odds-charts">
@@ -123,7 +123,7 @@ export function PetOdds({pet}: {pet: Pet}) {
         <ResponsiveContainer width="100%" height={210}>
           <BarChart data={dist} margin={{top: 10, right: 8, bottom: 0, left: -8}}>
             <CartesianGrid stroke={C.grid} vertical={false}/>
-            <XAxis dataKey="label" stroke={C.axis} fontSize={10} tickLine={false} interval={0}/>
+            <XAxis dataKey="label" stroke={C.axis} fontSize={10} tickLine={false} interval="equidistantPreserveStart" minTickGap={6}/>
             <YAxis tickFormatter={v => `${Math.round(v)}%`} stroke={C.axis} fontSize={11} tickLine={false} width={42}/>
             <Tooltip cursor={{fill: '#ffffff0d'}} contentStyle={{background: '#1e1c18', border: '1px solid #4a453c', borderRadius: 6}} formatter={v => [`${num(Number(v))}%`, 'Players']}/>
             <Bar dataKey="share" isAnimationActive={false} radius={[3, 3, 0, 0]} shape={(props: unknown) => {
@@ -139,8 +139,8 @@ export function PetOdds({pet}: {pet: Pet}) {
 }
 
 /** Compact odds for the side pop-out: milestones + small cumulative curve. */
-export function OddsMini({pet}: {pet: Pet}) {
-  const {method:m,label:markerLabel} = petChartRecord(pet);
+export function OddsMini({pet, journal}: {pet: Pet; journal?: Journal}) {
+  const {method:m,label:markerLabel} = petChartRecord(pet, journal);
   if (!m?.rate||otherMethods(pet).some(x=>x.rate)) return null;
   return <DropOddsMini probability={1/m.rate} current={m.kc} unit={petUnitLabel(pet,m.unit)} continuous={m.unit === 'XP'} markerLabel={markerLabel}/>;
 }

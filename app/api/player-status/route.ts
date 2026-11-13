@@ -1,6 +1,8 @@
 import {providerFetch,acquireSync} from '@/lib/request-controls';
 import {RequestError} from '@/lib/request-body';
 import {env} from 'cloudflare:workers';
+import {logEvent} from '@/lib/log';
+import {enqueueSources} from '@/lib/sync-queue';
 import {accountName,db,freshJournal,saveDiscoveredJournal} from '@/lib/storage';
 import {ensureAuthTables} from '@/lib/auth';
 import {discoverPlayer,type PlayerLookup} from '@/lib/player-lookup';
@@ -43,9 +45,21 @@ export async function GET(req:Request){
   // official stats. Claimed, reserved and private journals returned above.
   const allSources=!(Date.now()-Date.parse(sourcesCheckedAt(journal)??'')<86_400_000);
   const release=await acquireSync(username);
-  let discovery;try{discovery=await discoverPlayer(username,journal?hydratePublicJournal(journal):freshJournal(username),providerFetch,allSources);}finally{await release();}
+  const start=journal?hydratePublicJournal(journal):freshJournal(username);
+  // With the sync queue (lib/sync-queue.ts) a full pull answers with the official Hiscores at once and queues the
+  // paced sources. A name the Hiscores do not know is still asked of every source here: there is no journal to queue onto.
+  const queue=allSources?env.SYNC_QUEUE:undefined;
+  let discovery,queuing=false;try{
+   discovery=await discoverPlayer(username,start,providerFetch,!queue);
+   if(queue){if(discovery.lookup.hiscores==='found')queuing=true;else discovery=await discoverPlayer(username,start,providerFetch,true);}
+  }finally{await release();}
   const {lookup,journal:discovered}=discovery;
+  logEvent('player-lookup',{rsn,allSources,queued:queuing,state:lookup.state,hiscores:lookup.hiscores,runeprofile:lookup.runeprofile,temple:lookup.temple,wom:lookup.wom});
   const persisted=discovered?await saveDiscoveredJournal(discovered,row?.revision??0,journal,allSources?lookup.checkedAt:undefined):false;
+  if(queuing&&persisted){
+   await enqueueSources(db(),queue!,rsn,['runeprofile','temple']);
+   return Response.json({...lookup,skills:[],persisted,status:'sync_queued'},{headers:{'Cache-Control':'no-store'}});
+  }
   if(cache&&lookup.state!=='found'){
    try{await cache.put(cacheKey,Response.json({...lookup,skills:[],persisted:false},{headers:{'Cache-Control':`public, max-age=${lookup.state==='not_found'?60:15}`}}));}catch{}
   }

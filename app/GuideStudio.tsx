@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState,type ReactNode} from 'react';
-import {ChevronLeft,Eye,PenLine,Plus,Search} from 'lucide-react';
+import {ChevronLeft,Eye,PenLine,Plus,Search,ThumbsUp} from 'lucide-react';
+import {officialSkillIcon} from '@/lib/skill-info';
 import {IllustratedSelect} from './IllustratedSelect';
 import {GuideDocument,GuideDocumentBlocks} from './GuideDocument';
 import {GuideContents,CONTENTS_MIN} from './GuideContents';
@@ -14,23 +15,45 @@ import {GUIDE_LAYOUTS,type GuideLayoutId} from '@/lib/guide-templates';
 import {GUIDE_CATEGORIES,guideCategory,guideTopic,guideTopics,guideTopicImage,suggestedLayout,type GuideCategory} from '@/lib/guide-topics';
 import {STAFF_LABEL,STAFF_TONE,type StaffRole} from '@/lib/staff-policy';
 import {RankIcon} from './StaffBadge';
+import {num} from '@/lib/ui';
+import type {GuideVisibility} from '@/lib/guide-access';
 import './guides.css';
-type Entry={id:string;guide:Guide;revision:number;publishedAt:string|null;changesPending?:boolean;updatedAt?:string;canEdit:boolean;authorId:string};
+type Entry={id:string;guide:Guide;revision:number;publishedAt:string|null;changesPending?:boolean;updatedAt?:string;canEdit:boolean;authorId:string;visibility?:GuideVisibility};
 type Dashboard={viewer:{id:string;role:StaffRole;canPublish:boolean;canUpload?:boolean};guides:Entry[]};
-type Byline={author:{name:string;role:string|null}|null;publishedAt:string;updatedAt?:string};
+type Byline={author:{name:string;role:string|null}|null;publishedAt:string;updatedAt?:string;visibility?:GuideVisibility;thumbs?:number};
 const DAY=new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',year:'numeric'});
 const day=(iso:string)=>DAY.format(new Date(iso));
 /** Who wrote a guide and when: the author links to their profile; the edit date shows only when it differs from the publish date. */
-function GuideByline({byline:b,compact}:{byline:Byline;compact?:boolean}){
+/** "Staff only": a guide only signed-in staff can read (only staff are ever sent one). */
+function StaffOnlyTag(){return <span className="tag guide-staff-tag" title="Only signed-in staff can read this guide">Staff only</span>;}
+function GuideByline({byline:b,compact,children}:{byline:Byline;compact?:boolean;children?:ReactNode}){
  const edited=b.updatedAt&&day(b.updatedAt)!==day(b.publishedAt);
  const role=b.author?.role&&b.author.role in STAFF_LABEL?b.author.role as StaffRole:null;
  const name=b.author?<>{role&&<RankIcon staff={{role,prefix:null}}/>}{compact?<b>{b.author.name}</b>:<a href={'/player/'+encodeURIComponent(b.author.name)}>{b.author.name}</a>}</>:<b>Spooned staff</b>;
- return <p className="guide-byline"><span className={'guide-byline-author '+(role?STAFF_TONE[role]:'')}>{name}</span><span>{compact?'':'Published '}<time dateTime={b.publishedAt}>{day(b.publishedAt)}</time></span>{edited&&!compact&&<span>Updated <time dateTime={b.updatedAt}>{day(b.updatedAt!)}</time></span>}</p>;
+ const staffOnly=b.visibility==='staff'&&<StaffOnlyTag/>;
+ // Cards end with the tag, the thumbs up (when there are any) and the date; the guide page adds the thumbs up button.
+ if(compact)return <p className="guide-byline"><span className={'guide-byline-author '+(role?STAFF_TONE[role]:'')}>{name}</span><span className="guide-byline-facts">{staffOnly}{!!b.thumbs&&<span className="guide-byline-thumbs" aria-label={`${b.thumbs} thumbs up`}><ThumbsUp size={13} aria-hidden="true"/>{num(b.thumbs,0)}</span>}<time dateTime={b.publishedAt}>{day(b.publishedAt)}</time></span></p>;
+ return <p className="guide-byline"><span className={'guide-byline-author '+(role?STAFF_TONE[role]:'')}>{name}</span><span>Published <time dateTime={b.publishedAt}>{day(b.publishedAt)}</time></span>{edited&&<span>Updated <time dateTime={b.updatedAt}>{day(b.updatedAt!)}</time></span>}{staffOnly}{children}</p>;
+}
+/** The guide page's thumbs up: one per signed-in player, given or taken back with a click; signed-out readers see the count
+ * and a sign-in link. */
+function GuideThumbs({entry,signedIn,onChange}:{entry:PublicEntry;signedIn:boolean;onChange:(next:{thumbs:number;thumbed:boolean})=>void}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),count=num(entry.thumbs??0,0);
+ if(!signedIn)return <a className="guide-thumbs" href="/api/auth/discord" title="Sign in with Discord to give a thumbs up" aria-label={`${count} thumbs up. Sign in to give one`}><ThumbsUp size={15} aria-hidden="true"/>{count}</a>;
+ async function toggle(){
+  setBusy(true);setError('');
+  try{const r=await fetch('/api/guides/thumbs?'+new URLSearchParams({guide:entry.id}),{method:entry.thumbed?'DELETE':'PUT'});const b=await r.json() as {thumbs:number;thumbed:boolean;error?:string};if(!r.ok)throw Error(b.error||'Could not update your thumbs up.');onChange(b);}
+  catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
+ return <>{/* The count and pressed state say what a click does; errors show beside it. */}
+  <button type="button" className={'guide-thumbs'+(entry.thumbed?' given':'')} aria-pressed={!!entry.thumbed} disabled={busy} title={entry.thumbed?'Take back your thumbs up':'Give this guide a thumbs up'} aria-label={`${entry.thumbed?'Take back your thumbs up':'Give a thumbs up'}; ${count} so far`} onClick={()=>void toggle()}><ThumbsUp size={15} aria-hidden="true" fill={entry.thumbed?'currentColor':'none'}/>{count}</button>
+  {error&&<span className="guide-thumbs-error" role="alert">{error}</span>}
+ </>;
 }
 /** A guide as readers see it; three or more headings add the contents list beside it (above it on phones). */
-function GuideArticle({guide,byline}:{guide:Guide;byline?:Byline}){const headings=guide.blocks?guideHeadings(guide.blocks):[],article=<GuideArticleBody guide={guide} byline={byline}/>;return headings.length>=CONTENTS_MIN?<div className="guide-reader"><GuideContents headings={headings}/>{article}</div>:article;}
-function GuideArticleBody({guide,byline}:{guide:Guide;byline?:Byline}){const topic=guideTopicImage(guide.activity);return <article className="community-panel guide-article"><header className={topic?'has-topic':''}>{topic&&<img className="guide-article-topic" src={topic} alt=""/>}<span className="kicker">{guide.activity}</span><h2>{guide.title||'Your guide title'}</h2>{byline&&<GuideByline byline={byline}/>}<p className="guide-deck">{guide.summary||'A short introduction to this guide.'}</p></header>{guide.blocks?<GuideDocumentBlocks guide={guide}/>:<>{(guide.requirements||guide.requiredQuests?.length||guide.requiredDiaries?.length||guide.requiredItems?.length)?<section><h3>Before you begin</h3><RequirementBadges guide={guide}/><FormattedText text={guide.requirements}/></section>:null}<GuideSetup guide={guide}/><section><h3>Strategy</h3><FormattedText text={guide.strategy}/></section></>}</article>;}
-type PublicEntry={id:string;guide:Guide}&Byline;
+function GuideArticle({guide,byline,actions}:{guide:Guide;byline?:Byline;actions?:ReactNode}){const headings=guide.blocks?guideHeadings(guide.blocks):[],article=<GuideArticleBody guide={guide} byline={byline} actions={actions}/>;return headings.length>=CONTENTS_MIN?<div className="guide-reader"><GuideContents headings={headings}/>{article}</div>:article;}
+function GuideArticleBody({guide,byline,actions}:{guide:Guide;byline?:Byline;actions?:ReactNode}){const topic=guideTopicImage(guide.activity);return <article className="community-panel guide-article"><header className={topic?'has-topic':''}>{topic&&<img className="guide-article-topic" src={topic} alt=""/>}<span className="kicker">{guide.activity}</span>{actions?<div className="guide-title-row"><h2>{guide.title||'Your guide title'}</h2>{actions}</div>:<h2>{guide.title||'Your guide title'}</h2>}{byline&&<GuideByline byline={byline}/>}<p className="guide-deck">{guide.summary||'A short introduction to this guide.'}</p></header>{guide.blocks?<GuideDocumentBlocks guide={guide}/>:<>{(guide.requirements||guide.requiredQuests?.length||guide.requiredDiaries?.length||guide.requiredItems?.length)?<section><h3>Before you begin</h3><RequirementBadges guide={guide}/><FormattedText text={guide.requirements}/></section>:null}<GuideSetup guide={guide}/><section><h3>Strategy</h3><FormattedText text={guide.strategy}/></section></>}</article>;}
+type PublicEntry={id:string;guide:Guide;thumbed?:boolean}&Byline;
 const DISCORD_INVITE='https://discord.gg/spoonedosrs';
 const groupOf=(g:Guide)=>GUIDE_CATEGORIES.find(c=>c.id===guideCategory(g.activity))!;
 /** A guide card, shared by the public page and the staff workshop: large topic art, a one-line title, the summary (two lines
@@ -48,7 +71,7 @@ function GuideTile({guide:g,footer,showCategory,onOpen,empty='',className=''}:{g
     {g.activity&&<span>{g.activity}</span>}
     {showCategory&&group.id!=='other'&&<span><img src={group.icon} alt=""/>{group.label}</span>}
     {topic?.badge&&topic.detail&&<span><img src={topic.badge} alt=""/>{topic.detail}</span>}
-    {skill&&<span><img src={`/icons/skills/${skill.skill.toLowerCase()}.png`} alt=""/>{skill.level} {skill.skill}</span>}
+    {skill&&<span><img src={officialSkillIcon(skill.skill)} alt=""/>{skill.level} {skill.skill}</span>}
     {quest&&<span><img src="/ui/quest-point-icon.png" alt=""/>{quest}</span>}
    </span>
   </span>
@@ -76,22 +99,25 @@ function GuideFilters({counts,total,category,onCategory,q,onQuery,placeholder}:{
 /** Public guides: the filters, then one card per published guide, in sections by group when nothing is filtered. A card opens
  * the guide (/guides?guide=id); the chosen group is kept as ?category=. */
 export function Guides(){
- const [rows,setRows]=useState<PublicEntry[]>([]),[error,setError]=useState(''),[loaded,setLoaded]=useState(false),[q,setQ]=useState(''),[open,setOpen]=useState<string|null>(null),[category,setCategory]=useState<GuideCategory|'all'>('all');
+ const [rows,setRows]=useState<PublicEntry[]>([]),[signedIn,setSignedIn]=useState(false),[error,setError]=useState(''),[loaded,setLoaded]=useState(false),[q,setQ]=useState(''),[open,setOpen]=useState<string|null>(null),[category,setCategory]=useState<GuideCategory|'all'>('all');
  useEffect(()=>{const params=new URLSearchParams(window.location.search);setQ(params.get('q')??params.get('activity')??'');setOpen(params.get('guide'));
   const c=params.get('category');if(GUIDE_CATEGORIES.some(x=>x.id===c))setCategory(c as GuideCategory);
   const back=()=>setOpen(new URLSearchParams(window.location.search).get('guide'));window.addEventListener('popstate',back);
-  fetch('/api/guides').then(async r=>{const b=await r.json() as {error?:string;guides:PublicEntry[]};if(!r.ok)throw Error(b.error);setRows(b.guides);}).catch(e=>setError(e.message)).finally(()=>setLoaded(true));
+  fetch('/api/guides').then(async r=>{const b=await r.json() as {error?:string;guides:PublicEntry[];viewer?:{signedIn:boolean}};if(!r.ok)throw Error(b.error);setRows(b.guides);setSignedIn(!!b.viewer?.signedIn);}).catch(e=>setError(e.message)).finally(()=>setLoaded(true));
   return()=>window.removeEventListener('popstate',back);},[]);
  const show=(id:string|null)=>{const url=new URL(window.location.href);url.hash='';if(id)url.searchParams.set('guide',id);else url.searchParams.delete('guide');window.history.pushState(null,'',url);setOpen(id);window.scrollTo({top:0});};
  const pick=(next:GuideCategory|'all')=>{const url=new URL(window.location.href);if(next==='all')url.searchParams.delete('category');else url.searchParams.set('category',next);window.history.replaceState(null,'',url);setCategory(next);};
  const reading=open?rows.find(r=>r.id===open):undefined;
+ const thumbed=(id:string,next:{thumbs:number;thumbed:boolean})=>setRows(list=>list.map(r=>r.id===id?{...r,...next}:r));
  const {needle,matching,counts,shown}=filterGuides(rows,r=>r.guide,q,category);
  // Sections only help when the whole list is showing and it spans more than one group.
  const sections=category==='all'&&!needle&&counts.size>1;
  const grid=(list:PublicEntry[])=><div className="guide-list">{list.map(row=><GuideTile key={row.id} guide={row.guide} showCategory={category==='all'&&!sections} onOpen={()=>show(row.id)} footer={<GuideByline byline={row} compact/>}/>)}</div>;
  return <div className="site"><PublicHeader page="guides" onError={setError}/><main className="community-page guides-page">
   {error&&<p role="alert">{error}</p>}
-  {reading?<><button type="button" className="btn ghost guide-back" onClick={()=>show(null)}><ChevronLeft size={16} aria-hidden="true"/>All guides</button><GuideArticle guide={reading.guide} byline={reading}/></>:<>
+  {reading?<><button type="button" className="btn ghost guide-back" onClick={()=>show(null)}><ChevronLeft size={16} aria-hidden="true"/>All guides</button><GuideArticle guide={reading.guide} byline={reading} actions={<GuideThumbs entry={reading} signedIn={signedIn} onChange={next=>thumbed(reading.id,next)}/>}/></>
+  :open&&!loaded?<GuideTilesLoading/>
+  :open&&!error?<><button type="button" className="btn ghost guide-back" onClick={()=>show(null)}><ChevronLeft size={16} aria-hidden="true"/>All guides</button><section className="community-panel guides-empty" role="status">Guide not found.</section></>:<>
    <PageHero kicker="From the community" icon="/icons/navigation/collection-log-icon.png" title="Guides" text="Strategies, gear and inventories, written by our staff." actions={<><span className="page-hero-stat"><img src="/icons/navigation/collection-log-icon.png" alt=""/><b>{loaded?rows.length:'—'}</b>{rows.length===1?'guide':'guides'}</span><a className="btn" href={DISCORD_INVITE} target="_blank" rel="noreferrer"><DiscordMark/>Help write guides ↗</a></>}/>
    <GuideFilters counts={loaded?counts:null} total={loaded?matching.length:null} category={category} onCategory={pick} q={q} onQuery={setQ} placeholder="Search guides…"/>
    {shown.length?sections?GUIDE_CATEGORIES.filter(c=>counts.get(c.id)).map(c=><section key={c.id} className="guide-section" aria-labelledby={'guides-'+c.id}>
@@ -128,7 +154,7 @@ function GuideTiles({guides,onNew,onOpen}:{guides:Entry[];onNew:()=>void;onOpen:
  return <><GuideFilters counts={counts} total={matching.length} category={category} onCategory={setCategory} q={q} onQuery={setQ} placeholder="Find a guide by title or topic…"/><div className="guide-list">
   <button type="button" className="guide-tile guide-tile-new" onClick={onNew}><span className="guide-tile-art"><Plus size={30} aria-hidden="true"/></span><span className="guide-tile-body"><b className="guide-tile-title">New guide</b><span className="guide-tile-summary">Pick a title and topic, then start from a boss, quest, diary or blank layout.</span></span></button>
   {shown.map(row=>{const s=guideState(row);return <GuideTile key={row.id} guide={row.guide} showCategory={category==='all'} empty="No summary yet." onOpen={()=>onOpen(row)}
-   footer={<p className="guide-byline"><StateLabel state={s.state} label={s.label}/><span className="guide-tile-author"><Person id={row.authorId} fallback="A staff member"/></span><span><span className="guide-tile-rev">Rev {row.revision}{row.updatedAt&&' · '}</span>{row.updatedAt&&<>Edited {timeAgo(row.updatedAt)}</>}</span></p>}/>;})}
+   footer={<p className="guide-byline"><StateLabel state={s.state} label={s.label}/>{row.visibility==='staff'&&<StaffOnlyTag/>}<span className="guide-tile-author"><Person id={row.authorId} fallback="A staff member"/></span><span><span className="guide-tile-rev">Rev {row.revision}{row.updatedAt&&' · '}</span>{row.updatedAt&&<>Edited {timeAgo(row.updatedAt)}</>}</span></p>}/>;})}
  </div>{(needle||category!=='all')&&!shown.length&&<p className="fine">No guides match{needle?` “${q.trim()}”`:' that group'}.</p>}</>;
 }
 
@@ -147,7 +173,7 @@ export function GuideWorkshop(){
  function create(guide:Guide){setSelected(null);setDraft(structuredClone(guide));setBase('');setCreating(false);reset();}
  /** Back to the tiles; unsaved writing asks first. */
  function allGuides(){if(!discard())return;setSelected(null);setDraft(null);setBase('');setCreating(false);reset();load().catch(e=>setError(e.message));}
- async function post(action:string,id:string|undefined,revision:number|undefined,guide?:Guide){const r=await fetch('/api/staff/guides',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id,revision,guide})});const b=await r.json() as {id:string;error?:string};if(!r.ok)throw Error(b.error);return b.id;}
+ async function post(action:string,id:string|undefined,revision:number|undefined,guide?:Guide,visibility?:GuideVisibility){const r=await fetch('/api/staff/guides',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,id,revision,guide,visibility})});const b=await r.json() as {id:string;error?:string};if(!r.ok)throw Error(b.error);return b.id;}
  /** Publishing unsaved writing saves it first, so what you see is what goes live. */
  async function run(kind:'save'|'publish'|'unpublish'){
   if(!draft)return;setBusy(true);setError('');setNotice('');
@@ -158,6 +184,13 @@ export function GuideWorkshop(){
    setNotice(kind==='save'?'Draft saved. The published version stays unchanged.':kind==='publish'?(saving?'Saved and published.':'Published.'):'Guide removed from public browsing.');
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
+ /** Public or Staff only. Unsaved writing stays in the editor: only who can read the guide changes. */
+ async function changeVisibility(next:GuideVisibility){
+  if(!selected||busy||(selected.visibility??'public')===next)return;setBusy(true);setError('');setNotice('');
+  try{await post('visibility',selected.id,selected.revision,undefined,next);const row=(await load()).guides.find(x=>x.id===selected.id);if(row)setSelected(row);
+   setNotice(next==='staff'?'Only signed-in staff can read this guide now.':'Everyone can read this guide now.');}
+  catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
  const editing=!!draft&&(!selected||selected.canEdit),canPublish=!!data?.viewer.canPublish;
  useEffect(()=>{if(!editing||creating)return;const save=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();if(!busy&&dirty)void run('save');}};window.addEventListener('keydown',save);return()=>window.removeEventListener('keydown',save);});
  if(!data)return <div className="guide-workshop">{error?<p className="community-notice" role="alert">{error}</p>:<div className="staff-loading is-inline" role="status"><span className="loading-spinner"/><span className="sr-only">Loading guides…</span></div>}</div>;
@@ -167,8 +200,8 @@ export function GuideWorkshop(){
  return <div className="guide-workshop">
   <div className="guide-workshop-bar">
    <button type="button" className="btn sm ghost guide-back" onClick={creating?()=>{setCreating(false);reset();}:allGuides}><ChevronLeft size={16} aria-hidden="true"/>All guides</button>
-   {writing&&<span className="guide-workshop-status"><StateLabel state={state.state} label={state.label}/><small>{!editing?'Read only':dirty?'Unsaved changes':selected?.updatedAt?`Saved ${timeAgo(selected.updatedAt)}`:'Saved'}</small></span>}
-   {writing&&<div className="guide-workshop-actions"><button type="button" className="btn sm ghost" aria-pressed={preview} onClick={()=>setPreview(!preview)}>{preview?<><PenLine size={15} aria-hidden="true"/>Edit</>:<><Eye size={15} aria-hidden="true"/>Preview</>}</button>{canPublish&&selected?.publishedAt&&<button type="button" className="btn sm ghost" disabled={busy} onClick={()=>{if(window.confirm('Remove this guide from public browsing?'))void run('unpublish');}}>Unpublish</button>}{canPublish&&(editing||!!selected)&&<button type="button" className="btn sm" disabled={busy} onClick={()=>void run('publish')}>Publish</button>}{editing&&<button type="button" className="btn sm primary" disabled={busy||!dirty} onClick={()=>void run('save')}>Save draft</button>}</div>}
+   {writing&&<span className="guide-workshop-status"><StateLabel state={state.state} label={state.label}/><small>{!editing?'Read only':dirty?'Unsaved changes':selected?.updatedAt?`Saved ${timeAgo(selected.updatedAt)}`:'Saved'}</small>{!canPublish&&selected?.visibility==='staff'&&<StaffOnlyTag/>}</span>}
+   {writing&&<div className="guide-workshop-actions">{canPublish&&selected&&<div className="seg guide-visibility" role="radiogroup" aria-label="Who can read this guide">{([['public','Public'],['staff','Staff only']] as const).map(([v,label])=><button key={v} type="button" role="radio" aria-checked={(selected.visibility??'public')===v} disabled={busy} onClick={()=>void changeVisibility(v)}>{label}</button>)}</div>}<button type="button" className="btn sm ghost" aria-pressed={preview} onClick={()=>setPreview(!preview)}>{preview?<><PenLine size={15} aria-hidden="true"/>Edit</>:<><Eye size={15} aria-hidden="true"/>Preview</>}</button>{canPublish&&selected?.publishedAt&&<button type="button" className="btn sm ghost" disabled={busy} onClick={()=>{if(window.confirm('Remove this guide from public browsing?'))void run('unpublish');}}>Unpublish</button>}{canPublish&&(editing||!!selected)&&<button type="button" className="btn sm" disabled={busy} onClick={()=>void run('publish')}>Publish</button>}{editing&&<button type="button" className="btn sm primary" disabled={busy||!dirty} onClick={()=>void run('save')}>Save draft</button>}</div>}
   </div>
   {alerts}
   {creating||!draft?<NewGuide onCreate={create} onCancel={()=>{setCreating(false);reset();}} focus/>:preview?<GuideArticle guide={draft}/>:<GuideDocument guide={draft} onChange={setDraft} disabled={!editing||busy} uploads={!!data?.viewer.canUpload}/>}

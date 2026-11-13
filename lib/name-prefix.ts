@@ -16,10 +16,13 @@ export function earnedPrefix(role:StaffRole|null|undefined,guideWriter:boolean,s
  return role==='helper'||guideWriter?'Squire':null;
 }
 
-/** The prefix shown before a name. The stored choice only says "show my prefix" (people opt in, as with Sir), so it always
- * shows the one they earn today: a helper promoted to moderator goes from Squire to Sir without choosing again. */
+/** The prefix shown before a name. A stored "Sir" means "show my prefix" (people opt in), so it shows the one they earn
+ * today: a helper promoted to moderator goes from Squire to Sir without choosing again. Someone who earns Sir may choose
+ * Squire instead (a stored "Squire" then stays Squire); nobody can show a prefix above the one they earn. */
 export function shownPrefix(stored:unknown,role:StaffRole|null|undefined,guideWriter:boolean,squire=SQUIRE_PREFIX):NamePrefix|null{
- return cleanNamePrefix(stored)?earnedPrefix(role,guideWriter,squire):null;
+ const choice=cleanNamePrefix(stored),earned=earnedPrefix(role,guideWriter,squire);
+ if(!choice||!earned)return null;
+ return choice==='Squire'&&squire?'Squire':earned;
 }
 
 /** Why someone is a Squire, for the small card on the word itself (non-staff guide writers have no scimitar to hover). */

@@ -5,28 +5,31 @@ import type {Method, Pet} from './model';
  * the sheet's Xp/Resc, shown for reference only. Hespori counts kills; Hespori seeds are a flat 1/500. */
 export type TreeRow = {name: string; base: number; flat?: boolean; perHour: number; xp: number | null; unit: 'trees' | 'kills' | 'seeds';
   /** Older names for the same row: the spreadsheet catalogue's and the OSRS Wiki's. */
-  aliases?: string[]; activity?: string};
+  aliases?: string[]; activity?: string;
+  /** Grown in only a few patches (not the fruit-tree or tree patches of a tree run), so the sheet's example pace cannot
+   * be kept up: left out of expected hours unless the player sets their own pace (docs/calculations.md). */
+  fewPatches?: true};
 
 export const TANGLEROOT_TREES: TreeRow[] = [
   {name: 'Palm tree', base: 9000, perHour: 80, xp: 10510, unit: 'trees'},
-  {name: 'Spirit tree', base: 5000, perHour: 80, xp: 19500, unit: 'trees', aliases: ['Spirit seed']},
-  {name: 'Teak tree', base: 5000, perHour: 80, xp: 7290, unit: 'trees'},
-  {name: 'Mahogany tree', base: 5000, perHour: 80, xp: 15720, unit: 'trees'},
-  {name: 'Redwood tree', base: 5000, perHour: 80, xp: 22450, unit: 'trees'},
-  {name: 'Ironwood tree', base: 5000, perHour: 80, xp: 20525, unit: 'trees'},
-  {name: 'Rosewood tree', base: 5000, perHour: 80, xp: 23352, unit: 'trees'},
-  {name: 'Calquat tree', base: 6000, perHour: 80, xp: 12244, unit: 'trees', aliases: ['Calquat']},
+  {name: 'Spirit tree', base: 5000, perHour: 80, xp: 19500, unit: 'trees', fewPatches: true, aliases: ['Spirit seed']},
+  {name: 'Teak tree', base: 5000, perHour: 80, xp: 7290, unit: 'trees', fewPatches: true},
+  {name: 'Mahogany tree', base: 5000, perHour: 80, xp: 15720, unit: 'trees', fewPatches: true},
+  {name: 'Redwood tree', base: 5000, perHour: 80, xp: 22450, unit: 'trees', fewPatches: true},
+  {name: 'Ironwood tree', base: 5000, perHour: 80, xp: 20525, unit: 'trees', fewPatches: true},
+  {name: 'Rosewood tree', base: 5000, perHour: 80, xp: 23352, unit: 'trees', fewPatches: true},
+  {name: 'Calquat tree', base: 6000, perHour: 80, xp: 12244, unit: 'trees', fewPatches: true, aliases: ['Calquat']},
   {name: 'Papaya tree', base: 9000, perHour: 80, xp: 6380, unit: 'trees'},
-  {name: 'Celastrus tree', base: 9000, perHour: 80, xp: 14354, unit: 'trees'},
+  {name: 'Celastrus tree', base: 9000, perHour: 80, xp: 14354, unit: 'trees', fewPatches: true},
   {name: 'Dragonfruit tree', base: 9000, perHour: 80, xp: 17825, unit: 'trees'},
-  {name: 'Crystal tree', base: 9000, perHour: 80, xp: 13240, unit: 'trees'},
+  {name: 'Crystal tree', base: 9000, perHour: 80, xp: 13240, unit: 'trees', fewPatches: true},
   {name: 'Magic tree', base: 9368, perHour: 80, xp: 13914, unit: 'trees'},
   {name: 'Yew tree', base: 11242, perHour: 80, xp: 7151, unit: 'trees'},
   {name: 'Maple tree', base: 14052, perHour: 80, xp: 3448, unit: 'trees'},
-  {name: 'Cactus', base: 7000, perHour: 60, xp: 515, unit: 'trees'},
-  {name: 'Mushroom', base: 7500, perHour: 60, xp: 407, unit: 'trees'},
-  {name: 'Giant seaweed', base: 7500, perHour: 60, xp: 500, unit: 'trees'},
-  {name: 'Belladonna', base: 8000, perHour: 60, xp: 603, unit: 'trees', aliases: ['Belladona', 'Cave nightshade']},
+  {name: 'Cactus', base: 7000, perHour: 60, xp: 515, unit: 'trees', fewPatches: true},
+  {name: 'Mushroom', base: 7500, perHour: 60, xp: 407, unit: 'trees', fewPatches: true},
+  {name: 'Giant seaweed', base: 7500, perHour: 60, xp: 500, unit: 'trees', fewPatches: true},
+  {name: 'Belladonna', base: 8000, perHour: 60, xp: 603, unit: 'trees', fewPatches: true, aliases: ['Belladona', 'Cave nightshade']},
   {name: 'Hespori', base: 7000, perHour: 30, xp: 12600, unit: 'kills', aliases: ['Hespori (kills)'], activity: 'Hespori'},
   {name: 'Hespori seeds (no contracts)', base: 500, flat: true, perHour: 6.1, xp: null, unit: 'seeds'},
 ];

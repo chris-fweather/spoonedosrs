@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react';
 import {LegalPage} from '../LegalPage';
 import {PETCORD_SHEET} from '@/lib/petcord';
+import {isOwnTiles, TILE_VERSION} from '@/lib/map-tile-source';
 import {CreditsPeople} from './CreditsPeople';
 export const metadata={title:'Credits · Spooned OSRS',description:'The people, projects and data sources behind Spooned OSRS.'};
 
@@ -36,7 +37,10 @@ export default function Page(){return <LegalPage title="Credits & thanks" update
 
  <h2 id="maps">Maps &amp; travel</h2>
  <ul className="credits-list">
-  <li><b>Map tiles</b> rendered from the game by <X href="https://github.com/mejrs/layers_osrs">Mejrs</X>; the map itself is © Jagex Ltd.</li>
+  {/* Follows the tiles this deployment serves (lib/map-tile-source.ts). */}
+  {isOwnTiles(TILE_VERSION)
+   ? <li><b>Map tiles</b> rendered by Spooned OSRS from the game cache with <X href="https://github.com/runelite/runelite">RuneLite</X>&rsquo;s map tools (BSD 2-Clause); the map itself is © Jagex Ltd.</li>
+   : <li><b>Map tiles</b> rendered from the game by <X href="https://github.com/mejrs/layers_osrs">Mejrs</X>; the map itself is © Jagex Ltd.</li>}
   <li><b><X href="https://github.com/Skretzo/shortest-path">Shortest Path</X></b> by Skretzo and contributors: collision map, transports, teleports, banks and agility shortcut requirements. BSD 2-Clause.</li>
   <li><b><X href="https://github.com/Zoinkwiz/quest-helper">Quest Helper</X></b> by Zoinkwiz and contributors: quest start positions. BSD 2-Clause, © 2020 Zoinkwiz.</li>
   <li><b><X href="https://github.com/runelite/runelite">RuneLite</X></b>: agility shortcut names and levels, and which fish each fishing spot gives (with Fishing levels), for the map icons&rsquo; hover cards. BSD 2-Clause.</li>
@@ -55,4 +59,5 @@ export default function Page(){return <LegalPage title="Credits & thanks" update
   <li><b>Rocky</b>, our mascot, and the site&rsquo;s own icons belong to Spooned OSRS.</li>
  </ul>
  <p>Want to be credited, or removed? Contact us through our <X href="https://discord.gg/spoonedosrs">Discord server</X>.</p>
+ <p className="credits-note">Guide writers and staff can choose not to be listed in <a href="/account">Account settings</a>.</p>
  </LegalPage>;}

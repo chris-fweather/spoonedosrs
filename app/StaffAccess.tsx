@@ -237,6 +237,11 @@ function describe(a: AuditEntry): Described {
     const published = a.action === "guide-publish";
     return {tone: published ? "up" : "down", icon: "/icons/navigation/collection-log-icon.png", by: <>{published ? "Published" : "Unpublished"} {by}</>, title: <>Guide: <b>{a.detail}</b></>};
   }
+  if (a.action === "guide-visibility" && a.detail) {
+    // Stored as "<title>: Public" or "<title>: Staff only".
+    const cut = a.detail.lastIndexOf(": ");
+    return {tone: "edit", icon: "/icons/navigation/collection-log-icon.png", by: <>Changed {by}</>, title: <>Guide: <b>{cut > 0 ? a.detail.slice(0, cut) : a.detail}</b>{cut > 0 && <> set to {a.detail.slice(cut + 2)}</>}</>};
+  }
   const action = a.action.replace(/[-_]+/g, " ");
   return {tone: "edit", icon: "/icons/community/settings-icon.png", by, title: <>{action[0].toUpperCase() + action.slice(1)}{d ? null : <>: {a.detail}</>}</>};
 }

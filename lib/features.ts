@@ -5,13 +5,13 @@ import {IS_DEV_ENVIRONMENT} from './environment';
  * "Directions on the world map" link on guide map stops. Set WORLD_MAP_LIVE false to take it off the live site again
  * (no Map button, /map shows the not-found page, no directions links; guide maps keep working); the dev environment (a
  * build with SPOONED_ENV=dev) always shows it. */
-export const WORLD_MAP_LIVE:boolean=false;
+export const WORLD_MAP_LIVE:boolean=true;
 export function worldMapShown(dev=IS_DEV_ENVIRONMENT,live=WORLD_MAP_LIVE):boolean{return live||dev;}
 export const WORLD_MAP_PAGE:boolean=worldMapShown();
 
-/** The Squire name prefix (the rank below Sir, for helpers and guide writers; lib/name-prefix.ts). Off on the live site
- * for now: with it off, staff pick Sir as before and nobody shows Squire. The dev environment always shows it. */
-export const SQUIRE_LIVE:boolean=false;
+/** The Squire name prefix (the rank below Sir, for helpers and guide writers; lib/name-prefix.ts). Live since 1.0.0.
+ * With it off, every staff rank picks Sir and nobody shows Squire; the dev environment always shows it. */
+export const SQUIRE_LIVE:boolean=true;
 export function squireShown(dev=IS_DEV_ENVIRONMENT,live=SQUIRE_LIVE):boolean{return live||dev;}
 export const SQUIRE_PREFIX:boolean=squireShown();
 

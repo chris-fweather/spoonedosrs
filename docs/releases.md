@@ -55,6 +55,20 @@ Worker. A failed migration stops deployment. The build token therefore needs
 permission for D1 migrations as well as Worker deployment. Keep tokens in
 Cloudflare; GitHub does not need a Cloudflare credential for this workflow.
 
+### Cloudflare resources the Worker binds
+
+Created by hand in the Cloudflare account (never by a build). `scripts/check-worker-config.mjs` fails
+`release:verify` and the deploy when the generated config is missing one of them or has Workers Logs off.
+
+| Resource | Production | Dev | Binding |
+| --- | --- | --- | --- |
+| D1 database | `spoonedosrs-db` | `spoonedosrs-dev-db` | `DB` |
+| R2 bucket, guide images | `spoonedosrs-uploads` | `spoonedosrs-dev-uploads` | `UPLOADS` |
+| R2 bucket, world map tiles | `spoonedosrs-map-tiles` | `spoonedosrs-dev-map-tiles` | `MAP_TILES` |
+| Queue, sync (producer and consumer) | `spoonedosrs-sync` | `spoonedosrs-dev-sync` | `SYNC_QUEUE` |
+| Dead-letter queue, sync | `spoonedosrs-sync-dlq` | `spoonedosrs-dev-sync-dlq` | consumer setting |
+| Workers Logs | on | on | `observability` in `vite.config.ts` |
+
 There is no manual deploy script. Emergency manual deployment is a maintainer
 action, not the official release path; perform equivalent checks and record the reason.
 

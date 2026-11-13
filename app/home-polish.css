@@ -15,3 +15,4 @@
 .home-page .home-title-mascot>img,.home-page .home-start>img{image-rendering:auto}
 .home-page .home-title-mascot>img{width:84px;height:72px}
 @media(max-width:650px){.home-page .home-search-area{border-radius:7px 7px 0 0}.home-page .home-title-mascot>img{width:58px;height:52px}}
+.home-start small .link{font:inherit;color:var(--orange)}

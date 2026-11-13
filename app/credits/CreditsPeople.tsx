@@ -60,6 +60,5 @@ export function CreditsPeople(){
    </li>)}</ul>
   </section>}
   {!people.writers.length&&!groups.length&&!people.retired.length&&<><h2 id="people">People</h2><p>Nobody is listed yet.</p></>}
-  <p className="credits-note">Guide writers and staff can choose not to be listed in <a href="/account">Account settings</a>.</p>
  </div>;
 }

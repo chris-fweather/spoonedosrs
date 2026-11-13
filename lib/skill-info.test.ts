@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {GUIDE_SKILLS} from './guides';
-import {SKILL_INFO,SKILL_MAX_LEVEL,skillInfo} from './skill-info';
+import {SKILL_INFO,SKILL_MAX_LEVEL,seed,skillInfo} from './skill-info';
 
 test('every skill has a short rundown for its hover card',()=>{
  assert.deepEqual(Object.keys(SKILL_INFO).sort(),[...GUIDE_SKILLS].sort());
@@ -47,4 +47,13 @@ test('skills are found by name in any case, other words are not',()=>{
  assert.equal(skillInfo('magic')?.name,'Magic');
  assert.match(skillInfo('Magic')!.summary,/teleport/);
  assert.equal(skillInfo('Shark'),null);
+});
+test('farming unlocks show the seed you plant',()=>{
+ const icon=(label:string)=>SKILL_INFO.Farming.facts.find(f=>f.label===label)?.icon;
+ assert.equal(icon('Ranarr weed'),'/items/5295.png');
+ assert.equal(icon('Magic tree'),'/items/5316.png');
+ // No Spirit seed inventory icon in public/items, so its drop image.
+ assert.equal(icon('Spirit tree'),'/drops/Spirit_seed_5.png');
+ assert.equal(seed(5317),'/drops/Spirit_seed_5.png');
+ for(const f of SKILL_INFO.Farming.facts)assert.ok(existsSync('public'+f.icon),f.label);
 });

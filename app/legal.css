@@ -1,4 +1,5 @@
 .legal-page{max-width:800px;margin:3rem auto;padding:0 24px 40px;line-height:1.75;color:var(--text,#dedbcc)}
+.legal-page p+p{margin-top:.9em}
 .legal-page h1{font-size:2.3rem}.legal-page h2{font-size:1.3rem;margin-top:2rem;color:#ffab42}
 .legal-page .kicker{margin-top:2rem}.legal-page a{text-decoration:underline;text-underline-offset:3px}
 .legal-footer{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:2px 0;padding:10px 16px 14px;font-size:12px;line-height:1.6;color:#a59e8b}

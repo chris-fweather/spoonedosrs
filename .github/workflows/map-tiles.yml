@@ -1,0 +1,200 @@
+# Renders our own world map tiles from the OSRS game cache and, when asked, uploads them to R2 (docs/map-tiles.md).
+# Runs from the Actions tab (Run workflow) once this file is on main, or on any push to a `map-tiles/...` branch.
+# It never changes which tiles the site serves: that is TILE_VERSIONS in lib/map-tile-source.ts, in a normal PR.
+name: Map tiles
+on:
+  workflow_dispatch:
+    inputs:
+      cache_id:
+        description: OpenRS2 cache id (empty for the newest complete live Old School cache)
+        required: false
+        default: ''
+      upload:
+        description: Upload the tiles to R2 (needs the CLOUDFLARE_R2_TOKEN secret and CLOUDFLARE_ACCOUNT_ID variable)
+        type: boolean
+        default: false
+      bucket:
+        description: R2 bucket to upload to
+        type: choice
+        options: [dev, production]
+        default: dev
+      version:
+        description: R2 prefix (empty for spooned-maps-<cache date>); never mejrs-master
+        required: false
+        default: ''
+      full_artifact:
+        description: Also keep every tile as an artifact (a tar of about 2 GB; counts against Actions storage)
+        type: boolean
+        default: false
+  push:
+    branches: ['map-tiles/**']
+permissions:
+  contents: read
+concurrency:
+  group: map-tiles-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  # RuneLite release whose cache module draws the map (BSD 2-Clause). Bump it when a game update changes map formats.
+  RUNELITE_TAG: runelite-parent-1.13.6
+  # Push runs have no inputs: a repository variable can pin the cache, and MAP_TILES_PUSH_UPLOAD (dev or production)
+  # lets a push run upload, until this file is on main and the Run workflow button works.
+  CACHE_ID: ${{ inputs.cache_id || vars.MAP_TILES_CACHE_ID || '' }}
+  UPLOAD: ${{ (github.event_name == 'workflow_dispatch' && inputs.upload) || (github.event_name == 'push' && (vars.MAP_TILES_PUSH_UPLOAD == 'dev' || vars.MAP_TILES_PUSH_UPLOAD == 'production')) }}
+  BUCKET_CHOICE: ${{ github.event_name == 'workflow_dispatch' && inputs.bucket || vars.MAP_TILES_PUSH_UPLOAD || 'dev' }}
+  VERSION_INPUT: ${{ inputs.version || '' }}
+  # Inside the workspace: actions/upload-artifact refuses paths that contain "..".
+  WORK: ${{ github.workspace }}/.map-tiles-work
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      # Only sharp is needed (scripts/slice-map-tiles.mjs); a full install keeps its version the lockfile's.
+      - run: npm ci --include=dev --include=optional --no-audit --no-fund
+
+      - name: Pick the game cache (OpenRS2 Archive)
+        id: cache
+        run: |
+          mkdir -p "$WORK"
+          curl -fsSL --retry 5 --retry-all-errors https://archive.openrs2.org/caches.json -o "$WORK/caches.json"
+          node scripts/map-tiles-openrs2.mjs pick "$WORK/caches.json" "$CACHE_ID" | tee "$WORK/cache.json"
+          id=$(jq -r .id "$WORK/cache.json"); scope=$(jq -r .scope "$WORK/cache.json"); date=$(jq -r .date "$WORK/cache.json")
+          warning=$(jq -r '.warning // empty' "$WORK/cache.json")
+          if [ -n "$warning" ]; then echo "::warning::$warning"; fi
+          version="${VERSION_INPUT:-spooned-maps-$date}"
+          if ! [[ "$version" =~ ^spooned-[a-z0-9][a-z0-9-]{0,40}$ ]]; then echo "::error::Version $version must look like spooned-<date> (never mejrs-master)."; exit 1; fi
+          { echo "id=$id"; echo "scope=$scope"; echo "date=$date"; echo "version=$version"; } >> "$GITHUB_OUTPUT"
+
+      - name: Download the cache and its map keys
+        env:
+          ID: ${{ steps.cache.outputs.id }}
+          SCOPE: ${{ steps.cache.outputs.scope }}
+        run: |
+          cd "$WORK"
+          curl -fsSL --retry 5 --retry-all-errors "https://archive.openrs2.org/caches/$SCOPE/$ID/disk.zip" -o disk.zip
+          curl -fsSL --retry 5 --retry-all-errors "https://archive.openrs2.org/caches/$SCOPE/$ID/keys.json" -o keys.json
+          unzip -q disk.zip -d disk
+          dat=$(find disk -name main_file_cache.dat2 | head -1)
+          if [ -z "$dat" ]; then echo "::error::disk.zip has no main_file_cache.dat2"; exit 1; fi
+          echo "CACHE_DIR=$WORK/$(dirname "$dat")" >> "$GITHUB_ENV"
+          node "$GITHUB_WORKSPACE/scripts/map-tiles-openrs2.mjs" keys keys.json xtea.json
+          du -sh disk.zip "$(dirname "$dat")"
+
+      - name: Build RuneLite's cache tools
+        run: |
+          git clone --quiet --depth 1 --branch "$RUNELITE_TAG" https://github.com/runelite/runelite.git "$WORK/runelite"
+          cp scripts/map-tiles/SpoonedMapTiles.java "$WORK/runelite/cache/src/main/java/net/runelite/cache/"
+          cat >> "$WORK/runelite/cache/build.gradle.kts" <<'EOF'
+
+          // Spooned OSRS map tiles (.github/workflows/map-tiles.yml): renders every map square to its own image.
+          tasks.register<JavaExec>("spoonedMapTiles") {
+              classpath = sourceSets["main"].runtimeClasspath
+              mainClass.set("net.runelite.cache.SpoonedMapTiles")
+              maxHeapSize = System.getenv("MAP_TILES_HEAP") ?: "5g"
+              args(System.getenv("MT_CACHE"), System.getenv("MT_KEYS"), System.getenv("MT_OUT"))
+          }
+          EOF
+          cd "$WORK/runelite"
+          JAVA_HOME="$JAVA_HOME_11_X64" ./gradlew --no-daemon --quiet :cache:classes
+
+      - name: Render every map square (RuneLite MapImageDumper, 4 px per game tile) and read the game's world maps
+        env:
+          MT_CACHE: ${{ env.CACHE_DIR }}
+          MT_KEYS: ${{ env.WORK }}/xtea.json
+          MT_OUT: ${{ env.WORK }}/regions
+        run: |
+          cd "$WORK/runelite"
+          JAVA_HOME="$JAVA_HOME_11_X64" ./gradlew --no-daemon :cache:spoonedMapTiles
+          if [ ! -s "$WORK/regions/worldmaps.json" ]; then echo "::error::The render wrote no worldmaps.json (the game's world maps)."; exit 1; fi
+          missing=$(wc -l < "$WORK/regions/missing-keys.txt")
+          if [ "$missing" -gt 0 ]; then echo "::warning::$missing map squares have no XTEA key: they show terrain without objects (missing-keys.txt in the artifact)."; fi
+
+      - name: Slice each world map into the site's tiles (zoom -3 to 4)
+        env:
+          ID: ${{ steps.cache.outputs.id }}
+          DATE: ${{ steps.cache.outputs.date }}
+          VERSION: ${{ steps.cache.outputs.version }}
+        run: |
+          node --import ./scripts/register-tests.mjs scripts/slice-map-tiles.mjs --regions "$WORK/regions" --out "$WORK/tiles" --sample "$WORK/sample" --work "$WORK/map-squares" \
+            --cache-id "$ID" --cache-date "$DATE" --version "$VERSION" --renderer "RuneLite $RUNELITE_TAG cache MapImageDumper (BSD-2-Clause)"
+          cp "$WORK/cache.json" "$WORK/regions/render.json" "$WORK/regions/missing-keys.txt" "$WORK/regions/worldmaps.json" "$WORK/sample/"
+          {
+            echo "## Map tiles $VERSION"
+            echo "OpenRS2 cache $ID ($DATE)."
+            echo
+            echo '```json'
+            jq '{version, cacheId, cacheDate, count, bytes, outsideRoute, seconds}' "$WORK/tiles/manifest.json"
+            echo '```'
+            echo
+            echo '| Map | Name | Tiles | Floors | Squares | Zones |'
+            echo '| --- | --- | --- | --- | --- | --- |'
+            jq -r '.maps | to_entries[] | "| \(.key) | \(.value.name) | \(.value.count) | \(.value.planes) | \(.value.squares) | \(.value.zones) |"' "$WORK/tiles/manifest.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+          du -sh "$WORK/tiles" "$WORK/sample"
+
+      - name: Keep a review sample (every map's far zooms and a picture of it, the underground at zoom 2, surface landmarks)
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-tiles-sample-${{ steps.cache.outputs.version }}
+          path: ${{ env.WORK }}/sample
+          retention-days: 14
+          if-no-files-found: error
+      - name: Pack every tile
+        if: github.event_name == 'workflow_dispatch' && inputs.full_artifact
+        run: tar -C "$WORK" -cf "$WORK/tiles.tar" tiles
+      - name: Keep every tile
+        if: github.event_name == 'workflow_dispatch' && inputs.full_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-tiles-${{ steps.cache.outputs.version }}
+          path: ${{ env.WORK }}/tiles.tar
+          retention-days: 7
+          compression-level: 0
+
+      # rclone over R2's S3 API: parallel uploads (64 at once) and retries; far faster than one `wrangler r2 object put`
+      # per tile. The S3 key pair comes from the API token itself: its id, and the SHA-256 of its value.
+      - name: Upload to R2
+        if: env.UPLOAD == 'true'
+        env:
+          CLOUDFLARE_R2_TOKEN: ${{ secrets.CLOUDFLARE_R2_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION: ${{ steps.cache.outputs.version }}
+        run: |
+          if [ -z "$CLOUDFLARE_R2_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "::error::Uploading needs the CLOUDFLARE_R2_TOKEN secret and the CLOUDFLARE_ACCOUNT_ID variable (docs/map-tiles.md)."; exit 1; fi
+          case "$BUCKET_CHOICE" in
+            dev) bucket=spoonedosrs-dev-map-tiles ;;
+            production) bucket=spoonedosrs-map-tiles ;;
+            *) echo "::error::Unknown bucket $BUCKET_CHOICE"; exit 1 ;;
+          esac
+          if [ "$VERSION" = mejrs-master ]; then echo "::error::Never upload over mejrs-master."; exit 1; fi
+          token_id=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_R2_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify | jq -r '.result.id // empty' || true)
+          if [ -z "$token_id" ]; then
+            token_id=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_R2_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify" | jq -r '.result.id // empty' || true)
+          fi
+          if [ -z "$token_id" ]; then echo "::error::Cloudflare did not accept CLOUDFLARE_R2_TOKEN."; exit 1; fi
+          secret=$(printf %s "$CLOUDFLARE_R2_TOKEN" | sha256sum | cut -d' ' -f1)
+          echo "::add-mask::$token_id"; echo "::add-mask::$secret"
+          # A current rclone: Ubuntu's packaged 1.60 sends requests R2 answers with 501 NotImplemented.
+          curl -fsSL -o "$RUNNER_TEMP/rclone.zip" https://downloads.rclone.org/v1.68.2/rclone-v1.68.2-linux-amd64.zip
+          unzip -q -o "$RUNNER_TEMP/rclone.zip" -d "$RUNNER_TEMP" && sudo install -m 755 "$RUNNER_TEMP/rclone-v1.68.2-linux-amd64/rclone" /usr/local/bin/rclone
+          rclone version | head -1
+          export RCLONE_CONFIG_R2_TYPE=s3 RCLONE_CONFIG_R2_PROVIDER=Cloudflare RCLONE_CONFIG_R2_REGION=auto RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
+          export RCLONE_CONFIG_R2_ENDPOINT="https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
+          export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$token_id" RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$secret"
+          # A version is written once: never over an earlier upload (pick another version to redo one).
+          if [ -n "$(rclone lsf --max-depth 1 "r2:$bucket/$VERSION/" 2>/dev/null | head -1)" ]; then
+            echo "::error::$bucket already has $VERSION/. Choose another version, or delete it in the Cloudflare dashboard first."; exit 1
+          fi
+          rclone copy "$WORK/tiles" "r2:$bucket/$VERSION" --transfers 64 --checkers 32 --no-check-dest --retries 5 --low-level-retries 20 --stats 60s --stats-one-line
+          want=$(find "$WORK/tiles" -type f | wc -l)
+          have=$(rclone size --json "r2:$bucket/$VERSION" | jq .count)
+          echo "Uploaded $have of $want files to $bucket/$VERSION/"
+          if [ "$have" != "$want" ]; then echo "::error::R2 holds $have files under $VERSION/, expected $want."; exit 1; fi
+          echo "Uploaded to \`$bucket/$VERSION/\` ($have files). To serve it, set TILE_VERSIONS in lib/map-tile-source.ts (docs/map-tiles.md)." >> "$GITHUB_STEP_SUMMARY"

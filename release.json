@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0-beta.2",
-  "channel": "beta",
-  "notes": "releases/0.3.0-beta.2.md",
-  "minimumMigration": "0037_staff_title.sql"
+  "version": "1.0.0",
+  "channel": "stable",
+  "notes": "releases/1.0.0.md",
+  "minimumMigration": "0047_guide_blocks_list_repair.sql"
 }

@@ -3,6 +3,7 @@
 import untradeableValues from './untradeable-values.json' with {type: 'json'};
 import {guideItems} from './guides';
 import {itemQuests} from './item-quest';
+import itemNames from './item-names.json' with {type: 'json'};
 const API = 'https://prices.runescape.wiki/api/v1/osrs';
 const AGENT = 'spoonedosrs.com guide prices (discord.gg/spoonedosrs)';
 export type LatestTrade = {high: number | null; highTime: number | null; low: number | null; lowTime: number | null};
@@ -33,14 +34,42 @@ export async function itemMapping() {
 /** High alchemy values of untradeable items, from the Wiki drop tables (scripts/build-untradeable-values.mjs). */
 const untradeable = untradeableValues as Record<string, number>;
 
+/** Every item name we know, lower case, with its IDs: the guide items and the wider item list. */
+let namesIndex: Map<string, string[]> | null = null;
+function idsNamed(name: string): string[] {
+  if (!namesIndex) {
+    namesIndex = new Map();
+    for (const [id, n] of Object.entries({...(itemNames as Record<string, string>), ...guideItems})) {
+      const key = n.toLowerCase(), list = namesIndex.get(key) ?? [];
+      if (!list.includes(id)) namesIndex.set(key, [...list, id]);
+    }
+  }
+  return namesIndex.get(name.toLowerCase()) ?? [];
+}
+/** Charged items whose uncharged version has its own name rather than a suffix. */
+const UNCHARGED_NAME: Record<string, string> = {
+  'trident of the seas': 'uncharged trident', 'trident of the swamp': 'uncharged toxic trident', 'toxic staff of the dead': 'toxic staff (uncharged)',
+};
+/** The item to price a charged item by: charged weapons and armour (Tumeken's shadow, the Scythe of vitur, a toxic
+ * blowpipe) are not sold on the Grand Exchange, but their uncharged versions are, so the uncharged one (also named
+ * "(u)" or "(empty)") stands in. `sold` says whether an ID trades on the Grand Exchange; null when nothing stands in. */
+export function priceStandIn(id: string, sold: (id: string) => boolean): string | null {
+  const name = guideItems[id] ?? (itemNames as Record<string, string>)[id];
+  if (!name || sold(id)) return null;
+  const base = name.toLowerCase(), names = [UNCHARGED_NAME[base], `${base} (uncharged)`, `${base} (u)`, `${base} (empty)`].filter(Boolean) as string[];
+  for (const n of names) for (const other of idsNamed(n)) if (other !== id && sold(other)) return other;
+  return null;
+}
+
 /** One item's price card: the latest instant buy and sell trades, alchemy values and the buy limit. Items missing from
  * the mapping are not sold on the Grand Exchange; their card carries the high alchemy value when the Wiki lists one, and
- * the quests the item belongs to (lib/item-quest.ts). */
+ * the quests the item belongs to (lib/item-quest.ts). A charged item is priced by its uncharged version (`pricedAs`). */
 export async function itemPriceCard(id: string) {
   const [latest, mapping] = await Promise.all([latestTrades(), itemMapping()]);
-  const trade = latest[id], item = mapping.get(id);
+  const standIn = mapping.has(id) ? null : priceStandIn(id, other => mapping.has(other));
+  const priced = standIn ?? id, trade = latest[priced], item = mapping.get(priced);
   if (!item) return {id, tradeable: false as const, highAlch: untradeable[id] ?? null, quests: guideItems[id] ? await itemQuests(guideItems[id]) : []};
   return {id, tradeable: true as const, name: item.name, members: !!item.members, limit: item.limit ?? null,
     high: trade?.high ?? null, highTime: trade?.highTime ?? null, low: trade?.low ?? null, lowTime: trade?.lowTime ?? null,
-    highAlch: item.highalch ?? null, lowAlch: item.lowalch ?? null};
+    highAlch: item.highalch ?? null, lowAlch: item.lowalch ?? null, ...(standIn ? {pricedAs: item.name} : {})};
 }

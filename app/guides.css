@@ -57,7 +57,7 @@
 .guide-tile>.guide-byline>span+span::before{content:none}
 .guide-tile .guide-byline .rank-icon{width:15px;height:17px}
 @media(max-width:820px){.guide-list{grid-template-columns:1fr}}
-@media(max-width:650px){.guide-tile{grid-template-columns:56px minmax(0,1fr);column-gap:12px;padding:13px 14px 11px}.guide-tile-art{width:56px;height:56px}.guide-tile-art>img{width:44px;height:44px}.guide-tile-title{font-size:15px}}
+@media(max-width:650px){.guide-tile{grid-template-columns:56px minmax(0,1fr);column-gap:12px;padding:13px 14px 11px}.guide-tile-art{width:56px;height:56px}.guide-tile-art>img{width:44px;height:44px}.guide-tile-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal;font-size:15px}}
 
 /* Contents beside a guide with three or more headings (GuideContents.tsx); a dropdown above it on phones. */
 .guide-reader{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start}
@@ -110,3 +110,18 @@
 /* The search input sits inside the bordered label; this beats the staff window's own input border. */
 .guides-tools>.guides-search>input:not([type=checkbox]):not([type=radio]){border:0;background:none;box-shadow:none;padding-left:0;padding-right:0}
 @media(max-width:650px){.guide-tile-rev{display:none}}
+/* Staff-only guides carry a small neutral tag (only staff are ever sent one). Cards end with the tag, the thumbs up and the date. */
+.guide-staff-tag{font-size:11px;font-weight:600;padding:1px 7px}.guide-byline>.guide-staff-tag::before{content:none}
+.guide-byline-facts{display:inline-flex;align-items:center;gap:10px;white-space:nowrap}
+.guide-byline-thumbs{display:inline-flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums}
+/* The guide page's thumbs up sits at the end of the byline, like the profile's respect: gold once given. */
+/* The thumbs up sits on the title's line, at the far right, drawn like the respect count on a profile: no box. */
+.guide-title-row{display:flex;flex-wrap:wrap;align-items:center;gap:0 12px}
+.guide-title-row>h2{flex:1 1 0;min-width:0}.guide-title-row>.guide-thumbs{flex:none}
+.guide-thumbs{display:inline-flex;align-items:center;gap:9px;min-height:44px;margin-left:auto;margin-right:6px;padding:4px 6px;border:0;background:transparent;color:var(--text);font:inherit;font-size:22px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;text-decoration:none;cursor:pointer}
+/* The thumb is as tall as the heading's letters. */
+.guide-thumbs>svg{width:28px;height:28px;flex:none}
+.guide-thumbs:hover:not(:disabled),.guide-thumbs.given{color:var(--orange)}
+.guide-thumbs:focus-visible{outline:2px solid var(--orange);outline-offset:2px;border-radius:4px}
+.guide-thumbs-error{flex-basis:100%;text-align:right;color:var(--bad);font-size:12px}
+@media(max-width:650px){.guide-thumbs{min-height:44px;min-width:44px;margin-right:2px;justify-content:center;font-size:20px}.guide-thumbs>svg{width:26px;height:26px}}

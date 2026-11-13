@@ -96,7 +96,7 @@ function petHover(p:Pet,j:Journal){
 /** The overview pet hover's record lines and luck. */
 function petRecord(p:Pet,j:Journal){
  if(j.details?.petRecords===false)return {obtainedLine:null,currentLine:null,luck:null,expectedHours:null};
- const lines=petHoverLines(j,p,true),{luck,expected}=petLuck(p);
+ const lines=petHoverLines(j,p,true),{luck,expected}=petLuck(p,j);
  return {obtainedLine:lines.obtained,currentLine:lines.current,luck:luck===0?null:luck,expectedHours:expected};
 }
 

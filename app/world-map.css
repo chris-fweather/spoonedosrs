@@ -142,6 +142,7 @@ html.wm-fit .site{min-height:0}
 .wm-map{position:relative;isolation:isolate;min-width:0;min-height:0;background:#0e0d0b}
 .wm-canvas{position:absolute;inset:0;background:#0e0d0b;font:inherit}
 .wm-canvas.leaflet-container{background:#0e0d0b;font:inherit;outline:none}
+.wm-canvas.leaflet-container.is-dark{background:#000}
 .wm-canvas.is-picking.leaflet-container,.wm-canvas.is-picking .leaflet-interactive{cursor:crosshair}
 .wm-loading{display:flex;align-items:center;justify-content:center;color:#8f8672;font-size:13px}
 .wm-canvas .leaflet-tile{image-rendering:pixelated}
@@ -153,6 +154,16 @@ html.wm-fit .site{min-height:0}
 /* Where the map is and the way back, over the map's top left corner. */
 .wm-where{position:absolute;z-index:1000;top:10px;left:10px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:calc(100% - 70px);pointer-events:none}
 .wm-where>*{pointer-events:auto}
+/* The list of maps opens inside the map's height (the column ends 10px above the map's bottom) and scrolls there. */
+.wm-where{bottom:10px}
+.wm-where>*{flex:none}
+/* The list of the game's maps: top right, just left of + and − (and the teleports button under them). It opens downwards,
+   inside the map's height, and scrolls there. */
+.wm-picker{position:absolute;z-index:1000;top:10px;right:58px;bottom:10px;display:flex;flex-direction:column;align-items:flex-end;max-width:calc(50% - 64px);pointer-events:none}
+.wm-picker>.map-picker{display:flex;flex-direction:column;align-items:flex-end;flex:0 1 auto;min-height:0;pointer-events:auto}
+.wm-picker .map-picker-btn{flex:none}
+.wm-picker .map-picker-list{position:static;flex:0 1 auto;min-height:0;max-height:min(420px,100%);margin-top:4px}
+.wm-where{max-width:calc(50% - 16px)}
 .wm-where-name{max-width:100%;padding:3px 9px;border-radius:5px;background:#0e0d0bcc;font:700 15px var(--rs);color:#f3e6c4;text-shadow:1px 1px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Teleports: a third button under + and −, sized and framed like Leaflet's zoom bar (30px button in a 2px translucent
    frame), that opens the teleport options. */
@@ -204,7 +215,7 @@ html.wm-fit .site{min-height:0}
 /* Place card over the map */
 /* The selected spot's card: a roomy panel at the map's top left (under the area name and back button when they show),
  * with the name large, its facts in a row, the start text, and the actions in equal-height buttons. */
-.wm-card{position:absolute;z-index:1000;left:16px;top:16px;width:min(400px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:auto;display:flex;flex-direction:column;gap:14px;padding:16px 18px 18px;background:var(--panel);border:1px solid var(--line-3);border-radius:10px;box-shadow:0 16px 44px #000c}
+.wm-card{position:absolute;z-index:1000;left:16px;top:16px;width:min(320px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:auto;display:flex;flex-direction:column;gap:14px;padding:16px 18px 18px;background:var(--panel);border:1px solid var(--line-3);border-radius:10px;box-shadow:0 16px 44px #000c}
 .wm-where~.wm-card{top:96px;max-height:calc(100% - 112px)}
 .wm-card header{display:flex;align-items:center;gap:12px;min-width:0}
 .wm-card header>img{width:36px;height:36px;object-fit:contain;flex:none}
@@ -212,7 +223,8 @@ html.wm-fit .site{min-height:0}
 .wm-card header>svg{color:var(--gold);flex:none}
 .wm-card header>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .wm-card header .icon-btn{align-self:flex-start;margin:-4px -6px 0 0}
-.wm-card h2{font:700 22px/1.15 var(--rs);color:var(--orange);text-shadow:1px 1px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* A narrower, squarer card: a long name takes a second line instead of widening it. */
+.wm-card h2{font:700 21px/1.15 var(--rs);color:var(--orange);text-shadow:1px 1px 0 #000;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .wm-card header small{color:var(--muted);font-size:13.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wm-card-facts{display:flex;gap:6px 22px;flex-wrap:wrap;margin:0;padding:12px 0 0;border-top:1px solid var(--line-2)}
 .wm-card-facts div{display:flex;flex-direction:column;gap:1px;min-width:0}
@@ -274,7 +286,8 @@ html.wm-fit .site{min-height:0}
  .wm-card{left:0;right:0;top:auto;bottom:0;width:auto;max-height:78%;padding:14px 16px 16px;border-width:1px 0 0;border-radius:14px 14px 0 0;box-shadow:0 -10px 32px #000b}
  .wm-where~.wm-card{top:auto;max-height:78%}
  .wm-card-actions .btn{min-height:44px}
- .wm-where{top:8px;left:8px}
+ .wm-where{top:8px;left:8px;bottom:8px}
+ .wm-picker{top:8px;right:54px;bottom:8px}
  .wm-chips{grid-template-columns:repeat(2,minmax(0,1fr))}
  .wm-presets{grid-template-columns:repeat(3,minmax(0,1fr))}
  .wm-presets button{min-height:40px}
@@ -306,3 +319,5 @@ html.wm-fit .site{min-height:0}
 .wm-landing{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:2px solid;background:#1a1206;box-shadow:0 0 0 1.5px #1a1206,0 2px 6px #000a}
 .wm-landing img{width:18px;height:18px;object-fit:contain}
 .wm-arrow{display:block;width:20px;height:20px;transform-origin:50% 50%}
+/* The spot a click opened the menu at: a small white dot with a dark ring, until the menu closes. */
+.wm-spot-dot{display:block;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #1a1206;box-shadow:0 0 0 2px #ffd36b,0 2px 6px #000a}

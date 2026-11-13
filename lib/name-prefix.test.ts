@@ -16,16 +16,20 @@ test('Squire goes to helpers and guide writers; moderators, admins and the owner
 test('with Squire off, every staff rank earns Sir as before and guide writers earn nothing', () => {
  for(const role of ['helper','moderator','admin','owner'] as const)assert.equal(earnedPrefix(role,true,false),'Sir');
  assert.equal(earnedPrefix(null,true,false),null);
- // Production build (tests run as production): no Squire anywhere.
- assert.equal(earnedPrefix('helper',true),'Sir');
- assert.equal(earnedPrefix(null,true),null);
- assert.equal(shownPrefix('Squire','helper',true),'Sir');
- assert.equal(shownPrefix('Squire',null,true),null);
+ // Production build (tests run as production): Squire is live since 1.0.0.
+ assert.equal(earnedPrefix('helper',false),'Squire');
+ assert.equal(earnedPrefix(null,true),'Squire');
+ assert.equal(earnedPrefix('moderator',false),'Sir');
+ assert.equal(shownPrefix('Squire','moderator',false),'Squire');
+ assert.equal(shownPrefix('Sir','helper',false),'Squire');
+ assert.equal(shownPrefix('Squire',null,false),null);
 });
 test('the stored choice is opt-in and shows the prefix earned today', () => {
  assert.equal(shownPrefix(null,'helper',true,true),null);
  assert.equal(shownPrefix('Sir','helper',false,true),'Squire');
- assert.equal(shownPrefix('Squire','moderator',false,true),'Sir');
+ assert.equal(shownPrefix('Squire','moderator',false,true),'Squire','someone who earns Sir may choose Squire instead');
+ assert.equal(shownPrefix('Sir','moderator',false,true),'Sir');
+ assert.equal(shownPrefix('Sir','helper',false,true),'Squire','nobody shows a prefix above the one they earn');
  assert.equal(shownPrefix('Squire',null,false,true),null);
  assert.equal(shownPrefix('Lord','owner',false,true),null);
  assert.equal(cleanNamePrefix('Squire'),'Squire');

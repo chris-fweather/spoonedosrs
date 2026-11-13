@@ -93,14 +93,14 @@ const sources=(answers:Partial<Record<'hiscores'|'runeprofile'|'temple'|'wom',()
  return {calls,fetcher};
 };
 
-test('a first search asks all four sources once and saves stats, the collection log, pets and progress',async()=>{
+test('a first search asks every source it needs once and saves stats, the collection log, pets and progress',async()=>{
  const {initial}=await import('./model.ts');
  const {discoveryData,hydratePublicJournal,isPublicJournal}=await import('./public-journal.ts');
  const {journalStats}=await import('./community.ts');
  const {calls,fetcher}=sources({hiscores:()=>Response.json({skills,activities:[]}),runeprofile:()=>Response.json(runeprofile)});
  const {lookup,journal}=await discoverPlayer('Test player',{...structuredClone(initial),username:'Test player'},fetcher,true);
- assert.deepEqual([...calls].sort(),['api.runeprofile.com','api.wiseoldman.net','api.wiseoldman.net','secure.runescape.com','templeosrs.com'],'WOM is asked for the snapshot and the achievements');
- assert.deepEqual({state:lookup.state,hiscores:lookup.hiscores,runeprofile:lookup.runeprofile,temple:lookup.temple,wom:lookup.wom},{state:'found',hiscores:'found',runeprofile:'found',temple:'not_found',wom:'not_found'});
+ assert.deepEqual([...calls].sort(),['api.runeprofile.com','api.wiseoldman.net','secure.runescape.com','templeosrs.com'],'WOM is asked for the achievements only: the Hiscores answered for skills');
+ assert.deepEqual({state:lookup.state,hiscores:lookup.hiscores,runeprofile:lookup.runeprofile,temple:lookup.temple,wom:lookup.wom},{state:'found',hiscores:'found',runeprofile:'found',temple:'not_found',wom:'skipped'});
  assert.ok(journal);assert.equal('syncReport' in journal,false);
  assert.deepEqual(journal.hiscores.skills,skills);assert.equal(journal.log?.obtained,1);assert.equal(journal.profile?.combat[0].completed,5);
  assert.equal(journal.pets.find(p=>p.id==='12921')?.obtained,true);

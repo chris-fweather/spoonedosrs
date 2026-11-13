@@ -22,7 +22,7 @@ export function DriestRecord({name, activity}: {name: string; activity?: string}
       {record.date && <time>{record.date}</time>}
     </div></div>
     {record.note && <p>{record.note}</p>}
-    {record.likelihood && <p>Likelihood {record.likelihood}</p>}
+    {record.likelihood && <p title="The chance of having had the pet by this count, at the sheet's rate">Likelihood {record.likelihood}<small className="muted"> · chance to have it by now</small></p>}
     {(record.proof || record.clog) && <div className="pop-links">
       {record.proof && <a className="btn ghost sm" href={record.proof} target="_blank" rel="noreferrer">Pet proof <ExternalLink size={13}/></a>}
       {record.clog && <a className="btn ghost sm" href={record.clog} target="_blank" rel="noreferrer">Collection log proof <ExternalLink size={13}/></a>}

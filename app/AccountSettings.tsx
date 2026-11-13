@@ -83,6 +83,7 @@ export function AccountSettings() {
     setData((d) => d && !d.accounts.some((a) => a.name.toLowerCase() === name.toLowerCase()) ? {...d, accounts: [...d.accounts, {name, claimedAt: Date.now(), linkedAt: Date.now(), visibility: "public", details: DEFAULT_DETAILS, showDonation: true, showSupporter: true, supported: false, amountMinor: 0, currency: "USD"}]} : d);
   }
   const [reload, setReload] = useState(0);
+  const [signedOut, setSignedOut] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/account-settings", { signal: controller.signal })
@@ -92,6 +93,7 @@ export function AccountSettings() {
           accounts: Account[];
           error?: string;
         };
+        if (r.status === 401) setSignedOut(true);
         if (!r.ok) throw Error(b.error);
         setData(b);
       })
@@ -142,6 +144,7 @@ export function AccountSettings() {
             {error}
           </p>
         )}
+        {!data && signedOut && <p><a className="btn sm" href="/api/auth/discord">Sign in with Discord</a></p>}
         {!data && !error && <p role="status">Loading your accounts…</p>}
         {data && (
           <>

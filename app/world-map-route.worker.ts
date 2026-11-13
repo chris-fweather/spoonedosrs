@@ -3,6 +3,7 @@
 import {walkLinks, walkingPath, type PathPoint, type WalkLinks} from '../lib/guide-map-paths';
 import {buildGraph, decodeCollision, planRoutes, RouteError, teleportArrivals, type Collision, type TeleportArrival, type Tile, type TravelData, type TravelGraph} from '../lib/world-map-routing';
 import {parseTravelSettings} from '../lib/world-map-settings';
+import {worldMapData} from '../lib/world-map-data';
 
 export type PlanInput = {type: 'load'} | {type: 'plan'; from: Tile; to: Tile; settings: unknown} | {type: 'paths'; legs: {from: Tile; to: Tile}[]} | {type: 'teleports'; settings: unknown};
 export type PlanRequest = PlanInput & {id: number};
@@ -19,11 +20,11 @@ async function gunzip(response: Response) {
 }
 /** The travel data alone (the Teleports layer needs no collision map). */
 function loadTravel() {
-  travel ??= fetch('/world-map/travel.json').then(r => {if (!r.ok) throw Error('The map data could not be loaded.'); return r.json() as Promise<TravelData>;}).catch(error => {travel = null; throw error;});
+  travel ??= fetch(worldMapData('travel.json')).then(r => {if (!r.ok) throw Error('The map data could not be loaded.'); return r.json() as Promise<TravelData>;}).catch(error => {travel = null; throw error;});
   return travel;
 }
 function load() {
-  loading ??= Promise.all([fetch('/world-map/collision.dat').then(gunzip), loadTravel()])
+  loading ??= Promise.all([fetch(worldMapData('collision.dat')).then(gunzip), loadTravel()])
     .then(([bytes, data]) => ({collision: decodeCollision(bytes), data}))
     .catch(error => {loading = null; throw error;});
   return loading;

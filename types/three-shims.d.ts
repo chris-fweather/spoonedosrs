@@ -12,7 +12,8 @@ declare module 'three' {
   export class Vector3 { constructor(); x: number; y: number; z: number; }
   export class Color {constructor(color:number);}
   export class Fog {constructor(color:number,near:number,far:number);}
-  export class BufferGeometry {dispose():void;}
+  export class BufferAttribute {constructor(array:Float32Array,itemSize:number);count:number;needsUpdate:boolean;getX(i:number):number;getY(i:number):number;getZ(i:number):number;}
+  export class BufferGeometry {dispose():void;setAttribute(name:string,attribute:BufferAttribute):this;getAttribute(name:string):BufferAttribute|undefined;attributes:Record<string,BufferAttribute>;}
   export class BoxGeometry extends BufferGeometry {constructor(w:number,h:number,d:number);}
   export class CircleGeometry extends BufferGeometry {constructor(radius:number,segments:number);}
   export class CylinderGeometry extends BufferGeometry {constructor(top:number,bottom:number,height:number,segments:number);}
@@ -20,6 +21,9 @@ declare module 'three' {
   export class IcosahedronGeometry extends BufferGeometry {constructor(radius:number,detail:number);}
   export class MeshLambertMaterial {constructor(options:object);dispose():void;}
   export class MeshBasicMaterial {constructor(options:object);dispose():void;}
+  export class ShaderMaterial {constructor(options:object);dispose():void;}
+  export class Points extends Group {constructor(geometry:BufferGeometry,material:object);frustumCulled:boolean;}
+  export const AdditiveBlending:number;
   export class Mesh extends Group {constructor(geometry:BufferGeometry,material:object);castShadow:boolean;receiveShadow:boolean;}
   export class PointLight extends Group {constructor(color:number,intensity:number,distance:number);intensity:number;}
   export const PCFSoftShadowMap:number;

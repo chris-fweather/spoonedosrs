@@ -157,8 +157,56 @@ export function wearableUnlocks(owned:Iterable<string>):Set<string> {
  return ids;
 }
 
+/** Each skill's cape and its trimmed version, by the skill's name on the hiscores. The game names the trims without a
+ * space ("Attack cape(t)", "Woodcut. cape(t)"), so they are paired here to show as styles of one cape. */
+export const SKILL_CAPES:Record<string,[string,string]>={
+ Attack:['9747','9748'],Strength:['9750','9751'],Defence:['9753','9754'],Ranged:['9756','9757'],Prayer:['9759','9760'],
+ Magic:['9762','9763'],Runecraft:['9765','9766'],Hitpoints:['9768','9769'],Agility:['9771','9772'],Herblore:['9774','9775'],
+ Thieving:['9777','9778'],Crafting:['9780','9781'],Fletching:['9783','9784'],Slayer:['9786','9787'],Construction:['9789','9790'],
+ Mining:['9792','9793'],Smithing:['9795','9796'],Fishing:['9798','9799'],Cooking:['9801','9802'],Firemaking:['9804','9805'],
+ Woodcutting:['9807','9808'],Farming:['9810','9811'],Hunter:['9948','9949'],Sailing:['31288','31290'],
+};
+export const MAX_CAPE='13280';
+/** The site's completionist cape (lib/custom-wearables.ts): the max cape with embers falling from its hem. */
+export const COMPLETIONIST_CAPE='990001';
+/** The game's max cape versions, each made by adding another cape to the max cape, and the completionist cape's
+ * version of each (the same model with its embers; these IDs are saved in outfits, so never reuse or renumber them).
+ * Only versions with male and female models are listed. `needs` is everything the version takes besides the max cape:
+ * collection log item IDs, a finished quest (`quest:<name>`) or a whole diary tier (`diary:<area>:<tier>`), as the
+ * RuneLite plugin syncs them. */
+export const MAX_CAPE_VARIANTS:{id:string;completionist:string;label:string;needs:string[]}[]=[
+ {id:'13329',completionist:'990002',label:'Fire',needs:['6570']}, // Fire cape
+ // The game has two Infernal max capes: 21285 is the one players wear (its locked copy, 24133, uses the same model);
+ // 21284 colours the lava flat yellow instead of texturing it.
+ {id:'21285',completionist:'990003',label:'Infernal',needs:['21295']}, // Infernal cape
+ {id:'21898',completionist:'990004',label:'Assembler',needs:['21907']}, // Ava's assembler, made with Vorkath's head
+ {id:'27363',completionist:'990005',label:'Masori assembler',needs:['21907','27372']}, // Ava's assembler + Masori crafting kit
+ {id:'28902',completionist:'990006',label:"Dizana's",needs:['28947']}, // Dizana's quiver
+ {id:'20760',completionist:'990007',label:'Ardougne',needs:['diary:Ardougne:Elite']}, // Ardougne cloak 4
+ {id:'24855',completionist:'990008',label:'Mythical',needs:['quest:Dragon Slayer II']}, // Mythical cape
+ {id:'21776',completionist:'990009',label:'Imbued saradomin',needs:['quest:Mage Arena II']}, // Imbued god capes
+ {id:'21780',completionist:'990010',label:'Imbued zamorak',needs:['quest:Mage Arena II']},
+ {id:'21784',completionist:'990011',label:'Imbued guthix',needs:['quest:Mage Arena II']},
+ {id:'13331',completionist:'990012',label:'Saradomin',needs:['quest:Mage Arena I']}, // God capes
+ {id:'13333',completionist:'990013',label:'Zamorak',needs:['quest:Mage Arena I']},
+ {id:'13335',completionist:'990014',label:'Guthix',needs:['quest:Mage Arena I']},
+ {id:'13337',completionist:'990015',label:'Accumulator',needs:['quest:Animal Magnetism']}, // Ava's accumulator
+];
+/** A need as `have` sets hold it: quest and diary needs in lower case. */
+export const capeNeedKey=(need:string)=>need.toLowerCase();
+
+/** Max cape and completionist cape versions unlocked by `have` (owned item IDs, plus capeNeedKey keys of finished
+ * quests and diary tiers): each version needs its base cape and everything in its needs. */
+export function capeVariantUnlocks(have:Set<string>):string[] {
+ return MAX_CAPE_VARIANTS.filter(v=>v.needs.every(need=>have.has(capeNeedKey(need))))
+  .flatMap(v=>[...have.has(MAX_CAPE)?[v.id]:[],...have.has(COMPLETIONIST_CAPE)?[v.completionist]:[]]);
+}
+
 /** Recoloured item → the normal item it is a style of. */
-const STYLE_ROOT:Record<string,string>=Object.fromEntries([...Object.values(KIT_PAIRS).flat(),...STYLE_PAIRS].map(([normal,styled])=>[styled,normal]));
+const STYLE_ROOT:Record<string,string>=Object.fromEntries([...Object.values(KIT_PAIRS).flat(),...STYLE_PAIRS,...Object.values(SKILL_CAPES),
+ ...MAX_CAPE_VARIANTS.flatMap(v=>[[MAX_CAPE,v.id],[COMPLETIONIST_CAPE,v.completionist]])].map(([normal,styled])=>[styled,normal]));
+/** The max and completionist cape versions keep MAX_CAPE_VARIANTS order in the picker, so both rows match. */
+const STYLE_ORDER:Record<string,number>=Object.fromEntries(MAX_CAPE_VARIANTS.flatMap((v,i)=>[[v.id,i],[v.completionist,i]]));
 /** Clue-scroll trims of one item: "Rune platebody (g)", "(t)" and "(h1)"–"(h5)" are styles of "Rune platebody". */
 const TRIM=/ \((g|t|h[1-5])\)$/;
 
@@ -174,13 +222,15 @@ export function styleGroups<T extends {id:string;name:string}>(items:T[],name:(i
  const groups=new Map<string,T[]>();
  for(const item of items){const key=styleKey(item.id,name);groups.set(key,[...groups.get(key)??[],item]);}
  // Different items that share a cache name (the Castle Wars decorative armour colours) stay separate choices.
- return [...groups.entries()].flatMap(([key,group])=>new Set(group.map(item=>item.name)).size<group.length?group.map(item=>[item]):[[...group].sort((a,b)=>rank(a,key)-rank(b,key))]);
+ return [...groups.entries()].flatMap(([key,group])=>new Set(group.map(item=>item.name)).size<group.length?group.map(item=>[item]):[[...group].sort((a,b)=>rank(a,key)-rank(b,key)||(STYLE_ORDER[a.id]??0)-(STYLE_ORDER[b.id]??0))]);
  function rank(item:T,key:string){return name(item.id).toLowerCase()===key?0:1;}
 }
 
 const TRIM_LABEL:Record<string,string>={g:'Gold (g)',t:'Trimmed (t)',or:'Ornament (or)',h1:'Heraldic (h1)',h2:'Heraldic (h2)',h3:'Heraldic (h3)',h4:'Heraldic (h4)',h5:'Heraldic (h5)',f:'Standard'};
 /** Styles whose suffix means something else than a clue trim. */
-const STYLE_LABELS:Record<string,string>={'25916':'Vorkath (t)','25918':'King Black Dragon (b)','11865':'Slayer (i)'};
+const STYLE_LABELS:Record<string,string>={'25916':'Vorkath (t)','25918':'King Black Dragon (b)','11865':'Slayer (i)',
+ [MAX_CAPE]:'Standard',[COMPLETIONIST_CAPE]:'Standard',...Object.fromEntries(MAX_CAPE_VARIANTS.flatMap(v=>[[v.id,v.label],[v.completionist,v.label]])),
+ ...Object.fromEntries(Object.values(SKILL_CAPES).flatMap(([plain,trimmed])=>[[plain,'Standard'],[trimmed,'Trimmed (t)']]))};
 const sentence=(text:string)=>text.charAt(0).toUpperCase()+text.slice(1);
 
 /** Short Styles-row labels for one styleGroups group: "Torva" and "Sanguine torva" for the Torva full helms,

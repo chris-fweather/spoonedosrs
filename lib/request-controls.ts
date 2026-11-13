@@ -30,7 +30,9 @@ export async function acquireSync(username:string){
  if(!result)throw new RequestError(429,'This journal is syncing or was refreshed recently. Please wait a minute.',60);
  return async(saved=false)=>{await db().prepare(`UPDATE sync_locks SET expires=0${saved?'':',next_allowed=0'} WHERE rsn=? AND token=?`).bind(rsn,token).run();};
 }
+/** API keys we hold for providers, from Worker secrets. */
+export const providerKeys=()=>env.WOM_API_KEY?{wom:env.WOM_API_KEY}:{};
 /** Per-provider pacing and public response cache shared across regions. */
 export const providerFetch:typeof fetch=async(input,init)=>{
- return createProviderClient({database:db(),key:value=>budgetKey('provider-cache:'+value),dailyBudget:()=>takeBudget('provider-daily',10_000,86_400),paused:env.SYNC_PAUSED==='true'})(input,init);
+ return createProviderClient({database:db(),key:value=>budgetKey('provider-cache:'+value),dailyBudget:()=>takeBudget('provider-daily',10_000,86_400),paused:env.SYNC_PAUSED==='true',apiKeys:providerKeys()})(input,init);
 };

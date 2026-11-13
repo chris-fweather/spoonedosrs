@@ -1,6 +1,6 @@
 import {env} from 'cloudflare:workers';
 import {createProviderClient} from '@/lib/provider-client';
-import {budgetKey,takeBudget} from '@/lib/request-controls';
+import {budgetKey,takeBudget,providerKeys} from '@/lib/request-controls';
 import {publicMessage} from '@/lib/request-body';
 import {verifySignedGet} from '@/lib/signed-request';
 import {accountName,db,freshJournal} from '@/lib/storage';
@@ -18,7 +18,7 @@ export async function GET(request:Request){
  try{player=accountName(new URL(request.url).searchParams.get('player')??'');}catch{return Response.json({error:'Choose a valid player.'},{status:400,headers});}
  // A run-specific cache key forces a real upstream request; provider pacing and the daily budget stay shared.
  const run=crypto.randomUUID();
- const fetcher=createProviderClient({database:db(),key:value=>budgetKey(`provider-check:${run}:${value}`),dailyBudget:()=>takeBudget('provider-daily',10_000,86_400),paused:env.SYNC_PAUSED==='true'});
+ const fetcher=createProviderClient({database:db(),key:value=>budgetKey(`provider-check:${run}:${value}`),dailyBudget:()=>takeBudget('provider-daily',10_000,86_400),paused:env.SYNC_PAUSED==='true',apiKeys:providerKeys()});
  const results=await Promise.all(sources.map(async source=>{
   const started=Date.now();
   try{await syncJournal(source,freshJournal(player),null,fetcher);return {source,status:'ok',ms:Date.now()-started};}

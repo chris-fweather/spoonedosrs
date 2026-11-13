@@ -1,10 +1,15 @@
 import {publicMessage,requestJson,RequestError} from '@/lib/request-body';
 import {applyPetEdit} from '@/lib/pet-edit';
-import {readJournal,saveJournal} from '@/lib/storage';
+import {accountName,readJournal,saveJournal} from '@/lib/storage';
 import {HttpError,readSession,requireLinkedWriter} from '@/lib/auth';
 import {normalizeRates} from '@/lib/estimates';
 import {profileJournal} from '@/lib/profile-store';
-export async function GET(req:Request){try{return Response.json(await profileJournal(req,new URL(req.url).searchParams.get("username")),{headers:{'Cache-Control':'private, no-store','Vary':'Cookie'}});}catch{return Response.json({error:'Saved progress could not be loaded. Retry before making changes.'},{status:503,headers:{'Cache-Control':'no-store'}});}}
+export async function GET(req:Request){
+ const username=new URL(req.url).searchParams.get("username");
+ // A name RuneScape could never have is the visitor's mistake (400); 503 stays for a journal that failed to load.
+ try{accountName(username);}catch{return Response.json({error:'That isn’t a valid RuneScape name.'},{status:400,headers:{'Cache-Control':'no-store'}});}
+ try{return Response.json(await profileJournal(req,username),{headers:{'Cache-Control':'private, no-store','Vary':'Cookie'}});}catch{return Response.json({error:'Saved progress could not be loaded. Retry before making changes.'},{status:503,headers:{'Cache-Control':'no-store'}});}
+}
 export async function POST(req:Request){
  try{
   const {pet,revision,username}=await requestJson(req);await requireLinkedWriter(req,username);

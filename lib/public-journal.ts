@@ -1,4 +1,5 @@
 import {initial,type Journal,type Pet} from './model';
+import {HISCORES_COUNT_UNITS} from './estimates';
 /** v1 held official stats only; v2 also holds what the other public sources returned. */
 export type PublicJournal=Journal & {storageFormat:'public-hiscores-v1'|'public-sources-v2';sourcesCheckedAt?:string|null};
 export function isPublicJournal(j:Journal):j is PublicJournal{
@@ -31,7 +32,7 @@ export function hydratePublicJournal(j:Journal):Journal {
   recordedHours:null,historicalXph:null,obtainedCount:null,crateRolls:null,
   methods:p.methods.map(m=>{
    const activity=j.hiscores.activities.find(a=>a.name.toLowerCase()===m.activity?.toLowerCase());
-   const kc=activity&&activity.score>=0&&['kills','games','raids','runs','completions','subdues'].includes(m.unit)?activity.score:null;
+   const kc=activity&&activity.score>=0&&HISCORES_COUNT_UNITS.includes(m.unit)?activity.score:null;
    return {...m,kc,...(p.name==='TzRek-Jad'?{kph:60/45,source:m.source.replace('your stated 30','example 45')}:{})};
   })}));
  return {username:j.username,accountMode:j.accountMode,revision:j.revision,hiscores:structuredClone(j.hiscores),statsSyncedAt:j.statsSyncedAt,

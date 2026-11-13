@@ -12,8 +12,11 @@ try{
   await sql('INSERT INTO journals(id,data,revision) VALUES(?,?,0)',[name.toLowerCase(),JSON.stringify(journal)]);
  }
  await sql('INSERT INTO claimed_names(rsn,display_name,discord_id,claimed_at) VALUES(?,?,?,0)',[names[0].toLowerCase(),names[0],id]);
- const first=await api('/api/leaderboard?metric=log&q='+tag);assert.equal(first.status,200);assert.equal(first.body.rows.length,10);assert.equal(first.body.total,25);assert.equal(first.body.rows[0].name,names[24]);
- const second=await api('/api/leaderboard?metric=log&q='+tag+'&page=1');assert.equal(second.body.rows.length,10);assert.ok(second.body.rows[0].boardRank>first.body.rows.at(-1).boardRank);
+ const first=await api('/api/leaderboard?metric=log&q='+tag);assert.equal(first.status,200);assert.equal(first.body.rows.length,20,'20 per page by default');assert.equal(first.body.total,25);assert.equal(first.body.rows[0].name,names[24]);
+ const second=await api('/api/leaderboard?metric=log&q='+tag+'&page=1');assert.equal(second.body.rows.length,5);
+ const small=await api('/api/leaderboard?metric=log&size=10&q='+tag);assert.equal(small.body.rows.length,10,'10 per page on request');
+ const most=await api('/api/leaderboard?metric=log&size=40&q='+tag);assert.equal(most.body.rows.length,25,'40 per page on request');
+ assert.equal((await api('/api/leaderboard?metric=log&size=50&q='+tag)).status,400,'50 is above the cap');assert.ok(second.body.rows[0].boardRank>first.body.rows.at(-1).boardRank);
  const exact=await api('/api/leaderboard?metric=log&q='+names[24]);assert.equal(exact.body.rows[0].boardRank,first.body.rows[0].boardRank);
  await sql("INSERT INTO profile_options(rsn,details,skin) VALUES(?,?,'default')",[names[24].toLowerCase(),JSON.stringify({log:false})]);
  const hidden=await api('/api/leaderboard?metric=log&q='+names[24]);assert.equal(hidden.body.rows[0].boardRank,null);assert.ok(hidden.body.rows[0].stats.hidden.includes('log'));

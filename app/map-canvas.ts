@@ -6,6 +6,9 @@ import './map-canvas.css';
 import {EXIT_ZOOM, exitChangesArea, exitDetail, exitLabel, type Box, type MapExit} from '@/lib/world-map-exits';
 import {MARKER_PRIORITY, markerSize, type Footprint} from '@/lib/world-map-markers';
 import {GAME_ICON, GAME_SPRITE, gameSpriteSize} from '@/lib/world-map-game-icons';
+import {mapAttribution, tileUrl, TILE_VERSION} from '@/lib/map-tile-source';
+import type {GameMap} from '@/lib/world-maps';
+import type {Tile} from '@/lib/world-map-routing';
 
 /** Game tiles as map units: at zoom 6 one tile is one pixel, and each zoom level doubles it. */
 export const GAME_CRS = L.extend({}, L.CRS.Simple, {scale: (z: number) => 2 ** (z - 6), zoom: (s: number) => Math.log2(s) + 6});
@@ -13,44 +16,33 @@ export const GAME_CRS = L.extend({}, L.CRS.Simple, {scale: (z: number) => 2 ** (
 export const tileLatLng = (x: number, y: number) => L.latLng(y + .5, x + .5);
 /** The game tile under a map position. */
 export const latLngTile = (p: L.LatLng) => ({x: Math.floor(p.lng), y: Math.floor(p.lat)});
-/** The mapped surface of the game world, plus the underground areas north of it. */
-export const WORLD = L.latLngBounds(tileLatLng(1024, 1216), tileLatLng(4415, 12799));
 /** A box of game tiles as map bounds. */
 export const boxBounds = (b: Box) => L.latLngBounds(L.latLng(b.y0, b.x0), L.latLng(b.y1, b.x1));
-export const MAP_ATTRIBUTION = 'Map tiles: <a href="https://github.com/mejrs/layers_osrs" target="_blank" rel="noreferrer">Mejrs</a> · © Jagex';
+/** Credits whoever made the tiles this deployment serves (lib/map-tile-source.ts). */
+export const MAP_ATTRIBUTION = mapAttribution();
 /** Tiles at zoom 10 are the most detailed the tile set has; closer zooms scale them up. */
 export const MAX_NATIVE_ZOOM = 10;
 
-const TileSource = L.TileLayer.extend({getTileUrl(this: L.TileLayer & {options: {plane: number}}, c: L.Coords) {return `/api/map-tile?z=${c.z - 6}&p=${this.options.plane}&x=${c.x}&y=${-1 - c.y}`;}});
-/** Terrain for one floor, served through /api/map-tile; only squares touching `area` load. */
-export function terrainLayer(plane: number, minZoom: number, maxZoom: number, area?: Box): L.TileLayer {
-  return new (TileSource as unknown as new (url: string, o: L.TileLayerOptions & {plane: number}) => L.TileLayer)('', {plane, minZoom, maxZoom, maxNativeZoom: MAX_NATIVE_ZOOM, noWrap: true, bounds: area ? boxBounds(area) : WORLD, attribution: MAP_ATTRIBUTION, updateWhenZooming: false, keepBuffer: 3});
+const TileSource = L.TileLayer.extend({getTileUrl(this: L.TileLayer & {options: {plane: number; map?: number}}, c: L.Coords) {return tileUrl(c.z - 6, this.options.plane, c.x, -1 - c.y, TILE_VERSION, this.options.map);}});
+/** Terrain for one floor of one of the game's world maps (lib/world-maps.ts), served through /api/map-tile; only the
+ * squares inside the map load. */
+export function terrainLayer(map: GameMap, plane: number, minZoom: number, maxZoom: number): L.TileLayer {
+  return new (TileSource as unknown as new (url: string, o: L.TileLayerOptions & {plane: number; map?: number}) => L.TileLayer)('', {plane, map: map.ownTiles ? map.id : undefined, minZoom, maxZoom, maxNativeZoom: MAX_NATIVE_ZOOM, noWrap: true, bounds: boxBounds(map.bounds), attribution: MAP_ATTRIBUTION, updateWhenZooming: false, keepBuffer: 3});
 }
-
-/** Keeps a map inside one area: it cannot pan out of the area or zoom out past the whole area, and anything around the
- * area (a far-out terrain square also holds the neighbouring underground blocks) is covered in the map's background. */
-export function areaFrame(m: L.Map, minZoom: number) {
-  const pane = m.createPane('area-mask');
-  pane.style.zIndex = '250';
-  pane.style.pointerEvents = 'none';
-  let mask: L.Polygon | null = null, area: Box | null = null;
-  const fit = () => {
-    if (!area || !m.getSize().x) return;
-    m.setMinZoom(Math.min(m.getMaxZoom(), Math.max(minZoom, m.getBoundsZoom(boxBounds(area), false))));
-  };
-  m.on('resize', fit);
-  return {
-    /** Move the frame to a new area; the caller then moves the view into it. */
-    set(next: Box) {
-      area = next;
-      const far = 1e5, ring = (b: Box) => [L.latLng(b.y0, b.x0), L.latLng(b.y1, b.x0), L.latLng(b.y1, b.x1), L.latLng(b.y0, b.x1)];
-      mask?.remove();
-      mask = L.polygon([ring({x0: -far, y0: -far, x1: far, y1: far}), ring(next)], {pane: 'area-mask', stroke: false, fillColor: '#0e0d0b', fillOpacity: 1, interactive: false}).addTo(m);
-      m.setMaxBounds(boxBounds(next).pad(.04));
-      fit();
-    },
-  };
+/** Shows a map: the view can pan a little past its edges, and an underground map sits on plain black, the black of its
+ * own tiles, so nothing around it shows as a box and zooming never flashes another colour. Every map has the same zoom
+ * range (`minZoom`, set again on each switch), so leaving one never keeps another's limits. */
+export function showMap(m: L.Map, map: GameMap, minZoom: number) {
+  m.setMinZoom(minZoom);
+  m.setMaxBounds(boxBounds(map.bounds).pad(.08));
+  m.getContainer().classList.toggle('is-dark', map.dark);
 }
+/** Where a game tile is on the map shown, on the display floor shown: the map position of its centre, or null when the
+ * map (or the floor) does not show it. */
+export const placeOn = (map: GameMap, plane: number) => (t: Tile): L.LatLng | null => {
+  const d = map.toDisplay(t);
+  return d && d.plane === plane ? tileLatLng(d.x, d.y) : null;
+};
 
 // Exit markers, as the game's world map draws them: its Dungeon icon on a way into an area (or down), its Map link arrow
 // on the way back up, never in a box.
@@ -67,22 +59,24 @@ export type ExitOptions = {
   minZoom?: (e: MapExit) => number;
   /** Moves chosen exits aside, in pixels (a guide stop drawn on the same tile). */
   offset?: (e: MapExit) => number;
+  /** Where an exit is drawn (the map shown turns its game tile into a map position); null leaves it out. */
+  at?: (t: Tile) => L.LatLng | null;
   /** A click or tap on an exit opens a menu instead (the world map's, with the way through on top): where on the map
    * it was, in pixels from the map's top left. */
   onPick?: (e: MapExit, at: L.Point) => void;
 };
-/** Draw the exits on this floor inside the view. Exits closer than half a marker on screen show once; an up and a down
+/** Draw the exits inside the view (those `at` places on the map shown). Exits closer than half a marker on screen show once; an up and a down
  * on the same spot sit side by side. With a mouse an exit names its destination on hover and goes there on click; on a
  * touch screen a tap names it with a button to go. Returns where the markers are on screen, so other markers can keep
  * clear of them. */
 export function drawExits(m: L.Map, group: L.LayerGroup, exits: MapExit[], onExit: (e: MapExit) => void, options: ExitOptions = {}): Footprint[] {
   group.clearLayers();
-  const {label = (e: MapExit) => exitLabel(e), minZoom = () => EXIT_ZOOM, offset, onPick} = options;
+  const {label = (e: MapExit) => exitLabel(e), minZoom = () => EXIT_ZOOM, offset, onPick, at: place = (t: Tile) => tileLatLng(t.x, t.y)} = options;
   const zoom = m.getZoom(), view = m.getBounds().pad(.2), drawn: (Footprint & {dir: string})[] = [], hover = canHover();
   for (const e of exits) {
     if (zoom < minZoom(e)) continue;
-    const at = tileLatLng(e.from.x, e.from.y);
-    if (!view.contains(at)) continue;
+    const at = place(e.from);
+    if (!at || !view.contains(at)) continue;
     const p = m.latLngToContainerPoint(at), size = gameSpriteSize(markerSize(zoom)), close = size * .55;
     if (drawn.some(d => d.dir === e.dir && Math.abs(d.x - p.x) < close && Math.abs(d.y - p.y) < close)) continue;
     const pair = drawn.some(d => d.dir !== e.dir && Math.abs(d.x - p.x) < close && Math.abs(d.y - p.y) < close) || exits.some(o => o !== e && o.dir !== e.dir && o.from.plane === e.from.plane && Math.abs(o.from.x - e.from.x) <= 1 && Math.abs(o.from.y - e.from.y) <= 1);

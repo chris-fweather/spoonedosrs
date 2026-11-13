@@ -6,15 +6,17 @@ import {BoardSkeleton, CommunityChat, CommunityStatus, CollectorList, SupporterL
 import type {BoardRow} from '@/lib/flair';
 import {HOME_BOARD_PAGE,HOME_BOARD_ROWS} from '@/lib/community';
 import {PlayerSearch} from './SiteHeader';
+import {useSiteSession} from './site-session';
 
 export function Home() {
   const {rows, error, setError, retry} = useCommunity();
+  const session = useSiteSession();
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('login') === 'failed') {setError('Discord login did not finish. Try again.'); params.delete('login'); history.replaceState(null, '', '/' + (params.size ? '?' + params : ''));}
   }, [setError]);
   return <div className="site"><PublicHeader page="home" onError={setError}/><main className="community-page home-page">
-    <section className="home-discover"><div className="home-search-area"><span className="kicker">The collector’s journal</span><div className="home-title-mascot"><img src="/brand/rocky-mascot.webp" alt="Rocky, the SpoonedOSRS mascot"/><h1>Find your fellow collectors.</h1></div><p>Pets, drops and achievements. Look up a player to explore their collection and see what they’re hunting next.</p><PlayerSearch/></div><aside className="home-start"><img src="/brand/rocky-mascot.webp" alt="Rocky"/><h2>Make it your journal</h2><ol><li><span>1</span> Sign in with Discord</li><li><span>2</span> Link your RuneScape name</li><li><span>3</span> Sync and show your collection</li></ol><a className="btn" href="/player/Obifloat">Explore a profile <ArrowRight size={15}/></a><small>Use the account menu above to get started.</small></aside></section>
+    <section className="home-discover"><div className="home-search-area"><span className="kicker">The collector’s journal</span><div className="home-title-mascot"><img src="/brand/rocky-mascot.webp" alt="Rocky, the SpoonedOSRS mascot"/><h1>Find your fellow collectors.</h1></div><p>Pets, drops and achievements. Look up a player to explore their collection and see what they’re hunting next.</p><PlayerSearch/></div><aside className="home-start"><img src="/brand/rocky-mascot.webp" alt="Rocky"/><h2>Make it your journal</h2><ol><li><span>1</span> Sign in with Discord</li><li><span>2</span> Link your RuneScape name</li><li><span>3</span> Sync and show your collection</li></ol><a className="btn" href="/player/Obifloat">Explore a profile <ArrowRight size={15}/></a><small>{session.user?'Use the account menu above to get started.':<><a className="link" href="/api/auth/discord">Sign in with Discord</a> to get started.</>}</small></aside></section>
     {(error||rows)&&<CommunityStatus rows={rows} error={error} retry={retry}/>}
     <HomeBoards rows={rows}/>
     <CommunityChat/>

@@ -1,5 +1,7 @@
 import models from './appearance-models.json' with {type:'json'};
 import {SKIN_COLORS,cacheHex} from './game-colors';
+import {CUSTOM_FEMALE_MODELS} from './custom-wearables';
+import {clogMarkId} from './flair';
 export const SKIN_TONES=Object.fromEntries(Object.entries(SKIN_COLORS).map(([name,color])=>[name,cacheHex(color)])) as Record<keyof typeof SKIN_COLORS,string>;
 export type SkinTone=keyof typeof SKIN_TONES;
 export const BACKGROUNDS={none:'Plain',castle:'Castle courtyard',riverside:'Riverbank',mine:'Mine',woodland:'Woodland'} as const;
@@ -23,13 +25,13 @@ export function parseAppearance(value:unknown):Appearance {
 }
 export const appearanceModels=models as {femaleItems:Record<string,string>;femaleKits:{id:number;part:number;hide:number;file:string}[];hair:Record<'male'|'female',Record<Appearance['hair'],string>>};
 export function equipmentModel(id:string,maleFile:string,appearance:Appearance):string|null {
- return appearance.body==='female'?(appearanceModels.femaleItems[id]??null):maleFile;
+ return appearance.body==='female'?(appearanceModels.femaleItems[id]??CUSTOM_FEMALE_MODELS[id]??null):maleFile;
 }
 /** Retain existing saved emblems; offer fewer, stronger milestones in the picker. */
 export function featuredEmblem(id:string):boolean {
  if(id.startsWith('pets-'))return ['pets-5','pets-10','pets-20','pets-30','pets-50','pets-all'].includes(id);
- if(id.startsWith('clog-'))return ['clog-172','clog-429','clog-859','clog-1288','clog-1545','clog-all'].includes(id);
- if(id.startsWith('combat-'))return ['combat-50','combat-100','combat-250','combat-350','combat-500'].includes(id);
+ if(id.startsWith('clog-'))return [...[10,25,50,75,90].map(clogMarkId),'clog-all'].includes(id);
+ if(id.startsWith('combat-'))return ['combat-50','combat-100','combat-250','combat-350','combat-500','combat-all'].includes(id);
  return true;
 }
 

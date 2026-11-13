@@ -11,10 +11,13 @@ const huntList = (key:string) => <section key={key} className="sec"><div classNa
 /** The loaded profile, section by section, with the same classes: name and title lines, portrait, skills, boss ranks,
  * tabs, progress rows, pet summary, pet catalogue, hunt lists and the join banner. Every block keeps its loaded size,
  * so nothing moves when the journal arrives. */
-export function JournalLoading({username, failed, owner=false}: {username: string; failed: boolean;
+export function JournalLoading({username, failed, invalid=false, owner=false}: {username: string; failed: boolean;
+  /** The name in the address is not one RuneScape allows: there is no journal to open or retry. */
+  invalid?: boolean;
   /** The viewer's own linked name: the owner's tabs show too. */
   owner?: boolean}) {
   const tabs = owner ? PROFILE_TABS : PROFILE_TABS.filter(t => !OWNER_TABS.includes(t.n));
+  if (invalid) return <main className="journal-loading"><section className="osrs-panel journal-failed" role="alert"><h2>That isn’t a valid RuneScape name</h2><p>Names are 1 to 12 letters, numbers, spaces, hyphens or underscores. Search again above.</p></section></main>;
   return <main className="journal-loading" aria-busy={!failed}>
     <p className="sr-only" role="status">{failed ? "Journal unavailable" : `Opening ${username}’s journal`}</p>
     {failed ? <section className="osrs-panel journal-failed"><h2>Journal unavailable</h2><p>Use Retry above to try again.</p></section> :

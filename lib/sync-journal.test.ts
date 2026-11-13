@@ -7,7 +7,7 @@ import {SKILLS} from './skill-milestones.ts';
 const hs={skills:[{name:'Thieving',level:99,xp:15000000,rank:1}],activities:[{name:'Wintertodt',score:2425,rank:1}]};
 const profile={collectionLog:{obtained:0,total:0,tabs:[]},quests:[{id:1,name:'Test quest',points:1,type:'free',state:'finished'}],achievementDiaries:[{areaId:1,area:'Test',tiers:[{tier:'easy',completed:5,total:5}]}],combatAchievements:[]};
 function wom(username:string,createdAt='2099-01-01T00:00:00Z') {return {username,latestSnapshot:{createdAt,data:{skills:{thieving:{level:90,experience:6000000,rank:4}},bosses:{wintertodt:{kills:99,rank:5}}}}};}
-test('combined sync starts all four sources concurrently, applies official stats last and keeps manual pet entries',async()=>{
+test('combined sync starts every independent source at once, skips the WOM snapshot when Hiscores answer, and keeps manual pet entries',async()=>{
  const before=structuredClone(seed) as Journal;before.pets.find(p=>p.name==='Phoenix')!.crateRolls=5504;
  const snapshot=structuredClone(before), calls:string[]=[];
  let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
@@ -18,18 +18,19 @@ test('combined sync starts all four sources concurrently, applies official stats
   if(u.includes('wiseoldman.net'))return Response.json(wom(before.username));
   return Response.json({data:{player:before.username,total_collections_finished:0,items:[]}});
  }) as typeof fetch);
- assert.equal(calls.length,5,'all requests (and WOM achievements) start before any response resolves');assert.ok(calls.some(u=>u.endsWith('/achievements')));release();
+ assert.equal(calls.length,4,'Hiscores, RuneProfile, Temple and WOM achievements start before any response resolves');assert.ok(calls.some(u=>u.endsWith('/achievements')));release();
  const result=await work;
  assert.equal(result.hiscores.skills[0].xp,15000000);assert.equal(result.hiscores.activities[0].score,2425);
  assert.equal(result.profile?.diaries[0].tiers[0].completed,5);assert.equal(result.pets.find(p=>p.name==='Phoenix')?.crateRolls,5504);
- assert.ok(result.statsSyncedAt);assert.ok(result.logSyncedAt);assert.equal(result.syncReport?.filter(r=>r.status==='updated').length,4);
- assert.match(result.syncReport!.find(r=>r.source==='wom')!.message,/current OSRS/);assert.deepEqual(before,snapshot);
+ assert.ok(result.statsSyncedAt);assert.ok(result.logSyncedAt);assert.equal(result.syncReport?.filter(r=>r.status==='updated').length,3);
+ assert.ok(!calls.some(u=>u.endsWith('/players/'+encodeURIComponent(before.username))),'no WOM snapshot request');
+ assert.deepEqual(result.syncReport!.find(r=>r.source==='wom'),{source:'wom',status:'skipped',message:'Not needed: OSRS Hiscores answered.'});assert.deepEqual(before,snapshot);
 });
 test('partial sync retains successful sources and identifies each unavailable source',async()=>{
  const before=structuredClone(seed) as Journal, snapshot=structuredClone(before);
  const result=await syncJournal('all',before,null,(async url=>String(url).includes('runescape.com')?Response.json(hs):new Response('',{status:503})) as typeof fetch);
  assert.deepEqual(result.hiscores,hs);assert.deepEqual(result.profile,before.profile);assert.deepEqual(result.log,before.log);
- assert.equal(result.syncReport?.filter(r=>r.status==='unavailable').length,3);assert.deepEqual(before,snapshot);
+ assert.equal(result.syncReport?.filter(r=>r.status==='unavailable').length,2);assert.equal(result.syncReport?.find(r=>r.source==='wom')?.status,'skipped');assert.deepEqual(before,snapshot);
 });
 test('all failed sources leave the journal unchanged and do not claim success',async()=>{
  const before=structuredClone(seed) as Journal, snapshot=structuredClone(before);
@@ -75,4 +76,15 @@ test('levels crossed between our own syncs are dated at the sync and approximate
  assert.equal(combined,null,'no source refreshed');
  const withHs=await syncJournal('all',result,null,(async url=>String(url).endsWith('/achievements')?Response.json([{name:'90 Attack',createdAt:'2026-02-01T00:00:00Z'}]):String(url).includes('runescape.com')?Response.json(after):new Response('',{status:503})) as typeof fetch);
  assert.equal(withHs.skillMilestones?.['Attack:90'],'2026-02-01');assert.equal(withHs.skillMilestones?.['Attack:92'],'~'+day);
+});
+test('when Hiscores have no answer, Wise Old Man fills the skills and the report says so',async()=>{
+ const before=structuredClone(seed) as Journal;before.statsSyncedAt=null;const calls:string[]=[];
+ const result=await syncJournal('all',before,null,(async url=>{const u=String(url);calls.push(u);
+  if(u.includes('runescape.com'))return new Response('',{status:503});
+  if(u.includes('wiseoldman.net'))return u.endsWith('/achievements')?Response.json([]):Response.json(wom(before.username));
+  return new Response('',{status:503});}) as typeof fetch);
+ assert.equal(result.hiscores.skills.find(s=>s.name==='Thieving')?.xp,6000000);
+ assert.equal(result.syncReport?.find(r=>r.source==='hiscores')?.status,'unavailable');
+ assert.deepEqual(result.syncReport?.find(r=>r.source==='wom'),{source:'wom',status:'updated',message:'Tracked snapshot imported.'});
+ assert.equal(calls.filter(u=>u.includes('wiseoldman.net')&&!u.endsWith('/achievements')).length,1);
 });

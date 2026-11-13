@@ -2,9 +2,12 @@
 import {petUnitLabel} from './pet-record';
 import raw from './skill-pet-rates.json';
 import type {Journal, Method, Pet} from './model';
+import {expectedHours, likelihood} from './model';
+import {petChartRecord} from './odds-chart';
 import {lapMethod} from './agility-laps';
 import {isTreeRun, treeRunStats} from './farming-runs';
-import {lifetimeSkill, phoenixRollChance, oddsMethod,usesAcquisition, HONOUR_PER_GAMBLE} from './estimates';
+import {raidFact} from './raid-rates';
+import {lifetimeSkill, phoenixRollChance, oddsMethod, selectedMethod, usesAcquisition, HONOUR_PER_GAMBLE, ZEAL_PER_CRATE} from './estimates';
 
 export {atLevel, wikiMethod, methodWiki, skillPetFormula} from './skill-rates';
 import {atLevel, wikiMethod, type WikiMethod, skillPetFormula} from './skill-rates';
@@ -101,6 +104,7 @@ export function petRateLines(pet: Pet, journal: Journal): PetOutlook {
   if (m.rate) lines.push({label: 'Drop rate', value: dropRateText(m) + (m.unit ? ` ${petUnitLabel(pet,m.unit)}` : ''), tone: 'y'});
   else if (conditional) lines.push({label: 'Drop rate', value: conditional.value, tone: 'y'});
   else lines.push({label: 'Drop rate', value: 'No drop-style rate is stored'});
+  if (m.rate && m.raid) lines.push({label: m.raid.kind === 'cox' || m.raid.kind === 'toa' ? 'Raid inputs' : 'Your inputs', value: raidFact(m.raid)});
   if (m.kc != null && m.rate) {
     lines.push({label: `Your ${petUnitLabel(pet,m.unit)}`, value: m.kc.toLocaleString()});
     chance = -Math.expm1(m.kc * Math.log1p(-1 / m.rate));
@@ -110,6 +114,7 @@ export function petRateLines(pet: Pet, journal: Journal): PetOutlook {
     hours = m.rate / m.kph;
     lines.push({label: 'Mean hunt', value: `~${Math.round(hours).toLocaleString()} h`, tone: 'y'});
   }
+  if (m.kph && m.kph > 0 && m.unit === 'crates' && pet.name === "Lil' Creator") lines.push({label: 'Zeal per hour', value: Math.round(m.kph * ZEAL_PER_CRATE).toLocaleString()});
   if (m.kph && m.kph > 0 && m.unit === 'gambles') lines.push({label: 'Honour points per hour', value: Math.round(m.kph * HONOUR_PER_GAMBLE).toLocaleString()});
   if (m.kph && m.kph > 0 && ['games', 'runs', 'raids', 'crates', 'rolls', 'uniques'].includes(m.unit)) {
     lines.push({label: `Minutes per ${m.unit.replace(/s$/, '')}`, value: (60 / m.kph).toFixed(1)});
@@ -138,6 +143,23 @@ export function petRateLines(pet: Pet, journal: Journal): PetOutlook {
   if (m.kph && !m.paceConfirmed) bits.push('Pace is a stored example, not a measured session.');
   if (pet.name==='Phoenix') bits.push('Historical chance uses the standard rate before 200M Firemaking. For accounts at 200M, the total must be split into pre- and post-200M rolls before calculating historical chance.');
   return {lines, note: bits.filter(Boolean).join(' '), chance, hours, averageXp: null};
+}
+
+/** One pet's progress as both its card and its pop-out read it: the chance (at the method's count, or at lifetime XP
+ * when an XP method has none, as the graph marks it), the mean hunt in hours, and the count beside it. Before the pet is
+ * collected, a method with an hours estimate and no count reads 0 in its unit, so every card shows how far along it is. */
+export function petProgress(pet: Pet, journal: Journal): {chance: number | null; hours: number | null; byXp: boolean; count: {value: number; unit: string} | null} {
+  const m = oddsMethod(pet), outlook = petRateLines(pet, journal), chart = petChartRecord(pet, journal);
+  const xp = !pet.obtained && outlook.chance == null && likelihood(pet) == null && chart.label === 'Lifetime XP' && chart.method?.rate && chart.method.kc != null
+    ? -Math.expm1(-chart.method.kc / chart.method.rate) : null;
+  const chance = pet.obtained ? likelihood(pet) : outlook.chance ?? likelihood(pet) ?? xp;
+  const hours = outlook.hours ?? expectedHours(pet);
+  // A collected pet keeps today's count on its planned method; its pop-out reads the obtained record.
+  const shown = pet.obtained ? selectedMethod(pet) : m;
+  const count = xp != null ? {value: chart.method!.kc!, unit: 'XP'}
+    : shown?.kc != null ? {value: shown.kc, unit: petUnitLabel(pet, shown.unit)}
+    : !pet.obtained && shown && hours != null ? {value: 0, unit: petUnitLabel(pet, shown.unit)} : null;
+  return {chance, hours, byXp: xp != null, count};
 }
 
 /** Hours of play until the chance of having the pet reaches its next milestone (50%, 90%, then 95%). A pet roll has

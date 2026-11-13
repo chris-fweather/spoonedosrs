@@ -34,9 +34,17 @@
 .site .collector-list .fitted-score>span{display:inline-block;white-space:nowrap}
 @media(max-width:520px){.site .collector-list .collector-score b.fitted-score{font-size:17px}}
 
-/* Podium: ranks 1–3 get a crown beside the name and a matching rank number. */
-.site .collector-list .podium-crown{flex:none;align-self:center;margin-left:1px}
-.site .podium-crown{width:auto;height:14px;filter:drop-shadow(0 1px 1px #000)}
+/* Podium: ranks 1–3 get a crown at the front of the row, before the scimitar, and a matching rank number. Every row on a
+   page with a podium keeps the crown slot, empty or not, so names still start in the same place; a page with no podium
+   (page two onwards, or a filtered board) drops the slot.
+   The crown is centred across the name and achievement title lines, a little larger when there is a title; on a
+   row without a title it is centred on the name line. It is drawn over its slot, so the row keeps its height. */
+.site .collector-list .identity-crown{position:relative;display:block;flex:none;align-self:stretch;width:32px;min-height:20px}
+.site .collector-list.no-crowns .identity-crown{display:none}
+.site .community-panel .collector-list .identity-crown{min-height:18px}
+.site .podium-crown{position:absolute;left:50%;top:50%;width:auto;height:18px;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 1px #000)}
+.site .collector-identity:has(.achievement-title) .podium-crown{height:22px}
+@media(max-width:520px){.site .collector-list .identity-crown{width:30px}.site .podium-crown{height:16px}.site .collector-identity:has(.achievement-title) .podium-crown{height:20px}}
 .site .collector-list .collector-rank.podium-1{color:#ffd34d}.site .collector-list .collector-rank.podium-2{color:#dfe9ef}.site .collector-list .collector-rank.podium-3{color:#d98a4e}
 /* Same layout as profile name blocks: the scimitar and account badge sit level with the name line, each in its own
    column, and the achievement title centres under the username (and any donation title). */
@@ -69,13 +77,13 @@
 
 /* Badges sit above the row's stretched link, so hovering or tapping one opens its card (the rest of the row still opens the player). */
 .collector-identity .staff-rank,.collector-identity .prefix-hover,.collector-identity .account-mode-badge,.collector-identity .rs-title>span,.collector-identity .achievement-help{position:relative;z-index:2}
-/* Names line up down a board: every row keeps one slot for the rank scimitar (or supporter coin) with its staff word
-   ("Sir"), wide enough for both and centred, and one for the account badge, empty or not, so a name starts in the same
-   place whatever badges its row has. */
-.site .collector-list .identity-prefix:empty,.site .collector-list .identity-mode:empty{display:flex}
-.site .collector-list .identity-prefix{width:var(--prefix-slot,24px);justify-content:center}
-.site .collector-list .identity-mode{width:13px;justify-content:center}
-/* A page of the board with no account modes drops the empty mode column, so the name sits by the scimitar. */
-.site .collector-list.no-modes .identity-mode{display:none}
-.site .community-panel .collector-list{--prefix-slot:22px}
-@media(max-width:520px){.site .collector-list{--prefix-slot:22px}}
+/* Badges sit close together and Sir or the name follows them after one small, even gap: each badge takes only its own
+   width and a row without one leaves no empty space, so names start right after their badges rather than lining up
+   down the board. Only the crown keeps an empty slot (see Podium above). */
+.site .collector-list .collector-identity{gap:6px}
+.site .collector-list :is(.identity-prefix,.identity-mode):empty{display:none}
+/* "Not synced" on a board row: dotted underline, and on hover or tap which sources gave data (✓) and which did not (✗). */
+.not-synced{border-bottom:1px dotted var(--dim);cursor:help}
+.not-synced-tip{display:grid;gap:4px;max-width:280px;text-align:left}
+.not-synced-tip .ns-ok{color:var(--good)}
+.not-synced-tip .ns-missing{color:var(--muted)}

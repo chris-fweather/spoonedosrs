@@ -39,6 +39,15 @@ const localBindingConfig = {
   // Background refresh (lib/background-refresh.ts): profiles that never had a full four-source pull. Live only.
   triggers: { crons: isDev ? [] : ["*/10 * * * *"] },
   assets: { binding: "ASSETS" },
+  // The sync queue (lib/sync-queue.ts). Each Worker produces to and consumes its own queue; a message that still fails after
+  // max_retries goes to the dead-letter queue. max_retries must match MAX_RETRIES in lib/sync-queue.ts.
+  queues: {
+    producers: [{ binding: "SYNC_QUEUE", queue: isDev ? "spoonedosrs-dev-sync" : "spoonedosrs-sync" }],
+    consumers: [{ queue: isDev ? "spoonedosrs-dev-sync" : "spoonedosrs-sync", max_batch_size: 5, max_batch_timeout: 5, max_retries: 5, retry_delay: 30, dead_letter_queue: isDev ? "spoonedosrs-dev-sync-dlq" : "spoonedosrs-sync-dlq" }],
+  },
+  // Workers Logs for both Workers: every request and the JSON lines from lib/log.ts. Lower head_sampling_rate if the
+  // volume ever passes the plan's included logs.
+  observability: { enabled: true, head_sampling_rate: 1 },
   ratelimits: [
     {name:"API_READ_LIMIT",namespace_id:isDev?"1556621":"1556611",simple:{limit:180,period:60 as const}},
     {name:"API_WRITE_LIMIT",namespace_id:isDev?"1556622":"1556612",simple:{limit:30,period:60 as const}},
@@ -49,7 +58,11 @@ const localBindingConfig = {
   vars: {
     DISCORD_CLIENT_ID: deployment.discord.applicationId,
   },
-  r2_buckets: uploadsBound ? [{ binding: "UPLOADS", bucket_name: isDev ? "spoonedosrs-dev-uploads" : "spoonedosrs-uploads" }] : [],
+  r2_buckets: [
+    ...(uploadsBound ? [{ binding: "UPLOADS", bucket_name: isDev ? "spoonedosrs-dev-uploads" : "spoonedosrs-uploads" }] : []),
+    // Our copy of the world map tiles (lib/map-tile.ts). Both buckets exist in the Cloudflare account.
+    { binding: "MAP_TILES", bucket_name: isDev ? "spoonedosrs-dev-map-tiles" : "spoonedosrs-map-tiles" },
+  ],
   d1_databases: [
     {
       binding: "DB",

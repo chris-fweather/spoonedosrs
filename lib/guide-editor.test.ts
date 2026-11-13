@@ -33,8 +33,9 @@ test('the item catalogue covers supplies as well as gear',()=>{
 test('inline formatting: bold, colours and site emojis, everything else stays text',()=>{
  assert.deepEqual(guideInline('Use {gold}**Protect**{/gold} :quests: now'),['Use ',{kind:'tone',tone:'gold',children:[{kind:'bold',children:['Protect']}]},' ',{kind:'emoji',name:'quests'},' now']);
  assert.deepEqual(guideInline('{green}a{orange}b{/orange}c{/green}'),[{kind:'tone',tone:'green',children:['a',{kind:'tone',tone:'orange',children:['b']},'c']}]);
+ assert.deepEqual(guideInline('{red}Red{/red} and {blue}Blue{/blue}'),[{kind:'tone',tone:'red',children:['Red']},' and ',{kind:'tone',tone:'blue',children:['Blue']}]);
  assert.deepEqual(guideInline('{gold}open :nope: {/green} 10:30'),['{gold}open :nope: {/green} 10:30']);
- assert.deepEqual(guideInline('{red}x{/red} <b>y</b>'),['{red}x{/red} <b>y</b>']);
+ assert.deepEqual(guideInline('{purple}x{/purple} <b>y</b>'),['{purple}x{/purple} <b>y</b>']);
  assert.equal(guidePlainText('{gold}Phase **one**{/gold} :pets:'),'Phase one ');
 });
 test('numbered lists are a supported text style',()=>{
@@ -96,4 +97,13 @@ test('new guides pick a boss or activity with its official icon',()=>{
  assert.equal(new Set(guideTopics.map(t=>t.name)).size,guideTopics.length);
  for(const name of ['Nex','Chambers of Xeric','Guardians of the Rift','Slayer'])assert.ok(guideTopicImage(name),name);
  assert.ok(!guideTopics.some(t=>/ points$| - rank$/i.test(t.name)));
+});
+test('a prayer book can hide the prayers not chosen; spells and older sections keep the plain list',()=>{
+ const g={...valid(),blocks:[{id:'p',kind:'prayers',names:['Piety','Protect from Melee'],hide:true}]};
+ const b=parseGuide(g).blocks?.[0];
+ assert.ok(b?.kind==='prayers'&&b.hide===true);
+ const plain=parseGuide({...g,blocks:[{id:'p',kind:'prayers',names:['Piety']}]}).blocks?.[0];
+ assert.ok(plain?.kind==='prayers'&&!('hide' in plain));
+ const spells=parseGuide({...g,blocks:[{id:'s',kind:'spells',names:['Ice Barrage'],hide:true}]}).blocks?.[0];
+ assert.ok(spells?.kind==='spells'&&!('hide' in spells));
 });
